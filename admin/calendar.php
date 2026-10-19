@@ -64,7 +64,7 @@
         </div>
 
         <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;"><a href="#"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
+            <li class="nav-item" style="list-style: none;"><form method="post" action="logout.php"><input type="hidden" name="csrf" value="<?=htmlspecialchars($_SESSION['csrf'], ENT_QUOTES, 'UTF-8')?>"><button type="submit" style="background:none;border:0;color:inherit;cursor:pointer"><i class="fa-solid fa-right-from-bracket"></i> Logout</button></form></li>
         </div>
     </div>
 
