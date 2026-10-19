@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pio De Roda — Venue Rentals</title>
+
+<!-- Google Fonts: Fraunces for character-filled headings, Work Sans for clean, readable body text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="services.css">
+
+</head>
+<body>
+
+    <div class="topbar">
+      <div class="brand">Pio De Roda Cafe &amp; Restaurant<small>Venue Rentals</small></div>
+      <a class="back" href="nav.html">← Back to Home</a>
+    </div>
+
+    <div class="layout">
+      <!-- BOOKING PANEL -->
+      <div class="panel card" id="bookingPanel"></div>
+      <!-- SERVICE DETAILS -->
+      <div class="details card" id="serviceDetails"></div>
+    </div>
+
+    <!-- REVIEW MODAL -->
+    <div class="modal-bg" id="reviewModal">
+      <div class="modal">
+        <h2>Review Your Reservation</h2>
+        <p class="note">Please review your details below. Nothing is submitted yet.</p>
+        <div id="reviewBody"></div>
+        <div class="chk"><input type="checkbox" id="chkCorrect"><label for="chkCorrect">I confirm that the information provided above is correct.</label></div>
+        <div class="chk"><input type="checkbox" id="chkGuidelines"><label for="chkGuidelines">I have read and understood the reservation guidelines.</label></div>
+        <button class="btn-main" id="submitBtn" disabled>Submit Reservation</button>
+        <button class="btn-ghost" id="editBtn">Edit Reservation</button>
+      </div>
+    </div>
+
+    <!-- SUCCESS MODAL -->
+    <div class="modal-bg" id="successModal">
+      <div class="modal" id="successBody"></div>
+    </div>
+
+    <script src="services.js"></script>
+    <script>
+      /* This page is dedicated to one service. Change only this line to reuse
+        the template for another service card on the main site. */
+      const SERVICE_ID = "venue";
+    </script>
+<script src="reservation2.js"></script>
+</body>
+</html>

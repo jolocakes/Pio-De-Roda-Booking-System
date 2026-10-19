@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Status | Pio De Roda Cafe and Restaurant</title>
+  <meta name="description" content="Check the status and summary of your Pio De Roda Cafe and Restaurant reservation.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="nav.css">
+  <link rel="stylesheet" href="status.css">
+  <link rel="stylesheet" href="booking-status.css">
+</head>
+<body>
+  <!-- ============ NAVIGATION BAR (same as the homepage) ============ -->
+  <header class="site-header" id="site-header">
+    <nav class="navbar">
+      <a href="nav.html#home" class="brand">
+        <img src="pioderodalogo.jpg" alt="Pio De Roda Cafe and Restaurant logo" class="brand-mark">
+        <span class="brand-name">Pio De Roda Cafe<small>Restaurant &amp; Catering Services</small></span>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+        <span></span><span></span><span></span>
+      </button>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="nav.html#home" class="nav-link">Home</a></li>
+        <li><a href="nav.html#about" class="nav-link">About Us</a></li>
+        <li><a href="nav.html#availability" class="nav-link">Availability</a></li>
+        <li><a href="nav.html#contact" class="nav-link">Contact</a></li>
+        <li><a href="nav.html#guide" class="nav-link">Guide</a></li>
+        <li><a href="booking-status.html" class="nav-link active-link" aria-current="page">Booking Status</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="bs-main">
+    <div class="bs-wrap">
+      <h1>Booking Status</h1>
+      <p class="bs-intro">Enter your Reservation ID and Booking PIN to check your reservation. Both were shown when you submitted your reservation.</p>
+
+      <!-- STEP 1: verification form (shown first, and again after "Clear") -->
+      <section class="bs-card bs-verify" id="verifyCard" aria-labelledby="verifyTitle">
+        <p class="bs-kicker" id="verifyTitle">CHECK YOUR RESERVATION</p>
+        <form id="verifyForm" novalidate autocomplete="off">
+          <div class="bs-field">
+            <label for="resId">Reservation ID</label>
+            <input type="text" id="resId" placeholder="PDR-2026-0001" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            <div class="bs-err" id="errResId" role="alert"></div>
+          </div>
+          <div class="bs-field">
+            <label for="resPin">Booking PIN</label>
+            <input type="password" id="resPin" inputmode="numeric" maxlength="6" placeholder="6-digit PIN" autocomplete="off">
+            <label class="bs-show"><input type="checkbox" id="showPin"> Show PIN</label>
+            <div class="bs-err" id="errResPin" role="alert"></div>
+          </div>
+          <div class="bs-err bs-err-main" id="verifyError" role="alert"></div>
+          <button type="submit" class="btn btn-primary" id="verifyBtn">Check Booking Status</button>
+        </form>
+      </section>
+
+      <!-- STEP 2: filled in ONLY after the ID + PIN are verified; emptied by Clear -->
+      <div id="bookingStatusRoot" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <img src="pioderodalogo.jpg" alt="Pio De Roda Cafe and Restaurant logo" class="brand-mark">
+        <div>
+          <p class="footer-title">Pio De Roda Cafe</p>
+          <p class="footer-tagline">Catering, celebrations, and events made simple.</p>
+        </div>
+      </div>
+      <ul class="footer-links">
+        <li><a href="nav.html#home">Home</a></li>
+        <li><a href="nav.html#about">About Us</a></li>
+        <li><a href="nav.html#contact">Contact</a></li>
+        <li><a href="nav.html#guide">Guide</a></li>
+        <li><a href="booking-status.html">Booking Status</a></li>
+      </ul>
+    </div>
+    <p class="footer-copy">&copy; 2026 Pio De Roda Cafe. All Rights Reserved.</p>
+  </footer>
+
+  <!-- services.js holds the BACKEND AREA (findReservation) and must load first -->
+  <script src="services.js"></script>
+  <script src="booking-status.js"></script>
+</body>
+</html>

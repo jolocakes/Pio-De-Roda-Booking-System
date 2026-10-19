@@ -1,0 +1,162 @@
+/* Booking Status page — uses the same variables/fonts as nav.css */
+.bs-main {
+  padding: calc(var(--nav-height) + 2.5rem) 1.5rem 4rem;
+  background: var(--cream-soft);
+  min-height: 70vh;
+}
+.bs-wrap { max-width: var(--max-width); margin: 0 auto; }
+.bs-wrap > h1 { font-size: clamp(1.9rem, 3vw, 2.6rem); margin-bottom: 0.4rem; }
+.bs-intro { max-width: 60ch; margin-bottom: 1.8rem; }
+
+.bs-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+.bs-card {
+  background: var(--cream);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  padding: 1.8rem;
+}
+.bs-status-card { position: sticky; top: calc(var(--nav-height) + 1rem); }
+.bs-kicker {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+.bs-status-card h2 { font-size: 1.5rem; margin-bottom: 1.2rem; }
+.bs-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 0.2rem;
+}
+.bs-refnum {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  color: var(--maroon);
+  letter-spacing: 0.03em;
+  margin-bottom: 1.2rem;
+  overflow-wrap: anywhere;
+}
+.bs-sub {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text-dark);
+  margin: 0.7rem 0 0.2rem;
+}
+.bs-message { margin-bottom: 1.4rem; }
+.bs-note { font-size: 0.82rem; margin: 1rem 0 0; font-style: italic; }
+
+/* Reservation summary */
+.bs-summary h2 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+.bs-summary .bs-refnum { margin-bottom: 0.4rem; }
+.bs-section-title {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  font-weight: 600;
+  margin: 1.5rem 0 0.4rem;
+}
+.bs-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 0.95rem;
+}
+.bs-row span:first-child { color: var(--text-muted); }
+.bs-row span:last-child { text-align: right; font-weight: 600; color: var(--text-dark); overflow-wrap: anywhere; }
+.bs-services-list { margin: 0; padding: 0; text-align: right; }
+.bs-services-list li { list-style: none; }
+.bs-services-list li::before { content: "• "; color: var(--gold); }
+.bs-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 0.4rem;
+  padding: 0.9rem 1rem;
+  background: var(--cream-soft);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--crimson);
+  font-size: 1.25rem;
+}
+.bs-total small { font-family: var(--font-body); font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
+
+/* Status card actions: "View Reservation Summary" and "Proceed to Payment"
+   (Confirmed only) stack full-width instead of sitting side by side. */
+.bs-status-card .btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+  margin-top: 0.8rem;
+}
+.bs-status-card .bs-note + .btn { margin-top: 0.8rem; }
+
+/* Verification form */
+.bs-verify { max-width: 520px; margin: 0 auto; }
+.bs-field { margin-bottom: 1.1rem; }
+.bs-field label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  color: var(--crimson);
+  margin-bottom: 0.35rem;
+}
+.bs-field input[type="text"], .bs-field input[type="password"], .bs-field input[type="tel"] {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  background: var(--cream-soft);
+  color: var(--text-dark);
+}
+.bs-field input.invalid { border-color: #A13B2B; box-shadow: 0 0 0 2px rgba(161,59,43,.15); }
+.bs-field label.bs-show {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin: 0.45rem 0 0; font-family: var(--font-body); font-size: 0.82rem; color: var(--text-muted);
+}
+.bs-err { color: #A13B2B; font-size: 0.84rem; font-weight: 600; margin-top: 0.3rem; min-height: 0; }
+.bs-err:empty { display: none; }
+.bs-err-main { margin: 0 0 0.9rem; font-size: 0.9rem; }
+.bs-verify .btn { width: 100%; }
+.bs-verify .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.bs-clear { margin-top: 0.8rem; width: 100%; }
+
+@media (max-width: 900px) {
+  .bs-grid { grid-template-columns: 1fr; }
+  .bs-status-card { position: static; }
+}
+@media (max-width: 680px) {
+  .bs-main { padding: calc(var(--nav-height) + 1.5rem) 1rem 3rem; }
+  .bs-card { padding: 1.3rem; }
+  .bs-row { flex-direction: column; gap: 0.1rem; }
+  .bs-row span:last-child, .bs-services-list { text-align: left; }
+}
+
+button.bs-clear {
+  background: none;
+  border: 1.5px solid var(--border-soft);
+  color: var(--crimson);
+  border-radius: 999px;
+  padding: 0.7rem 1.4rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+button.bs-clear:hover { border-color: var(--gold-light); color: var(--maroon); }

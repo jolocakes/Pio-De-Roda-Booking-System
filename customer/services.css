@@ -1,0 +1,791 @@
+:root{
+  --maroon:#5B0808;          /* deep maroon, primary dark */
+  --maroon-light:#7A1414;    /* lighter maroon for surfaces on dark / gradients */
+  --cream:#F6ECDD;           /* warm cream, primary light surface */
+  --cream-soft:#FBF6EE;      /* softer cream, section background */
+  --cream-dim:#EFDFC6;       /* slightly deeper cream, for contrast fields/chips */
+  --crimson:#8C1414;         /* crimson red accent — hovers/underlines/prices */
+  --gold:#B8862E;            /* muted gold, calls to action */
+  --gold-light:#D9A84E;
+  --sage:#5F6F52;            /* fresh accent for dine-in / everyday items */
+  /* Legacy names (old, misleading). Kept ONLY so any page that still uses them keeps its colours.
+     Delete these 3 lines once searching your project for "--espresso" and "--wine" finds nothing. */
+  --espresso: var(--maroon);
+  --espresso-light: var(--maroon-light);
+  --wine: var(--crimson);
+  --text-dark:#2A0E0E;
+  --text-muted:#6B4C4C;
+  --text-light:#FBF6EE;
+  --text-light-muted:#E3C9C9;
+  --line:#E3D2B0;
+  --danger:#A13B2B;
+  --radius:14px;
+  --font-body:'Work Sans', sans-serif;
+  --font-accent:'Fraunces', serif;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  box-sizing:border-box;
+}
+* {
+  box-sizing:border-box;
+}
+
+body {
+  margin:0;
+  background:var(--cream-soft);
+  color:var(--text-dark);
+  font-family:var(--font-body);
+}
+
+h1,h2,h3,h4 {font-family:var(--font-accent);color:var(--maroon);margin:0 0 .4em;}
+.topbar {
+  background:var(--maroon);
+  color:var(--text-light);
+  padding:16px 20px;
+  font-family:var(--font-accent);
+  letter-spacing:.02em;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.topbar .brand {
+  font-size:1.15rem;
+  font-weight:bold;
+}
+
+.topbar .brand small {
+  display:block;
+  font-weight:normal;
+  font-size:.7rem;
+  color:var(--text-light-muted);
+}
+
+.topbar a.back {
+  color:var(--text-light-muted);
+  text-decoration:none;
+  font-size:.82rem;
+  border:1px solid var(--maroon-light);
+  border-radius:999px;
+  padding:6px 14px;
+}
+
+.topbar a.back:hover {
+  color:var(--text-light);
+  border-color:var(--gold-light);
+}
+
+.layout {
+  display:grid;
+  grid-template-columns:380px 1fr;
+  gap:22px;
+  max-width:1180px;
+  margin:22px auto;
+  padding:0 20px;
+}
+
+@media (max-width:900px) {
+  .layout {
+    grid-template-columns:1fr;
+  }
+  .layout {
+    display:flex;
+    flex-direction:column;
+  }
+  .layout .panel {
+    order:2;
+  }
+  .layout .details {
+    order:1;
+  }
+}
+
+.card {
+  background:var(--cream);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:0 2px 10px rgba(91,8,8,.08);
+}
+
+.details {
+  padding:26px;
+}
+
+.venue-img {
+  width:100%;
+  aspect-ratio:16/9;
+  border-radius:var(--radius);
+  background:repeating-linear-gradient(135deg,var(--cream-dim),var(--cream-dim) 12px,#E4CFA3 12px,#E4CFA3 24px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--text-muted);
+  font-family:var(--font-accent);
+  font-size:.9rem;
+  margin:10px 0 20px;
+  object-fit:cover;
+}
+
+/* When a service photo is present (same image as its homepage card), it
+   fills the 16:9 box instead of showing the striped placeholder. */
+.venue-img img {
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+  border-radius:var(--radius);
+}
+
+.section-label {
+  font-family:var(--font-accent);
+  font-size:.72rem;
+  letter-spacing:.08em;
+  color:var(--gold);
+  margin-bottom:6px;
+}
+
+.price-hero {
+  background:var(--cream-dim);
+  border-radius:var(--radius);
+  padding:16px 18px;
+  margin:14px 0;
+}
+
+.price-hero .amt {
+  font-size:1.6rem;
+  color:var(--crimson);
+  font-family:var(--font-accent);
+  font-weight:bold;
+}
+
+table.rates {
+  width:100%;
+  border-collapse:collapse;
+  margin:8px 0 18px;
+}
+
+table.rates td {
+  padding:7px 4px;
+  border-bottom:1px solid var(--line);
+  font-size:.92rem;
+}
+
+table.rates td:last-child {
+  text-align:right;
+  color:var(--crimson);
+  font-weight:bold;
+}
+
+/* Inclusions comparison table — a real grid, boxed so it reads clearly as a
+   table rather than a plain list. Wrapped in .table-scroll so it scrolls
+   horizontally on narrow screens instead of squeezing or overflowing. */
+.table-scroll {
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  margin:8px 0 18px;
+}
+
+table.rates.inclusions-table {
+  margin:0;
+  border-collapse:separate;
+  border-spacing:0;
+  border:1px solid var(--line);
+  border-radius:10px;
+  overflow:hidden;
+  min-width:480px;
+}
+table.rates.inclusions-table th{
+  font-family:var(--font-accent);
+  font-size:.76rem;
+  letter-spacing:.03em;
+  color:var(--text-light);
+  background:var(--maroon);
+  text-align:left;
+  padding:10px 14px;
+  border-bottom:none;
+}
+table.rates.inclusions-table td{
+  text-align:left;
+  color:var(--text-dark);
+  font-weight:normal;
+  font-size:.86rem;
+  padding:10px 14px;
+  border-bottom:1px solid var(--line);
+  border-right:1px solid var(--line);
+}
+table.rates.inclusions-table td:last-child{
+  border-right:none;
+  text-align:left;
+  color:var(--text-dark);
+  font-weight:normal;
+}
+table.rates.inclusions-table tbody tr:last-child td {
+  border-bottom:none;
+}
+
+table.rates.inclusions-table tbody tr:nth-child(even) td {
+  background:var(--cream-dim);
+}
+
+table.rates.inclusions-table td:first-child {
+  text-align:left;
+}
+
+table.rates.menu-table td {
+  font-size:.88rem;
+}
+
+/* Dine-In set menus: each set menu's dish list is drawn as a table, with the
+   Select button vertically centered on the right via a rowspan cell. */
+table.rates.menu-table td {
+  text-align:left;
+  color:var(--text-dark);
+  font-weight:normal;
+}
+
+table.rates.menu-table td.menu-pick {
+  text-align:right;
+  vertical-align:middle;
+  border-bottom:none;
+}
+
+table.rates.menu-table tr.menu-row.sel td {
+  background:var(--cream-dim);
+}
+
+table.rates.menu-table tr.menu-row.sel td {
+  background:var(--cream-dim);
+}
+
+.menu-select {
+  background:var(--cream-soft);
+  color:var(--crimson);
+  border:1px solid var(--line);
+  border-radius:7px;
+  padding:5px 12px;
+  font-size:.78rem;
+  font-family:var(--font-accent);
+  cursor:pointer;
+  white-space:nowrap;
+}
+
+.menu-select.sel {
+  background:var(--sage);
+  color:var(--text-light);
+  border-color:var(--sage);
+}
+
+/* Catering with Menu: main-course toggle buttons (minimum 2 selections) */
+.mc-section {
+  margin-bottom:16px; /* keeps this block clear of the STARTING PRICE section below */
+}
+
+/* The minimum-2 error lives outside a .field, so it needs the same
+   error styling (and hidden default via inline style in reservation2.js). */
+.mc-section .err {
+  color:var(--danger);
+  font-size:.76rem;
+  margin-top:6px;
+  font-family:var(--font-accent);
+}
+
+.mc-list {
+  margin:2px 0 6px;
+}
+
+.mc-opt {
+  background:var(--cream-soft);
+  color:var(--text-dark);
+  border:1px solid var(--line);
+  border-radius:7px;
+  padding:7px 14px;
+  font-size:.82rem;
+  font-family:var(--font-accent);
+  cursor:pointer;
+  margin:0 8px 8px 0;
+}
+
+.mc-opt.sel {
+  background:var(--sage);
+  color:var(--text-light);
+  border-color:var(--sage);
+}
+
+ul.plain {
+  list-style:none;
+  padding:0;
+  margin:0 0 18px;
+}
+
+ul.plain li {
+  padding:5px 0 5px 24px;
+  position:relative;
+  font-size:.93rem;
+}
+
+ul.plain.check li:before {
+  content:"✓";
+  position:absolute;
+  left:0;
+  color:var(--sage);
+  font-weight:bold;
+}
+
+ul.plain.dot li:before {
+  content:"•";
+  position:absolute;
+  left:6px;
+  color:var(--gold);
+}
+
+.guideline-heading {
+  font-family:var(--font-accent);
+  font-size:.85rem;
+  color:var(--crimson);
+  margin:14px 0 4px;
+  letter-spacing:.01em;
+}
+
+/* Guidelines "See More" / "See Less" toggle (all services share this) */
+.gl-rest[hidden] {
+  display:none;
+}
+
+.gl-toggle {
+  display:inline-block;
+  margin:2px 0 16px;
+  padding:8px 20px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--cream-soft);
+  color:var(--crimson);
+  font-family:var(--font-accent);
+  font-size:.82rem;
+  font-weight:600;
+  letter-spacing:.02em;
+  cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
+}
+
+.gl-toggle:hover {
+  border-color:var(--gold);
+  color:var(--maroon);
+  background:var(--cream-dim);
+}
+
+.gl-toggle:focus-visible {
+  outline:2px solid var(--gold);
+  outline-offset:2px;
+}
+
+.note {
+  font-size:.78rem;
+  color:var(--text-muted);
+  font-style:italic;
+}
+
+.panel {
+  padding:22px;
+  position:sticky;
+  top:14px;
+  align-self:start;
+  max-height:calc(100vh - 28px);
+  overflow-y:auto;
+}
+
+.panel h2 {
+  font-size:1.15rem;
+}
+
+.field {
+  margin-bottom:16px;
+}
+
+.field label {
+  display:block;
+  font-family:var(--font-accent);
+  font-size:.8rem;color:var(--crimson);
+  margin-bottom:5px;
+}
+
+.field input[type=text],.field input[type=tel],.field input[type=email],.field input[type=number],.field select {
+  width:100%;
+  padding:9px 10px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  font-size:.92rem;
+  font-family:inherit;
+  background:var(--cream-soft);
+  color:var(--text-dark);
+}
+
+.field .err {
+  color:var(--danger);
+  font-size:.76rem;
+  margin-top:4px;
+  display:none;
+  font-family:var(--font-accent);
+}
+
+.field .cap {
+  font-size:.76rem;
+  color:var(--text-muted);
+  margin-top:4px;
+}
+
+/* calendar */
+.date-input {
+  cursor:pointer;
+  position:relative;
+}
+
+.cal {
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px;
+  margin-top:8px;
+  background:var(--cream-soft);
+  display:none;
+}
+
+.cal.open {
+  display:block;
+}
+
+.cal-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-family:var(--font-accent);
+  font-size:.85rem;
+  margin-bottom:8px;
+  color:var(--maroon);
+}
+
+.cal-head button {
+  background:none;
+  border:1px solid var(--line);
+  border-radius:6px;
+  cursor:pointer;
+  padding:3px 9px;
+  color:var(--crimson);
+}
+
+.cal-grid {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:3px;
+  text-align:center;
+  font-size:.8rem;
+}
+
+.cal-grid .dow {
+  color:var(--text-muted);
+  font-family:var(--font-accent);
+  font-size:.68rem;
+  padding:3px 0;
+}
+
+.cal-grid .day {
+  padding:7px 0;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.cal-grid .day.avail:hover {
+  background:var(--cream-dim);
+}
+
+.cal-grid .day.sel {
+  background:var(--maroon);
+  color:var(--text-light);
+}
+
+.cal-grid .day.unavail {
+  color:#BBA98F;
+  background:#EFE6D2;
+  cursor:not-allowed;
+}
+
+/* PAST dates — disabled in JavaScript too (no data-date, no .avail class),
+   so they can never be picked. This is only the visual treatment. */
+.cal-grid .day.past {
+  color:#C4B49B;
+  background:#F1EADB;
+  opacity:.55;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+
+/* TODAY — subtle outline so the current day stands out without blocking it */
+.cal-grid .day.today:not(.sel) {
+  box-shadow:inset 0 0 0 1.5px var(--gold);
+  font-weight:600;
+}
+
+.cal-grid .day.blank {
+  visibility:hidden;
+}
+
+.pkg-opt,.addon {
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px 12px;
+  margin-bottom:8px;
+}
+.pkg-opt {
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.pkg-opt.sel {
+  border-color:var(--gold);
+  background:var(--cream-dim);
+}
+.pkg-opt .nm {
+  font-family:var(--font-accent);
+  font-size:.88rem;
+}
+
+.addon {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+}
+
+.addon .nm {
+  font-family:var(--font-accent);
+  font-size:.88rem;
+}
+
+.addon .desc {
+  font-size:.74rem;
+  color:var(--text-muted);
+}
+
+.addon .price {
+  font-size:.8rem;
+  color:var(--crimson);
+} 
+.addon button.add {
+  background:var(--maroon);
+  color:var(--text-light);
+  border:none;
+  border-radius:7px;
+  padding:6px 12px;
+  font-size:.78rem;
+  cursor:pointer;
+  font-family:var(--font-accent);
+  white-space:nowrap;
+}
+
+.addon button.add:hover {
+  background:var(--crimson);
+}
+
+.addon button.add.added {
+  background:var(--sage);
+}
+
+.qty {
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.qty button {
+  width:24px;
+  height:24px;
+  border-radius:6px;
+  border:1px solid var(--line);
+  background:var(--cream-soft);
+  cursor:pointer;
+  color:var(--maroon);
+}
+
+.summary {
+  background:var(--cream-dim);
+  border-radius:10px;
+  padding:14px;
+  margin-top:16px;
+  font-size:.86rem;
+}
+
+.summary .row {
+  display:flex;
+  justify-content:space-between;
+  padding:3px 0;
+}
+
+.summary .total {
+  border-top:1px solid var(--line);
+  margin-top:8px;
+  padding-top:8px;
+  font-family:var(--font-accent);
+  font-weight:bold;
+  color:var(--crimson);
+  font-size:1rem;
+}
+
+.btn-main {
+  width:100%;
+  background:var(--gold);
+  color:var(--text-dark);
+  border:none;
+  border-radius:10px;
+  padding:13px;
+  font-size:.95rem;
+  font-family:var(--font-accent);
+  font-weight:bold;
+  cursor:pointer;
+  margin-top:14px;
+  transition:background .15s;
+}
+
+.btn-main:hover {
+  background:var(--gold-light);
+}
+
+.btn-main:disabled {
+  background:var(--cream-dim);
+  color:var(--text-muted);
+  cursor:not-allowed;
+}
+
+.btn-ghost {
+  width:100%;
+  background:none;
+  color:var(--crimson);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:11px;
+  font-family:var(--font-accent);
+  cursor:pointer;
+  margin-top:8px;
+}
+
+.modal-bg {
+  position:fixed;
+  inset:0;
+  background:rgba(42,14,14,.6);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  z-index:50;
+}
+
+.modal-bg.open {
+  display:flex;
+}
+
+.modal {
+  background:var(--cream);
+  border-radius:var(--radius);
+  max-width:480px;
+  width:100%;
+  max-height:88vh;
+  overflow-y:auto;
+  padding:24px;
+}
+
+.modal h2 {
+  font-size:1.2rem;
+}
+
+.confirm-row {
+  display:flex;
+  justify-content:space-between;
+  padding:6px 0;
+  border-bottom:1px solid var(--line);
+  font-size:.88rem;
+}
+
+.confirm-row span:last-child {
+  color:var(--crimson);
+  font-weight:bold;
+  text-align:right;
+}
+
+.chk {
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+  margin:14px 0;
+  font-size:.85rem;
+}
+
+.chk input {
+  margin-top:3px;
+}
+
+.status-pill {
+  display:inline-block;
+  background:var(--cream-dim);
+  color:var(--gold);
+  border-radius:999px;
+  padding:4px 12px;
+  font-family:var(--font-accent);
+  font-size:.75rem;
+  font-weight:bold;
+}
+
+.refnum {
+  font-family:var(--font-accent);
+  font-size:1.3rem;
+  color:var(--maroon);
+  font-weight:bold;
+  letter-spacing:.03em;
+}
+
+/* Additional Services: subtle fade when the main service changes */
+.addon.fade-in {
+  animation:addonFade .25s ease both;
+}
+@keyframes addonFade {
+  from {opacity:0; transform:translateY(4px);}
+  to   {opacity:1; transform:none;}
+}
+@media (prefers-reduced-motion:reduce) {
+  .addon.fade-in {animation:none;}
+}
+
+/* Required-field markers and invalid-input highlight */
+.req {
+  color:var(--danger);
+  font-weight:bold;
+  font-size:1.15em;
+  line-height:1;
+  margin-left:2px;
+}
+.req-legend {
+  font-size:.78rem;
+  color:var(--text-muted);
+  margin:0 0 14px;
+}
+.field input.invalid,
+.field select.invalid {
+  border-color:var(--danger);
+  box-shadow:0 0 0 2px rgba(161,59,43,.15);
+}
+
+/* Reservation ID + Booking PIN box in the success popup */
+.credentials-box {
+  background:var(--cream-dim);
+  border:1px dashed var(--gold);
+  border-radius:var(--radius);
+  padding:14px 16px 4px;
+  margin:14px 0 10px;
+}
+.refnum.pin-digits {
+  font-size:1.7rem;
+  letter-spacing:.35em;
+}
+.pin-warn {
+  font-size:.84rem;
+  color:var(--danger);
+  margin:0 0 14px;
+}

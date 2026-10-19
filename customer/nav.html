@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pio De Roda Cafe and Restaurant | Reservations &amp; Catering</title>
+  <meta name="description" content="Pio De Roda Cafe and Restaurant — dine-in, catering, and event packages. Reserve your table or book your celebration.">
+
+  <!-- Google Fonts: Fraunces for character-filled headings, Work Sans for clean, readable body text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="nav.css">
+</head>
+<body>
+    <!-- ============ NAVIGATION BAR ============ -->
+    <header class="site-header" id="site-header">
+      <nav class="navbar">
+        <a href="#home" class="brand">
+          <img src="pioderodalogo.jpg" alt="Pio De Roda Cafe and Restaurant logo" class="brand-mark">
+          <span class="brand-name">Pio De Roda Cafe<small>Restaurant &amp; Catering Services</small></span>
+        </a>
+
+        <!-- Hamburger button, shown only on small screens -->
+        <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <ul class="nav-links" id="navLinks">
+          <li><a href="#home" class="nav-link active-link" data-nav>Home</a></li>
+          <li><a href="#about" class="nav-link" data-nav>About Us</a></li>
+          <li><a href="#availability" class="nav-link" data-nav>Availability</a></li>
+          <li><a href="#contact" class="nav-link" data-nav>Contact</a></li>
+          <li><a href="#guide" class="nav-link" data-nav>Guide</a></li>
+          <li><a href="booking-status.html" class="nav-link">Booking Status</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main>
+
+    <!-- ============ HERO / LANDING SECTION ============ -->
+    <section class="hero" id="home">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <p class="hero-kicker">Pio De Roda Cafe, Restaurant And Catering Services</p>
+        <h1 class="hero-heading">Where Every Celebration<br>Finds Its Place.</h1>
+        <p class="hero-sub">Book your venue, catering, and packages for celebrations and unforgettable gatherings.</p>
+        <a href="#services" class="btn btn-primary">Reserve Now</a>
+      </div>
+      <a href="#about" class="scroll-hint" aria-label="Scroll to learn more">
+        <span></span>
+      </a>
+    </section>
+
+    <!-- ============ ABOUT US SECTION ============ -->
+    <section class="about" id="about">
+      <div class="about-grid">
+        <div class="about-image">
+          <div class="about-image-frame"></div>
+        </div>
+        <div class="about-copy">
+          <h2 class="section-heading">About Pio De Roda</h2>
+          <p>
+            Pio De Roda Cafe, Restaurant And Catering Services began as a small neighborhood coffee corner and grew into a
+            gathering place for everyday meals and once-in-a-lifetime celebrations alike. Our kitchen and
+            events team work side by side, so the same care that goes into a cup of coffee also goes into
+            every wedding, reunion, and birthday we help host.
+          </p>
+          <p>
+            Whether you are planning an intimate get-together or a full-scale celebration, our goal is the
+            same: good food, dependable service, and a space that feels like it was set up just for you.
+          </p>
+          <ul class="about-facts">
+            <li><span>Catering &amp; Events</span>Full-service packages for gatherings of any size</li>
+            <li><span>Venue &amp; Rentals</span>A space and equipment ready for your occasion</li>
+            <li><span>Dine-In Menu</span>Everyday meals for guests joining before or after the event</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ AVAILABILITY CALENDAR SECTION ============ -->
+    <section class="availability" id="availability">
+      <div class="availability-inner">
+        <h2 class="section-heading">Check Our Availability</h2>
+        <p class="availability-intro">See which dates are still open before you book. Ready to reserve? Pick a service below and choose your date.</p>
+        <div class="availability-cal" id="availabilityCalendar"></div>
+        <ul class="cal-legend" aria-label="Calendar legend">
+          <li><span class="swatch swatch-avail"></span>Available</li>
+          <li><span class="swatch swatch-unavail"></span>Unavailable</li>
+          <li><span class="swatch swatch-past"></span>Past Date</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ SERVICES SECTION ============ -->
+    <section class="services" id="services">
+      <div class="services-header">
+        <h2 class="section-heading">Our Services &amp; Packages</h2>
+        <p>
+          From an intimate gathering to a fully catered celebration, choose the catering, event, venue,
+          or rental service that fits your occasion. Every package below can be adjusted to your guest
+          count and budget — tap a card to see what's included.
+        </p>
+      </div>
+
+      <div class="services-grid" id="servicesGrid">
+
+        <!-- 1. Catering with Menu -->
+        <article class="service-card" data-details="Our catering-with-menu service brings a full spread to your venue, with menu options spanning Filipino favorites, pasta, and grilled dishes. A minimum guest count applies, and menus can be customized to dietary needs.">
+          <a href="CwM.html">
+          <div class="card-media"><img src="cateringwmenu.jpg" alt="Catering with menu spread on a table"></div>
+            <div class="card-body">
+              <h3>Catering with Menu</h3>
+              <p>Full-course catering with a customizable menu for any occasion, served at your chosen venue.</p>
+              <p class="price">Starting at ₱1,000 <span>/ head</span></p>
+              <button class="btn btn-card" data-view-details>View Details</button>
+            </div>
+          </a>
+        </article>
+
+        <!-- 2. Venue Rentals -->
+        <article class="service-card" data-details="Rent the Pio De Roda venue for private events, complete with seating arrangement and basic ambiance. Rental duration and inclusions vary by event size.">
+          <a href="VR.html">
+          <div class="card-media"><img src="venuerent.jpg" alt="Pio De Roda venue set up for an event"></div>
+          <div class="card-body">
+            <h3>Venue Rentals</h3>
+            <p>A comfortable and welcoming space for celebrations, gatherings, and memorable special events.</p>
+            <p class="price">Starting at ₱15,000</p>
+            <button class="btn btn-card" data-view-details>View Details</button>
+          </div>
+          </a>
+        </article>
+
+        <!-- 3. Dine-In Menu -->
+        <article class="service-card" data-details="Enjoy the regular dine-in menu, featuring coffee, pastries, all-day breakfast, and main courses. Walk-ins are welcome, and reservations are recommended for groups.">
+          <a href="DN.html">
+          <div class="card-media"><img src="dinein.jpg" alt="Dine-in table with coffee and food"></div>
+          <div class="card-body">
+            <h3>Dine-In Menu</h3>
+            <p>A selection of delicious meals and refreshing drinks served fresh for all dine-in guests to enjoy and savor.</p>
+            <p class="price">Starting at ₱600 <span>/ head</span></p>
+            <button class="btn btn-card" data-view-details>View Details</button>
+          </div>
+          </a>
+        </article>
+
+        <!-- 4. Non-Coffee Booth Package -->
+        <article class="service-card" data-details="A refreshment booth serving non-coffee drinks such as fruit teas, milk-based beverages, and mocktails — ideal for guests who prefer something other than coffee.">
+          <a href="NCB.html">
+          <div class="card-media"><img src="noncoffee.jpg" alt="Non-coffee drinks booth for events"></div>
+            <div class="card-body">
+              <h3>Non-Coffee Booth Package</h3>
+              <p>A refreshment booth serving fruit teas, milk drinks, and mocktails for your guests.</p>
+              <p class="price">Starting at ₱4,250 <span>/ package</span></p>
+              <button class="btn btn-card" data-view-details>View Details</button>
+            </div>
+          </a>
+        </article>
+
+        <!-- 5. Coffee Booth Package -->
+        <article class="service-card" data-details="A staffed coffee booth serving espresso-based drinks for your event, including cups, condiments, and setup. Great for corporate events, weddings, and parties.">
+          <a href="CB.html">
+          <div class="card-media"><img src="coffeebooth.jpg" alt="Coffee booth serving guests at an event"></div>
+          <div class="card-body">
+            <h3>Coffee Booth Package</h3>
+            <p>A coffee station serving freshly brewed coffee and refreshing specialty drinks for your guests.</p>
+            <p class="price">Starting at ₱6,250 <span>/ package</span></p>
+            <button class="btn btn-card" data-view-details>View Details</button>
+          </div>
+          </a>
+        </article>
+
+        <!-- 6. Pizza Booth -->
+        <article class="service-card" data-details="A live pizza booth serving freshly made pizza slices for your guests, with a choice of classic flavors. Ideal as a fun food station for parties and gatherings.">
+        <a href="PZ.html">
+          <div class="card-media"><img src="pizza.jpg" alt="Pizza booth serving fresh slices"></div>
+          <div class="card-body">
+            <h3>Pizza Booth</h3>
+            <p>A pizza station serving freshly prepared, delicious pizzas and tasty treats, perfect for sharing with your guests.</p>
+            <p class="price">Starting at ₱7,500 <span>/ package</span></p>
+            <button class="btn btn-card" data-view-details>View Details</button>
+          </div>
+          </a>
+        </article>
+
+        <!-- 7. Intimate Celebration Package -->
+        <article class="service-card" data-details="A package designed for smaller, more intimate celebrations, with a cozy setup, curated menu, and simple decor suited for close friends and family.">
+        <a href="INT.html">
+          <div class="card-media"><img src="intimate.jpg" alt="Table setup for an intimate celebration"></div>
+          <div class="card-body">
+            <h3>Intimate Celebration Package</h3>
+            <p>A cozy, scaled-down package for smaller celebrations with close family and friends.</p>
+            <p class="price">Starting at ₱4,000 <span>/ package</span></p>
+            <button class="btn btn-card" data-view-details>View Details</button>
+          </div>
+          </a>
+        </article>
+
+        <!-- 8. Equipment Rental -->
+        <article class="service-card" data-details="Rent tables, chairs, tents, food warmers, and other event equipment on their own, whether or not you book catering. Delivery and pick-up options may be available.">
+        <a href="ER.html">
+          <div class="card-media"><img src="equipment.png" alt="Tables, chairs, and event equipment for rent"></div>
+          <div class="card-body">
+            <h3>Equipment Rental</h3>
+            <p>Tables, chairs, tents, food warmers, and other essentials to keep your event comfortable, organized, and ready for any occasion.</p>
+            <p class="price">Starting at ₱300 <span>/ item</span></p>
+            <button class="btn btn-card" data-view-details>View Details</button>
+          </div>
+          </a>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- ============ GUIDE SECTION ============ -->
+    <section class="guide" id="guide">
+      <h2 class="section-heading">How to Make a Reservation</h2>
+      <ol class="guide-steps">
+        <li>
+          <span class="step-number">1</span>
+          <div>
+            <h3>Browse our services</h3>
+            <p>Look through the services and packages above to find what fits your occasion and guest count.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-number">2</span>
+          <div>
+            <h3>Check the details</h3>
+            <p>Tap "View Details" on a service card to review inclusions, pricing, and requirements.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-number">3</span>
+          <div>
+            <h3>Reserve your date</h3>
+            <p>Use the "Reserve Now" or "Continue Reservation" button to start your booking request.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-number">4</span>
+          <div>
+            <h3>Confirm with our team</h3>
+            <p>Our staff will reach out to confirm your date, finalize details, and answer any questions.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ============ CONTACT SECTION ============ -->
+    <section class="contact" id="contact">
+      <div class="contact-grid">
+        <div>
+          <h2 class="section-heading">Contact Us</h2>
+          <p>Have questions about a package or your reservation? Reach out and our team will get back to you.</p>
+          <ul class="contact-list">
+            <li><strong>Address</strong>508 De Ocampo St., Indang, Cavite, Indang, Philippines, 4122</li>
+            <li><strong>Phone</strong>(046) 415 0390 / (0926) 684 5833</li>
+            <li><strong>Email</strong>pioderodacafe.restaurant@gmail.com</li>
+            <li><strong>Hours</strong>Open daily, 8:00 AM – 10:00 PM</li>
+          </ul>
+        </div>
+        <form class="contact-form" id="contactForm">
+          <label for="cf-name">Name</label>
+          <input type="text" id="cf-name" name="name" placeholder="Your full name" required>
+
+          <label for="cf-email">Email</label>
+          <input type="email" id="cf-email" name="email" placeholder="you@example.com" required>
+
+          <label for="cf-message">Message</label>
+          <textarea id="cf-message" name="message" rows="4" placeholder="Tell us about your occasion..." required></textarea>
+
+          <button type="submit" class="btn btn-primary">Send Message</button>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+    <!-- ============ VIEW DETAILS MODAL ============ -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <button class="modal-close" id="modalClose" aria-label="Close details">&times;</button>
+        <h3 id="modalTitle">Service Details</h3>
+        <p id="modalBody"></p>
+      </div>
+    </div>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="site-footer">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="pioderodalogo.jpg" alt="Pio De Roda Cafe and Restaurant logo" class="brand-mark">
+          <div>
+            <p class="footer-title">Pio De Roda Cafe</p>
+            <p class="footer-tagline">Catering, celebrations, and events made simple.</p>
+          </div>
+        </div>
+
+        <ul class="footer-links">
+          <li><a href="#home">Home</a></li>
+          <li><a href="#about">About Us</a></li>
+          <li><a href="#contact">Contact</a></li>
+          <li><a href="#guide">Guide</a></li>
+          <li><a href="booking-status.html">Booking Status</a></li>
+        </ul>
+      </div>
+      <p class="footer-copy">&copy; 2026 Pio De Roda Cafe. All Rights Reserved.</p>
+    </footer>
+
+  <!-- services.js MUST load before availability.js (it defines getUnavailableDates) -->
+  <script src="services.js"></script>
+  <script src="availability.js"></script>
+
+  <!-- Mobile menu + header scroll state — same bindNav() behavior as the
+       Booking Status and Payment pages (this page had no wiring for it). -->
+  <script>
+    (function(){
+      const toggle = document.getElementById("navToggle"), links = document.getElementById("navLinks");
+      if(toggle && links){
+        toggle.addEventListener("click", ()=>{
+          const open = links.classList.toggle("open");
+          toggle.classList.toggle("open", open);
+          toggle.setAttribute("aria-expanded", open);
+        });
+        // Homepage menu links jump to sections — close the drawer after a choice.
+        links.addEventListener("click", e=>{
+          if(e.target.closest("a")){
+            links.classList.remove("open"); toggle.classList.remove("open");
+            toggle.setAttribute("aria-expanded", false);
+          }
+        });
+      }
+      const header = document.getElementById("site-header");
+      if(header){
+        const onScroll = ()=>header.classList.toggle("scrolled", window.scrollY > 10);
+        window.addEventListener("scroll", onScroll); onScroll();
+      }
+    })();
+  </script>
+</body>
+</html>
