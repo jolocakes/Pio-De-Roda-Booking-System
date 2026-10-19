@@ -1,8 +1,59 @@
 <?php
-require_once __DIR__ . '/../includes/admin_auth.php';
-$reservations = [];
-try { $reservations = db()->query('SELECT reservation_code AS id,customer_name AS customer,contact_number AS phone,email,main_service AS service,event_date AS date,event_time AS time,guests,status,estimated_total AS amount FROM reservations ORDER BY created_at DESC')->fetchAll(); }
-catch (Throwable $e) { http_response_code(503); }
+
+$reservations = [
+    [
+        'id' => 'PDR-2026-0098',
+        'customer' => 'Jolo Cruzada',
+        'phone' => '+63 000 000 0000',
+        'email' => 'jolo,cruzada@email.com',
+        'service' => 'Cafe',
+        'date' => '2026-09-20',
+        'time' => '10:00 AM',
+        'guests' => 2,
+        'status' => 'Confirmed',
+        'payment' => 'Cash',
+        'amount' => '₱900.00',
+    ],
+    [
+        'id' => 'PDR-2026-0097',
+        'customer' => 'Khean Digno',
+        'phone' => '+63 000 000 0000',
+        'email' => 'khean.digno@email.com',
+        'service' => 'Restaurant',
+        'date' => '2026-09-21',
+        'time' => '02:00 PM',
+        'guests' => 3,
+        'status' => 'Confirmed',
+        'payment' => 'GCash',
+        'amount' => '₱1,500.00',
+    ],
+    [
+        'id' => 'PDR-2026-0096',
+        'customer' => 'Ruzelle Peji',
+        'phone' => '+63 000 000 0000',
+        'email' => 'ruzelle.peji@email.com',
+        'service' => 'Catering',
+        'date' => '2026-09-22',
+        'time' => '04:00 PM',
+        'guests' => 1,
+        'status' => 'Cancelled',
+        'payment' => 'Cash',
+        'amount' => '₱10,000.00',
+    ],
+    [
+        'id' => 'PDR-2026-0095',
+        'customer' => 'Puso Dimaranan',
+        'phone' => '+63 000 000 0000',
+        'email' => 'puso.dimaranan@email.com',
+        'service' => 'Events Place',
+        'date' => '2026-09-23',
+        'time' => '06:00 PM',
+        'guests' => 100,
+        'status' => 'Pending',
+        'payment' => 'Cash',
+        'amount' => '₱20,000.00',
+    ]
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,7 +118,7 @@ catch (Throwable $e) { http_response_code(503); }
             </ul>
         </div>
         <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;"><a href="#" onclick="document.getElementById('logout-form').submit(); return false;"><i class="fa-solid fa-right-from-bracket"></i> Logout</a><form id="logout-form" method="post" action="logout.php" hidden><input type="hidden" name="csrf" value="<?=htmlspecialchars($_SESSION['csrf'] ?? '', ENT_QUOTES, 'UTF-8')?>"></form></li>
+            <li class="nav-item" style="list-style: none;"><a href="#"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
         </div>
     </aside>
 
@@ -119,34 +170,34 @@ catch (Throwable $e) { http_response_code(503); }
                         <tbody>
                             <?php foreach($reservations as$row): ?>
                                 <tr id="row-<?php echo $row['id']; ?>">
-                                    <td><strong><?php echo htmlspecialchars($row['id'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
-                                    <td><?php echo htmlspecialchars($row['customer'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td><?php echo htmlspecialchars($row['service'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td><?php echo htmlspecialchars($row['date'] . ' ' .$row['time'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td><strong><?php echo $row['id']; ?></strong></td>
+                                    <td><?php echo $row['customer']; ?></td>
+                                    <td><?php echo $row['service']; ?></td>
+                                    <td><?php echo $row['date'] . ' ' .$row['time']; ?></td>
                                     <td>
-                                        <span class="badge badge-<?php echo strtolower(htmlspecialchars($row['status'], ENT_QUOTES, 'UTF-8')); ?>" id="status-badge-<?php echo htmlspecialchars($row['id'], ENT_QUOTES, 'UTF-8'); ?>">
-                                            <?php echo htmlspecialchars($row['status'], ENT_QUOTES, 'UTF-8'); ?>
+                                        <span class="badge badge-<?php echo strtolower($row['status']); ?>" id="status-badge-<?php echo $row['id']; ?>">
+                                            <?php echo $row['status']; ?>
                                         </span>
                                     </td>
-                                    <td>—</td>
+                                    <td><?php echo $row['payment']; ?></td>
                                     <td class="action-cell">
                                         <!-- Approve -->
-                                        <button class="btn btn-approve" title="Approve" onclick="updateStatus(<?php echo json_encode($row['id']); ?>, 'Confirmed')">
+                                        <button class="btn btn-approve" title="Approve" onclick="updateStatus('<?php echo $row['id']; ?>', 'Confirmed')">
                                             <i class="fa-solid fa-check"></i>
                                         </button>
 
                                         <!-- Reject -->
-                                        <button class="btn btn-reject" title="Reject" onclick="updateStatus(<?php echo json_encode($row['id']); ?>, 'Rejected')">
+                                        <button class="btn btn-reject" title="Reject" onclick="updateStatus('<?php echo $row['id']; ?>', 'Rejected')">
                                             <i class="fa-solid fa-xmark"></i>
                                         </button>
 
                                         <!-- Reschedule / Edit -->
-                                        <button class="btn btn-edit" title="Edit / Reschedule" onclick="openEditModal(<?php echo json_encode($row['id'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>, <?php echo json_encode($row['service'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>, <?php echo json_encode($row['date']); ?>, <?php echo json_encode(substr((string)$row['time'], 0, 5)); ?>, <?php echo (int)$row['guests']; ?>, <?php echo json_encode($row['status']); ?>)">
+                                        <button class="btn btn-edit" title="Edit / Reschedule" onclick="openEditModal('<?php echo $row['id']; ?>', '<?php echo$row['service']; ?>', '<?php echo $row['date']; ?>', '<?php echo$row['time']; ?>', '<?php echo $row['guests']; ?>', '<?php echo$row['status']; ?>')">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
 
                                         <!-- Cancel -->
-                                        <button class="btn btn-cancel" title="Cancel Booking" onclick="updateStatus(<?php echo json_encode($row['id']); ?>, 'Cancelled')">
+                                        <button class="btn btn-cancel" title="Cancel Booking" onclick="updateStatus('<?php echo $row['id']; ?>', 'Cancelled')">
                                             <i class="fa-solid fa-ban"></i>
                                         </button>
                                     </td>
@@ -245,13 +296,12 @@ catch (Throwable $e) { http_response_code(503); }
         }
 
         // Update Reservation Status (Approve, Reject, Cancel)
-        async function updateStatus(id, newStatus) {
-            if (!confirm(`Are you sure you want to change status to ${newStatus}?`)) return;
-            try {
-                const res = await fetch('api.php?action=status', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':<?=json_encode($_SESSION['csrf'])?>},body:JSON.stringify({reservationId:id,status:newStatus})});
-                const data = await res.json(); if (!res.ok || !data.ok) throw new Error();
-                const badge = document.getElementById(`status-badge-${id}`); badge.innerText = data.status; badge.className = `badge badge-${data.status.toLowerCase()}`;
-            } catch(e) { alert('Status update failed. Refresh the page and try again.'); }
+        function updateStatus(id, newStatus) {
+            if (confirm(`Are you sure you want to change status to ${newStatus}?`)) {
+                const badge = document.getElementById(`status-badge-${id}`);
+                badge.innerText = newStatus;
+                badge.className = `badge badge-${newStatus.toLowerCase()}`;
+            }
         }
 
         // Edit / Reschedule Modal Open
@@ -266,14 +316,13 @@ catch (Throwable $e) { http_response_code(503); }
         }
 
         // Save Edit / Reschedule
-        async function saveEdit() {
+        function saveEdit() {
             const id = document.getElementById('editResId').value;
-            const payload = {reservationId:id,eventDate:document.getElementById('editDate').value,eventTime:document.getElementById('editTime').value,guests:document.getElementById('editGuests').value,status:document.getElementById('editStatus').value};
-            try {
-                const res=await fetch('api.php?action=edit',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':<?=json_encode($_SESSION['csrf'])?>},body:JSON.stringify(payload)});
-                const data=await res.json(); if(!res.ok||!data.ok) throw new Error(data.reason||'NETWORK');
-                location.reload();
-            } catch(e) { alert(e.message==='DATE_TAKEN'?'That date is no longer available. Choose another date.':'The reservation could not be updated. Check the date, time, and guest count.'); }
+            const newStatus = document.getElementById('editStatus').value;
+            
+            updateStatus(id, newStatus);
+            closeModal('editModal');
+            alert('Reservation updated successfully!');
         }
 
         function closeModal(modalId) {

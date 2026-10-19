@@ -28,13 +28,7 @@
     Confirmed: { cls:"status-confirmed", label:"CONFIRMED", sub:"Reservation Confirmed",
                  heading:"Reservation Confirmed!",
                  message:"Your reservation has been confirmed by Pio De Roda Cafe and Restaurant.",
-                 full:"Confirmed" },
-    Rejected:  { cls:"status-unknown", label:"REJECTED", sub:"Request not accepted",
-                 heading:"Your reservation was not accepted",
-                 message:"Please contact Pio De Roda Cafe and Restaurant if you need help.", full:"Rejected" },
-    Cancelled: { cls:"status-unknown", label:"CANCELLED", sub:"Reservation cancelled",
-                 heading:"Your reservation is cancelled",
-                 message:"Please contact Pio De Roda Cafe and Restaurant if you need help.", full:"Cancelled" }
+                 full:"Confirmed" }
   };
 
   const root = document.getElementById("bookingStatusRoot");
