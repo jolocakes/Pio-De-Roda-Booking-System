@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/auth_check.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -84,9 +85,11 @@
         <div class="content-body">
             <div class="page-header-container">
                 <div class="page-title-group">
-                    <p>Organize, view, and record all catering and venue event specifications.</p>
+                    <p>Organize, view, and record all catering and venue event specifications from customer reservations.</p>
                 </div>
-                <button class="btn-add-new" onclick="openModal()"><i class="fa-solid fa-plus"></i> Add New Event</button>
+                <div style="font-size: 13px; color: var(--text-muted); background: var(--bg-card, #fff); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <i class="fa-solid fa-info-circle" style="color: var(--primary);"></i> Events originate automatically from customer reservations.
+                </div>
             </div>
 
             <!-- Events Table -->
@@ -94,14 +97,15 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Event Name</th>
+                            <th>Reservation ID</th>
+                            <th>Event / Service</th>
                             <th>Customer</th>
                             <th>Type</th>
                             <th>Date & Time</th>
                             <th>Guests</th>
-                            <th>Venue</th>
-                            <th>Catering Package</th>
-                            
+                            <th>Package</th>
+                            <th>Status</th>
+                            <th style="text-align: right;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="eventsTableBody">
@@ -112,93 +116,26 @@
         </div>
     </div>
 
-    <!-- Add New Event Modal -->
-    <div class="modal-overlay" id="addModal">
-        <div class="modal-box">
-            <h3>Add New Event</h3>
-            <form id="addEventForm" onsubmit="handleAddEvent(event)">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Event Name</label>
-                        <input type="text" id="event_name" required placeholder="e.g. Santos Wedding Reception">
-                    </div>
-                    <div class="form-group">
-                        <label>Customer Name</label>
-                        <input type="text" id="customer_name" required placeholder="e.g. Maria Santos">
-                    </div>
-                    <div class="form-group">
-                        <label>Event Type</label>
-                        <select id="event_type" required>
-                            <option value="Wedding">Wedding</option>
-                            <option value="Birthday / Debut">Birthday / Debut</option>
-                            <option value="Corporate Event">Corporate Event</option>
-                            <option value="Intimate Gathering">Intimate Gathering</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Event Date</label>
-                        <input type="date" id="event_date" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Start Time</label>
-                        <input type="time" id="start_time" required>
-                    </div>
-                    <div class="form-group">
-                        <label>End Time</label>
-                        <input type="time" id="end_time" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Number of Guests</label>
-                        <input type="number" id="number_of_guests" required placeholder="100">
-                    </div>
-                    <div class="form-group">
-                        <label>Venue</label>
-                        <select id="venue" required>
-                            <option value="Events Place">Events Place</option>
-                            <option value="Restaurant / Cafe">Restaurant / Cafe</option>
-                            <option value="Client Selected Venue">Client Selected Venue</option>
-                        </select>
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Catering Package</label>
-                        <input type="text" id="catering_package" required placeholder="e.g. Catering with Menu (Full Course)">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Additional Services</label>
-                        <input type="text" id="additional_services" placeholder="e.g. Coffee Booth Package, Pizza Station">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Special Requests</label>
-                        <textarea id="special_requests" rows="3" placeholder="e.g. Dietary preferences, decoration details..."></textarea>
-                    </div>
-                </div>
-
-                <div class="modal-actions">
-                    <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn-add-new">Save Event</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- View Event Details Modal -->
     <div class="modal-overlay" id="viewModal">
         <div class="modal-box">
             <h3 id="view_event_title">Event Details</h3>
             
+            <div class="detail-row"><strong>Reservation ID:</strong> <span id="v_id"></span></div>
             <div class="detail-row"><strong>Customer:</strong> <span id="v_customer"></span></div>
+            <div class="detail-row"><strong>Contact Number:</strong> <span id="v_phone"></span></div>
+            <div class="detail-row"><strong>Email:</strong> <span id="v_email"></span></div>
             <div class="detail-row"><strong>Event Type:</strong> <span id="v_type"></span></div>
             <div class="detail-row"><strong>Event Date:</strong> <span id="v_date"></span></div>
             <div class="detail-row"><strong>Schedule:</strong> <span id="v_time"></span></div>
             <div class="detail-row"><strong>Guest Count:</strong> <span id="v_guests"></span></div>
-            <div class="detail-row"><strong>Venue Location:</strong> <span id="v_venue"></span></div>
+            <div class="detail-row"><strong>Status:</strong> <span id="v_status"></span></div>
             <hr style="border:0; border-top: 1px solid var(--border-color); margin: 15px 0;">
             <div class="detail-row"><strong>Catering Package:</strong> <span id="v_package"></span></div>
             <div class="detail-row"><strong>Additional Services:</strong> <span id="v_services"></span></div>
-            <div class="detail-row"><strong>Special Requests:</strong> <span id="v_requests"></span></div>
+            <div class="detail-row"><strong>Estimated Total:</strong> <span id="v_total"></span></div>
 
-            <div class="modal-actions">
+            <div class="modal-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
                 <button type="button" class="btn-cancel" onclick="closeViewModal()">Close</button>
             </div>
         </div>

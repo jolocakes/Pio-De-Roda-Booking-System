@@ -25,19 +25,19 @@ img {
 /* ---------- Design tokens ---------- */
 :root {
   /* Core palette */
-  --maroon: #5B0808;        /* deep maroon, primary dark */
-  --maroon-light: #7A1414;  /* lighter maroon for surfaces on dark / gradients */
-  --cream: #F6ECDD;          /* warm cream, primary light surface */
-  --cream-soft: #FBF6EE;     /* softer cream, section background */
-  --crimson: #8C1414;       /* crimson red accent, for hovers/underlines/prices */
-  --gold: #B8862E;           /* muted gold, calls to action */
-  --gold-light: #D9A84E;
-  --sage: #5F6F52;           /* fresh accent for dine-in / everyday items */
+  --maroon: #5b0808; /* deep maroon, primary dark */
+  --maroon-light: #7a1414; /* lighter maroon for surfaces on dark / gradients */
+  --cream: #f6ecdd; /* warm cream, primary light surface */
+  --cream-soft: #fbf6ee; /* softer cream, section background */
+  --crimson: #8c1414; /* crimson red accent, for hovers/underlines/prices */
+  --gold: #b8862e; /* muted gold, calls to action */
+  --gold-light: #d9a84e;
+  --sage: #5f6f52; /* fresh accent for dine-in / everyday items */
 
-  --text-dark: #2A0E0E;
-  --text-muted: #6B4C4C;
-  --text-light: #FBF6EE;
-  --text-light-muted: #E3C9C9;
+  --text-dark: #2a0e0e;
+  --text-muted: #6b4c4c;
+  --text-light: #fbf6ee;
+  --text-light-muted: #e3c9c9;
 
   --border-soft: rgba(91, 8, 8, 0.14);
   --shadow-soft: 0 10px 30px rgba(91, 8, 8, 0.14);
@@ -62,7 +62,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   font-family: var(--font-display);
   color: var(--text-dark);
   line-height: 1.15;
@@ -83,7 +85,8 @@ a {
   text-decoration: none;
 }
 
-ul, ol {
+ul,
+ol {
   list-style: none;
 }
 
@@ -110,7 +113,10 @@ textarea:focus-visible {
   border-radius: 999px;
   border: none;
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
 }
 
 .btn-primary {
@@ -148,7 +154,9 @@ textarea:focus-visible {
   z-index: 1000;
   background: var(--cream);
   border-bottom: 1px solid transparent;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .site-header.scrolled {
@@ -256,7 +264,9 @@ textarea:focus-visible {
   width: 100%;
   background: var(--text-dark);
   border-radius: 2px;
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
 }
 
 .nav-toggle.open span:nth-child(1) {
@@ -282,15 +292,23 @@ textarea:focus-visible {
   justify-content: center;
   text-align: center;
   padding: 0 1.5rem;
-  background-image: url("piobg.jpg");
-  background-size: cover;
-  background-position: center;
   overflow: hidden;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 0;
 }
 
 .hero-overlay {
   position: absolute;
   inset: 0;
+  z-index: 1;
   background: linear-gradient(
     180deg,
     rgba(91, 8, 8, 0.55) 0%,
@@ -371,9 +389,18 @@ textarea:focus-visible {
 }
 
 @keyframes scroll-dot {
-  0% { top: 6px; opacity: 1; }
-  80% { top: 20px; opacity: 0; }
-  100% { top: 6px; opacity: 0; }
+  0% {
+    top: 6px;
+    opacity: 1;
+  }
+  80% {
+    top: 20px;
+    opacity: 0;
+  }
+  100% {
+    top: 6px;
+    opacity: 0;
+  }
 }
 
 /* ==========================================================================
@@ -397,12 +424,19 @@ textarea:focus-visible {
 }
 
 .about-image-frame {
+  position: relative;
   aspect-ratio: 4 / 5;
   border-radius: var(--radius-lg);
-  background-image: url("pioabout.jpg");
-  background-size: cover;
-  background-position: center;
+  overflow: hidden;
   box-shadow: var(--shadow-soft);
+}
+
+.about-image-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .about-image-frame::after {
@@ -477,7 +511,10 @@ textarea:focus-visible {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .service-card:hover {
@@ -716,7 +753,7 @@ textarea:focus-visible {
    ========================================================================== */
 .site-footer {
   background: var(--maroon);
-  background-color: #5B0808;
+  background-color: #5b0808;
   color: var(--text-light-muted);
   padding: 3.5rem 1.5rem 2rem;
 }
@@ -963,15 +1000,15 @@ textarea:focus-visible {
 }
 
 .availability-cal .day.unavail {
-  color: #BBA98F;
-  background: #EFE6D2;
+  color: #bba98f;
+  background: #efe6d2;
   cursor: not-allowed;
 }
 
 /* Past dates — greyed out (also marked in JavaScript, never selectable) */
 .availability-cal .day.past {
-  color: #C4B49B;
-  background: #F1EADB;
+  color: #c4b49b;
+  background: #f1eadb;
   opacity: 0.55;
   cursor: not-allowed;
   pointer-events: none;
@@ -1009,6 +1046,15 @@ textarea:focus-visible {
   border: 1px solid var(--border-soft);
 }
 
-.cal-legend .swatch-avail { background: var(--cream-soft); }
-.cal-legend .swatch-unavail { background: #EFE6D2; border-color: #BBA98F; }
-.cal-legend .swatch-past { background: #F1EADB; border-color: #C4B49B; opacity: 0.75; }
+.cal-legend .swatch-avail {
+  background: var(--cream-soft);
+}
+.cal-legend .swatch-unavail {
+  background: #efe6d2;
+  border-color: #bba98f;
+}
+.cal-legend .swatch-past {
+  background: #f1eadb;
+  border-color: #c4b49b;
+  opacity: 0.75;
+}

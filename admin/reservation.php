@@ -1,59 +1,29 @@
 <?php
+require_once __DIR__ . '/auth_check.php';
+require_once __DIR__ . '/../config/db.php';
 
-$reservations = [
-    [
-        'id' => 'PDR-2026-0098',
-        'customer' => 'Jolo Cruzada',
-        'phone' => '+63 000 000 0000',
-        'email' => 'jolo,cruzada@email.com',
-        'service' => 'Cafe',
-        'date' => '2026-09-20',
-        'time' => '10:00 AM',
-        'guests' => 2,
-        'status' => 'Confirmed',
-        'payment' => 'Cash',
-        'amount' => '₱900.00',
-    ],
-    [
-        'id' => 'PDR-2026-0097',
-        'customer' => 'Khean Digno',
-        'phone' => '+63 000 000 0000',
-        'email' => 'khean.digno@email.com',
-        'service' => 'Restaurant',
-        'date' => '2026-09-21',
-        'time' => '02:00 PM',
-        'guests' => 3,
-        'status' => 'Confirmed',
-        'payment' => 'GCash',
-        'amount' => '₱1,500.00',
-    ],
-    [
-        'id' => 'PDR-2026-0096',
-        'customer' => 'Ruzelle Peji',
-        'phone' => '+63 000 000 0000',
-        'email' => 'ruzelle.peji@email.com',
-        'service' => 'Catering',
-        'date' => '2026-09-22',
-        'time' => '04:00 PM',
-        'guests' => 1,
-        'status' => 'Cancelled',
-        'payment' => 'Cash',
-        'amount' => '₱10,000.00',
-    ],
-    [
-        'id' => 'PDR-2026-0095',
-        'customer' => 'Puso Dimaranan',
-        'phone' => '+63 000 000 0000',
-        'email' => 'puso.dimaranan@email.com',
-        'service' => 'Events Place',
-        'date' => '2026-09-23',
-        'time' => '06:00 PM',
-        'guests' => 100,
-        'status' => 'Pending',
-        'payment' => 'Cash',
-        'amount' => '₱20,000.00',
-    ]
-];
+$reservations = [];
+try {
+    $stmt = $pdo->query("SELECT * FROM reservations ORDER BY id DESC");
+    $rows = $stmt->fetchAll();
+    foreach ($rows as $r) {
+        $reservations[] = [
+            'id' => $r['reservation_id'],
+            'customer' => $r['customer_name'],
+            'phone' => $r['contact_number'],
+            'email' => $r['email'],
+            'service' => $r['main_service'],
+            'date' => $r['event_date'],
+            'time' => $r['event_time'],
+            'guests' => $r['guests'],
+            'status' => $r['status'],
+            'payment' => $r['payment_method'],
+            'amount' => '₱' . number_format($r['estimated_total'], 2),
+        ];
+    }
+} catch (Exception $e) {
+    $reservations = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -187,7 +157,7 @@ $reservations = [
                                         </button>
 
                                         <!-- Reject -->
-                                        <button class="btn btn-reject" title="Reject" onclick="updateStatus('<?php echo $row['id']; ?>', 'Rejected')">
+                                        <button class="btn btn-reject" title="Reject" onclick="updateStatus('<?php echo $row['id']; ?>', 'Cancelled')">
                                             <i class="fa-solid fa-xmark"></i>
                                         </button>
 
@@ -252,7 +222,7 @@ $reservations = [
                     <option value="Confirmed">Confirmed</option>
                     <option value="Pending">Pending</option>
                     <option value="Cancelled">Cancelled</option>
-                    <option value="Rejected">Rejected</option>
+                    <option value="Completed">Completed</option>
                 </select>
             </div>
             <div class="modal-footer">
@@ -295,12 +265,57 @@ $reservations = [
             document.getElementById('viewModal').style.display = 'flex';
         }
 
+        let isUpdatingStatus = false;
+
         // Update Reservation Status (Approve, Reject, Cancel)
-        function updateStatus(id, newStatus) {
-            if (confirm(`Are you sure you want to change status to ${newStatus}?`)) {
-                const badge = document.getElementById(`status-badge-${id}`);
-                badge.innerText = newStatus;
-                badge.className = `badge badge-${newStatus.toLowerCase()}`;
+        async function updateStatus(id, newStatus) {
+            if (newStatus === 'Rejected') {
+                newStatus = 'Cancelled';
+            }
+            const validStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed'];
+            if (!validStatuses.includes(newStatus)) {
+                alert('Invalid status: ' + newStatus);
+                return false;
+            }
+
+            if (!confirm(`Are you sure you want to change status to ${newStatus}?`)) {
+                return false;
+            }
+
+            if (isUpdatingStatus) return false;
+            isUpdatingStatus = true;
+
+            try {
+                const res = await fetch('../api/admin/update_status.php', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reservationId: id,
+                        status: newStatus
+                    })
+                });
+
+                const data = await res.json().catch(() => null);
+
+                if (res.ok && data && data.ok) {
+                    const badge = document.getElementById(`status-badge-${id}`);
+                    if (badge) {
+                        badge.innerText = newStatus;
+                        badge.className = `badge badge-${newStatus.toLowerCase()}`;
+                    }
+                    return true;
+                } else {
+                    const errorMsg = (data && data.reason) ? data.reason : 'Failed to update reservation status.';
+                    alert('Error updating status: ' + errorMsg);
+                    return false;
+                }
+            } catch (err) {
+                alert('Network error while updating reservation status.');
+                return false;
+            } finally {
+                isUpdatingStatus = false;
             }
         }
 
@@ -316,13 +331,15 @@ $reservations = [
         }
 
         // Save Edit / Reschedule
-        function saveEdit() {
+        async function saveEdit() {
             const id = document.getElementById('editResId').value;
             const newStatus = document.getElementById('editStatus').value;
             
-            updateStatus(id, newStatus);
-            closeModal('editModal');
-            alert('Reservation updated successfully!');
+            const success = await updateStatus(id, newStatus);
+            if (success) {
+                closeModal('editModal');
+                alert('Reservation updated successfully!');
+            }
         }
 
         function closeModal(modalId) {

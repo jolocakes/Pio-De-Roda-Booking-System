@@ -280,6 +280,18 @@ body {
   color: var(--gold); 
   border-left: 3px solid var(--gold); 
 }
+.chip-cancelled {
+  background-color: rgba(180, 50, 50, 0.15);
+  color: #b43232;
+  border-left: 3px solid #b43232;
+}
+
+.chip-completed {
+  background-color: rgba(70, 130, 180, 0.15);
+  color: #4682b4;
+  border-left: 3px solid #4682b4;
+}
+
 
 /* Sidebar Panels */
 .panel-section-title {

@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/auth_check.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,7 +35,7 @@
                 </li>
 
                 <li class="nav-item active">
-                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> calendar</a>
+                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
                 </li>
 
                 <li class="nav-item">
@@ -162,18 +163,59 @@
         </div>
     </div>
     <script>
-// Mock Data para sa Events at Venues
-const eventsData = [
-    { date: '2026-09-18', title: 'Wedding Reception', time: '05:00 PM - 10:00 PM', venue: 'Events Place', status: 'confirmed' },
-    { date: '2026-09-19', title: 'Cafe', time: '02:00 PM - 03:30 PM', venue: 'Cafe', status: 'pending' },
-    { date: '2026-09-20', title: 'Family Dinner', time: '06:00 PM - 09:00 PM', venue: 'Restaurant', status: 'confirmed' },
-    { date: '2026-09-20', title: 'Cafe', time: '02:00 PM - 03:30 PM', venue: 'Cafe', status: 'pending' }
-];
-
+let eventsData = [];
 const venueList = ['Events Place', 'Restaurant', 'Cafe'];
 
-let currentDate = new Date(2026, 8, 1); // September 2026
-let selectedDateStr = '2026-09-20'; // Default selected date
+let currentDate = new Date();
+let selectedDateStr = new Date().toISOString().split('T')[0];
+
+let fetchSequence = 0;
+
+async function fetchAdminReservations() {
+    const currentSeq = ++fetchSequence;
+    try {
+        const res = await fetch('../api/admin/reservations.php', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Network response was not ok');
+        const rows = await res.json();
+        
+        if (currentSeq !== fetchSequence) return;
+
+        eventsData = (rows || []).map(r => ({
+            id: r.id,
+            date: r.eventDate,
+            title: r.service || 'Reservation',
+            time: r.eventTime || 'All Day',
+            venue: r.service || 'Events Place',
+            status: (r.status || 'Pending').toLowerCase(),
+            rawStatus: r.status || 'Pending',
+            customer: r.customerName,
+            contactNumber: r.contactNumber || 'Not provided',
+            email: r.email || 'Not provided',
+            eventType: r.eventType || 'Not provided',
+            guests: r.guests || 0,
+            selectedPackage: r.selectedPackage || 'Not provided',
+            additionalServices: r.additionalServices || []
+        }));
+        renderCalendar();
+    } catch (e) {
+        if (eventsData.length === 0) {
+            renderCalendar();
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', fetchAdminReservations);
+
+window.addEventListener('pageshow', (event) => {
+    fetchAdminReservations();
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        fetchAdminReservations();
+    }
+});
+
 
 function renderCalendar() {
     const year = currentDate.getFullYear();
@@ -224,8 +266,10 @@ function renderCalendar() {
         let eventsHTML = `<div class="day-number">${i}</div>`;
         const dayEvents = eventsData.filter(e => e.date === dateString);
         dayEvents.forEach(evt => {
-            const badgeClass = evt.status === 'confirmed' ? 'chip-confirmed' : 'chip-pending';
-            eventsHTML += `<span class="event-chip ${badgeClass}">${evt.title}</span>`;
+            if (evt.status === 'confirmed') {
+                const badge = getBadgeInfo(evt.rawStatus);
+                eventsHTML += `<span class="event-chip ${badge.cls}">${evt.title}</span>`;
+            }
         });
 
         cell.innerHTML = eventsHTML;

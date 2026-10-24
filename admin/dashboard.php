@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/auth_check.php';
 
 $admin_name = "Admin User";
 $admin_role = "Administrator";
