@@ -110,7 +110,7 @@
                 <!-- Right Side Information Panel -->
                 <div>
                     <!-- Venue Availability Tracker -->
-                    <div class="card" style="margin-bottom: 20px;">
+                    <div class="card" id="venueAvailabilityCard" style="margin-bottom: 20px;">
                         <div class="panel-section-title">
                             <span>Venue Availability</span>
                             <span style="font-size: 11px; color: var(--text-muted);">Sept 20, 2026</span>
@@ -136,7 +136,7 @@
                     </div>
 
                     <!-- Events & Pending List -->
-                    <div class="card">
+                    <div class="card" id="scheduleDetailsCard">
                         <div class="panel-section-title">
                             <span>Schedule Details</span>
                         </div>
@@ -165,6 +165,16 @@
     <script>
 let eventsData = [];
 const venueList = ['Events Place', 'Restaurant', 'Cafe'];
+function getBadgeInfo(status) {
+    const s = (status || '').toLowerCase();
+    if (s === 'confirmed') return { cls: 'chip-confirmed', label: 'Confirmed Event' };
+    if (s === 'pending') return { cls: 'chip-pending', label: 'Pending Reservation' };
+    if (s === 'cancelled') return { cls: 'chip-cancelled', label: 'Cancelled' };
+    if (s === 'completed') return { cls: 'chip-completed', label: 'Completed' };
+    return { cls: 'chip-pending', label: status || 'Pending' };
+}
+
+
 
 let currentDate = new Date();
 let selectedDateStr = new Date().toISOString().split('T')[0];
@@ -264,12 +274,10 @@ function renderCalendar() {
         }
 
         let eventsHTML = `<div class="day-number">${i}</div>`;
-        const dayEvents = eventsData.filter(e => e.date === dateString);
+        const dayEvents = eventsData.filter(e => e.date === dateString && (e.status === 'confirmed' || e.status === 'pending'));
         dayEvents.forEach(evt => {
-            if (evt.status === 'confirmed') {
-                const badge = getBadgeInfo(evt.rawStatus);
-                eventsHTML += `<span class="event-chip ${badge.cls}">${evt.title}</span>`;
-            }
+            const badge = getBadgeInfo(evt.rawStatus);
+            eventsHTML += `<span class="event-chip ${badge.cls}">${evt.title}</span>`;
         });
 
         cell.innerHTML = eventsHTML;
@@ -317,8 +325,8 @@ function updateSidePanels(dateStr) {
     const availHeader = document.querySelector('.availability-card')?.parentElement?.querySelector('span:last-child');
     if(availHeader) availHeader.innerText = formattedDate;
 
-    // 2. Filter Events sa napiling araw
-    const dayEvents = eventsData.filter(e => e.date === dateStr);
+    // 2. Filter Events sa napiling araw (Pending and Confirmed only)
+    const dayEvents = eventsData.filter(e => e.date === dateStr && (e.status === 'confirmed' || e.status === 'pending'));
 
     // Update Schedule Details Container
     const scheduleCard = document.querySelectorAll('.card')[2]; // Pangatlong card sa layout
@@ -355,7 +363,7 @@ function updateSidePanels(dateStr) {
             </div>`;
 
         venueList.forEach(v => {
-            const bookedEvt = dayEvents.find(e => e.venue === v);
+            const bookedEvt = dayEvents.find(e => e.status === 'confirmed' && (e.venue === v || v === 'Events Place'));
             if (bookedEvt) {
                 availHTML += `
                     <div class="availability-card">
