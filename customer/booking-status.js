@@ -28,7 +28,11 @@
     Confirmed: { cls:"status-confirmed", label:"CONFIRMED", sub:"Reservation Confirmed",
                  heading:"Reservation Confirmed!",
                  message:"Your reservation has been confirmed by Pio De Roda Cafe and Restaurant.",
-                 full:"Confirmed" }
+                 full:"Confirmed" },
+    Cancelled:  { cls:"status-cancelled", label:"CANCELLED", sub:"Reservation Cancelled",
+                 heading:"Your reservation was cancelled",
+                 message:"This reservation has been cancelled. Please contact Pio De Roda Cafe and Restaurant if you believe this is a mistake.",
+                 full:"Cancelled" }
   };
 
   const root = document.getElementById("bookingStatusRoot");
@@ -68,7 +72,11 @@
     return `<ul class="bs-services-list">${list.map(s=>{
       const name = typeof s === "string" ? s : s && s.name;
       const qty  = s && s.quantity > 1 ? ` × ${esc(s.quantity)}` : "";
-      return has(name) ? `<li>${esc(name)}${qty}</li>` : "";
+      // packageName/totalPrice come from the inline package picker — show the
+      // exact chosen package and what it cost when the record has them.
+      const pkg  = s && s.packageName ? ` <small>${esc(s.packageName)}</small>` : "";
+      const amt  = s && s.totalPrice != null ? ` — ${money(s.totalPrice)}` : "";
+      return has(name) ? `<li>${esc(name)}${pkg}${qty}${amt}</li>` : "";
     }).join("")}</ul>`;
   }
 

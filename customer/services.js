@@ -512,8 +512,8 @@ const addonCatalog = [
     id: "dinein-addon",
     serviceId: "dinein",
     name: "Dine-In Menu",
-    desc: "Add dine-in menu service. See the Dine-In Menu page to choose specific items.",
-    price: null,
+    desc: "Add a set menu (Menu A or Menu B) served per guest.",
+    priceFrom: "dinein",
     qty: false,
   },
   {
@@ -553,20 +553,44 @@ const addonCatalog = [
     serviceId: "equipment",
     name: "Equipment Rental",
     desc: "Add extra equipment rental. Priced per item.",
-    price: null,
-    qty: false,
+    priceFrom: "equipment",
+    qty: true,
   },
 ];
 
-// Fill in each `priceFrom` add-on's price from that service's own first
-// package in SERVICES, so the two never go out of sync.
+// Fill in each add-on from its linked SERVICES entry so the two never go
+// out of sync. Each add-on inherits the service's full `packages` list plus
+// its per-head flags, which power the INLINE PACKAGE PICKER in the booking
+// panel — `price` here is only ever the STARTING price ("From ₱…"); the
+// customer picks the exact package before the add-on enters the cart.
 addonCatalog.forEach((a) => {
+  const svc = SERVICES.find((s) => s.id === (a.priceFrom || a.serviceId));
+  if (!svc) return;
+  a.pkgs = svc.packages || [];
+  a.perHead = svc.perHead || 0; // Dine-In: keeps the numeric ₱600 per guest
+  a.perHeadByPkg = !!svc.perHeadByPkg; // Catering: rate depends on courses
   if (a.priceFrom) {
-    const svc = SERVICES.find((s) => s.id === a.priceFrom);
-    a.price =
-      svc && svc.packages && svc.packages[0] ? svc.packages[0][1] : null;
+    const first = a.pkgs[0];
+    a.price = first && first[1] != null ? first[1] : svc.perHead || null;
   }
 });
+
+// Every choice the inline picker shows for an add-on (usually the linked
+// service's packages; Dine-In falls back to its per-head rate).
+function addonOptions(a) {
+  if (a.pkgs && a.pkgs.length) return a.pkgs;
+  if (a.perHead) return [[a.name, a.perHead]];
+  return [[a.name, a.price]];
+}
+
+// The per-unit price of ONE option: per-head-by-package services use the
+// package's rate, plain per-head services use the service rate, everything
+// else uses the package's flat price.
+function addonOptionRate(a, pkg) {
+  if (a.perHeadByPkg) return (pkg && pkg[1]) || 0;
+  if (a.perHead) return a.perHead;
+  return (pkg && pkg[1]) || 0;
+}
 
 // The ONE place that decides which services may be offered as add-ons:
 // every add-on EXCEPT the service currently being booked (main service).
