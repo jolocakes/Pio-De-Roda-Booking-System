@@ -1,0 +1,9 @@
+<IfModule mod_headers.c>
+  # Dev convenience: always revalidate site files so edits show up on a
+  # normal refresh (no more stale CSS/JS after code changes).
+  # If this project is ever deployed to a real host, replace with long
+  # cache lifetimes for /assets and HTML files marked no-cache.
+  <FilesMatch "\.(html|htm|css|js|php)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>

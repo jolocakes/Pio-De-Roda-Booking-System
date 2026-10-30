@@ -606,6 +606,106 @@ ul.plain.dot li:before {
   color:var(--maroon);
 }
 
+/* ---- Inline package picker for Additional Services (Option A) ---- */
+.addon.picking {
+  flex-wrap:wrap;
+  align-items:flex-start;
+  background:var(--cream-dim);
+}
+.addon.picking .pick-head,
+.addon .pick-rows,
+.addon .pick-actions {
+  flex-basis:100%;
+}
+.addon-pkg {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:8px 10px;
+  margin-top:6px;
+  cursor:pointer;
+  background:var(--cream-soft);
+}
+.addon-pkg:hover {
+  border-color:var(--gold);
+}
+.addon-pkg:focus-visible,
+.addon-pkg.sel:focus-visible {
+  outline:2px solid var(--gold);
+  outline-offset:2px;
+}
+.addon-pkg.sel {
+  border-color:var(--gold);
+  background:var(--cream-soft);
+  box-shadow:inset 0 0 0 1px var(--gold);
+}
+.addon-pkg .nm {
+  font-family:var(--font-accent);
+  font-size:.84rem;
+  color:var(--maroon);
+}
+.addon-pkg .amt {
+  color:var(--crimson);
+  font-size:.74rem;
+  text-align:right;
+}
+.addon .pick-actions {
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+}
+.addon .pick-actions .cancel {
+  background:none;
+  border:1px solid var(--line);
+  border-radius:7px;
+  padding:6px 12px;
+  font-size:.78rem;
+  cursor:pointer;
+  font-family:var(--font-accent);
+  color:var(--text-muted);
+}
+.addon .pick-actions .cancel:hover {
+  border-color:var(--maroon);
+  color:var(--maroon);
+}
+
+/* ---- In-cart add-on row: chosen package + Change/✕ controls ---- */
+.addon.in-cart {
+  border-color:var(--sage);
+  background:var(--cream-soft);
+}
+.addon .cart-actions {
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+.addon .cart-actions .mini {
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:7px;
+  padding:5px 9px;
+  font-size:.72rem;
+  cursor:pointer;
+  font-family:var(--font-accent);
+  color:var(--maroon);
+}
+.addon .cart-actions .mini:hover {
+  border-color:var(--maroon);
+}
+.addon .cart-actions .mini.danger:hover {
+  border-color:var(--crimson);
+  color:var(--crimson);
+}
+.line-note {
+  display:block;
+  font-size:.7rem;
+  font-weight:400;
+  color:var(--text-muted);
+}
+
 .summary {
   background:var(--cream-dim);
   border-radius:10px;
@@ -732,6 +832,12 @@ ul.plain.dot li:before {
   font-size:.75rem;
   font-weight:bold;
 }
+
+/* State colours — same palette as the badges on booking-status.html.
+   Pending = orange, Confirmed = green, Cancelled = red. */
+.status-pill.pending   { color:#a35a06; background:#fdeed8; border:1px solid #e7b271; }
+.status-pill.confirmed { color:#2f6b3a; background:#e4f2e2; border:1px solid #9dc39a; }
+.status-pill.cancelled { color:#a01b1b; background:#fbe4e2; border:1px solid #dda19d; }
 
 .refnum {
   font-family:var(--font-accent);

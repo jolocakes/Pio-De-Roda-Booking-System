@@ -53,6 +53,73 @@
   color: var(--text-dark);
   margin: 0.7rem 0 0.2rem;
 }
+/* Status badge — the coloured status chip under "Status".
+   Pending = orange, Confirmed = green, Cancelled = red. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.42rem 0.95rem;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: var(--status-color, var(--text-dark));
+  background: var(--status-bg, var(--cream-soft));
+  border: 1px solid var(--status-line, var(--border-soft));
+}
+.status-badge .dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-badge .status-text { text-transform: uppercase; }
+
+/* Pending — orange, with a slow pulse so it reads as "in progress" */
+.status-pending {
+  --status-color: #a35a06;
+  --status-bg: #fdeed8;
+  --status-line: #e7b271;
+}
+.status-pending .dot {
+  box-shadow: 0 0 0 0 rgba(163, 90, 6, 0.55);
+  animation: pdrStatusPulse 2.2s ease-out infinite;
+}
+@keyframes pdrStatusPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(163, 90, 6, 0.5); }
+  70%  { box-shadow: 0 0 0 9px rgba(163, 90, 6, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(163, 90, 6, 0); }
+}
+
+/* Confirmed — green */
+.status-confirmed {
+  --status-color: #2f6b3a;
+  --status-bg: #e4f2e2;
+  --status-line: #9dc39a;
+}
+
+/* Cancelled — red */
+.status-cancelled {
+  --status-color: #a01b1b;
+  --status-bg: #fbe4e2;
+  --status-line: #dda19d;
+}
+
+/* Unknown / unexpected status — neutral */
+.status-unknown {
+  --status-color: var(--text-muted);
+  --status-bg: var(--cream-soft);
+  --status-line: var(--border-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pending .dot { animation: none; }
+}
+
 .bs-message { margin-bottom: 1.4rem; }
 .bs-note { font-size: 0.82rem; margin: 1rem 0 0; font-style: italic; }
 

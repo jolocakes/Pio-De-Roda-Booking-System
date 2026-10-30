@@ -44,7 +44,9 @@ let state = {
   guests: "",
   selectedPackage: null,
   mainCourses: [], // Catering with Menu: chosen main courses (minimum 2)
-  cart: {}, // id -> {qty, item}  (ADDITIONAL services only — never the main service)
+  cart: {}, // id -> {qty, item, pkgName, unitPrice}  (ADDITIONAL services only — never the main service)
+  picking: null, // add-on id whose inline package picker is currently open
+  pickingPkg: 0, // selected package row inside that picker
   notice: "", // one-time message shown in the Additional Services section
   guidelinesOpen: {}, // serviceId -> true/false  (each service expands/collapses INDEPENDENTLY)
   calYear: parseInt(_todayDS.slice(0, 4), 10),
@@ -411,8 +413,64 @@ function renderPanel() {
 }
 
 /* ---------------- ADDITIONAL SERVICES (dynamic) ---------------- */
+/* Line pricing for one cart entry. Per-head add-ons (Dine-In, Catering)
+   multiply their rate by the guest count; quantity add-ons (Equipment)
+   multiply by the chosen quantity; everything else is a flat price. */
+function addonLineUnit(c) {
+  return c.unitPrice || 0;
+}
+function addonLineTotal(c) {
+  const per = c.item.perHead || c.item.perHeadByPkg;
+  const base = per
+    ? addonLineUnit(c) * (parseInt(state.guests) || 0)
+    : addonLineUnit(c);
+  return base * (c.item.qty ? c.qty : 1);
+}
+
+/* Shared row markup for the summary box AND the review modal: shows the
+   chosen package, the computed amount, and how a per-head amount derives. */
+function addonCartRows(kind) {
+  const guests = parseInt(state.guests) || 0;
+  return Object.values(state.cart)
+    .map((c) => {
+      const per = c.item.perHead || c.item.perHeadByPkg;
+      const note = c.pkgName
+        ? ` <small class="line-note">${c.pkgName}${
+            per && guests > 0
+              ? ` — ${guests} pax × ₱${addonLineUnit(c).toLocaleString()} per head`
+              : ""
+          }</small>`
+        : "";
+      const label =
+        c.item.name + (c.item.qty ? " × " + c.qty : "") + note;
+      return `<div class="${kind}"><span>${label}</span><span>₱${addonLineTotal(c).toLocaleString()}</span></div>`;
+    })
+    .join("");
+}
+
+/* Adds (or updates) a cart entry from the picker's selected package row. */
+function addAddonToCart(item, pkgIdx) {
+  if (!item || item.serviceId === state.service.id) return;
+  const opts = addonOptions(item);
+  const pkg =
+    opts[Math.max(0, Math.min(pkgIdx || 0, opts.length - 1))] ||
+    [item.name, item.price];
+  const prev = state.cart[item.id];
+  state.cart[item.id] = {
+    qty: prev && item.qty ? prev.qty : 1,
+    item,
+    pkgName: pkg[0],
+    unitPrice: addonOptionRate(item, pkg),
+  };
+  state.picking = null;
+  renderAdditionalServices(state.service.id);
+  renderSummary();
+}
+
 // Renders every add-on EXCEPT the main service currently being booked.
 // Pass `animate=true` when the main service just changed (subtle fade-in).
+// Add-ons with several packages open an INLINE PICKER (state.picking), so
+// the customer always chooses the exact package — never a hidden "cheapest".
 function renderAdditionalServices(currentServiceId, animate = false) {
   const box = document.getElementById("additionalServicesList");
   if (!box) return;
@@ -428,38 +486,171 @@ function renderAdditionalServices(currentServiceId, animate = false) {
     return;
   }
 
+  const guests = parseInt(state.guests) || 0;
+
   box.innerHTML =
     notice +
     list
       .map((a) => {
         const inCart = state.cart[a.id];
-        const hasPrice = a.price !== null && a.price !== undefined;
-        const priceLabel = hasPrice
-          ? `₱${a.price.toLocaleString()}${a.qty ? " each" : ""}`
-          : "Price to be confirmed";
-        return `<div class="addon ${animate ? "fade-in" : ""}">
-      <div style="flex:1"><div class="nm">${a.name}</div><div class="desc">${a.desc}</div><div class="price">${priceLabel}</div></div>
-      ${inCart && a.qty ? `<div class="qty"><button type="button" data-qty="-1" data-id="${a.id}">-</button><span>${inCart.qty}</span><button type="button" data-qty="1" data-id="${a.id}">+</button></div>` : ""}
-      <button type="button" class="add ${inCart ? "added" : ""}" data-id="${a.id}" ${hasPrice ? "" : "disabled"}>${hasPrice ? (inCart ? "Added ✓" : "+ Add") : "Price TBD"}</button>
-    </div>`;
+        const opts = addonOptions(a);
+        const rates = opts.map((o) => addonOptionRate(a, o)).filter((r) => r > 0);
+        const min = rates.length ? Math.min(...rates) : null;
+        const perHeadish = a.perHead || a.perHeadByPkg;
+        const anim = animate ? " fade-in" : "";
+
+        // ---- inline package picker open for this add-on ----
+        if (state.picking === a.id) {
+          const rows = opts
+            .map((o, i) => {
+              const rate = addonOptionRate(a, o);
+              const sel = i === state.pickingPkg ? " sel" : "";
+              const amt = perHeadish
+                ? `₱${rate.toLocaleString()} / head` +
+                  (guests > 0
+                    ? ` · ₱${(rate * guests).toLocaleString()} (${guests} pax)`
+                    : "")
+                : `₱${rate.toLocaleString()}`;
+              return `<div class="addon-pkg${sel}" data-idx="${i}" role="radio" aria-checked="${sel ? "true" : "false"}" tabindex="0">
+                <span class="nm">${o[0]}</span><span class="amt">${amt}</span></div>`;
+            })
+            .join("");
+          return `<div class="addon picking${anim}">
+            <div class="pick-head"><div class="nm">${a.name}</div><div class="desc">Choose a package to add:</div></div>
+            <div class="pick-rows">${rows}</div>
+            <div class="pick-actions">
+              <button type="button" class="add" data-confirm="${a.id}">Add to Booking</button>
+              <button type="button" class="cancel" data-cancel="1">Cancel</button>
+            </div>
+          </div>`;
+        }
+
+        // ---- already in the cart: chosen package + computed amount ----
+        if (inCart) {
+          const breakdown = perHeadish
+            ? guests > 0
+              ? `${guests} pax × ₱${addonLineUnit(inCart).toLocaleString()} per head`
+              : "per guest"
+            : a.qty
+              ? `₱${addonLineUnit(inCart).toLocaleString()} per item`
+              : "";
+          return `<div class="addon in-cart${anim}">
+            <div style="flex:1">
+              <div class="nm">✓ ${a.name}</div>
+              <div class="price">${inCart.pkgName || ""} — ₱${addonLineTotal(inCart).toLocaleString()}</div>
+              ${breakdown ? `<div class="desc">${breakdown}</div>` : ""}
+            </div>
+            ${
+              a.qty
+                ? `<div class="qty"><button type="button" data-qty="-1" data-id="${a.id}">-</button><span>${inCart.qty}</span><button type="button" data-qty="1" data-id="${a.id}">+</button></div>`
+                : ""
+            }
+            <div class="cart-actions">
+              ${
+                a.qty
+                  ? ""
+                  : `<button type="button" class="mini" data-change="${a.id}">Change</button>`
+              }
+              <button type="button" class="mini danger" data-remove="${a.id}" aria-label="Remove ${a.name}">✕</button>
+            </div>
+          </div>`;
+        }
+
+        // ---- default (not yet added) card ----
+        let priceLabel;
+        if (min === null) priceLabel = "Price to be confirmed";
+        else if (a.perHeadByPkg)
+          priceLabel = `From ₱${min.toLocaleString()} per head${
+            opts.length > 1 ? " · " + opts.length + " packages" : ""
+          }`;
+        else if (a.perHead)
+          priceLabel = `₱${min.toLocaleString()} per head${
+            opts.length > 1 ? " · choose menu" : ""
+          }`;
+        else if (a.qty) priceLabel = `₱${min.toLocaleString()} per item`;
+        else
+          priceLabel =
+            opts.length > 1
+              ? `From ₱${min.toLocaleString()} · ${opts.length} packages`
+              : `₱${min.toLocaleString()}`;
+
+        return `<div class="addon${anim}">
+          <div style="flex:1"><div class="nm">${a.name}</div><div class="desc">${a.desc}</div><div class="price">${priceLabel}</div></div>
+          <button type="button" class="add" data-add="${a.id}">${opts.length > 1 ? "Choose" : "+ Add"}</button>
+        </div>`;
       })
       .join("");
 
-  box.querySelectorAll(".addon .add").forEach(
+  /* --- bindings --- */
+  box.querySelectorAll("[data-add]").forEach(
     (btn) =>
       (btn.onclick = () => {
-        const id = btn.dataset.id;
-        const item = addonCatalog.find((a) => a.id === id);
-        if (!item || item.serviceId === state.service.id) return; // never add the main service
-        if (state.cart[id]) {
-          delete state.cart[id];
+        const item = addonCatalog.find((a) => a.id === btn.dataset.add);
+        if (!item || item.serviceId === state.service.id) return;
+        if (addonOptions(item).length > 1) {
+          state.picking = item.id;
+          state.pickingPkg = 0;
+          renderAdditionalServices(state.service.id);
         } else {
-          state.cart[id] = { qty: 1, item };
+          addAddonToCart(item, 0); // single-option add-ons add instantly
         }
+      }),
+  );
+
+  box.querySelectorAll(".addon-pkg").forEach((row) => {
+    const pick = () => {
+      state.pickingPkg = parseInt(row.dataset.idx) || 0;
+      renderAdditionalServices(state.service.id);
+    };
+    row.onclick = pick;
+    row.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        pick();
+      }
+    };
+  });
+
+  box.querySelectorAll("[data-confirm]").forEach(
+    (btn) =>
+      (btn.onclick = () => {
+        const item = addonCatalog.find((a) => a.id === btn.dataset.confirm);
+        addAddonToCart(item, state.pickingPkg);
+      }),
+  );
+
+  box.querySelectorAll("[data-cancel]").forEach(
+    (btn) =>
+      (btn.onclick = () => {
+        state.picking = null;
+        renderAdditionalServices(state.service.id);
+      }),
+  );
+
+  box.querySelectorAll("[data-change]").forEach(
+    (btn) =>
+      (btn.onclick = () => {
+        const id = btn.dataset.change;
+        const item = addonCatalog.find((a) => a.id === id);
+        const c = state.cart[id];
+        if (!item || !c) return;
+        const opts = addonOptions(item);
+        const at = opts.findIndex((o) => o[0] === c.pkgName);
+        state.picking = id;
+        state.pickingPkg = at >= 0 ? at : 0;
+        renderAdditionalServices(state.service.id);
+      }),
+  );
+
+  box.querySelectorAll("[data-remove]").forEach(
+    (btn) =>
+      (btn.onclick = () => {
+        delete state.cart[btn.dataset.remove];
         renderAdditionalServices(state.service.id);
         renderSummary();
       }),
   );
+
   box.querySelectorAll(".qty button").forEach(
     (btn) =>
       (btn.onclick = (ev) => {
@@ -539,7 +730,7 @@ function computeTotal() {
     );
   }
   Object.values(state.cart).forEach((c) => {
-    total += c.item.price * (c.item.qty ? c.qty : 1);
+    total += addonLineTotal(c);
   });
   return total;
 }
@@ -551,12 +742,7 @@ function renderSummary() {
     state.selectedPackage !== null
       ? state.service.packages[state.selectedPackage]
       : null;
-  const cartRows = Object.values(state.cart)
-    .map(
-      (c) =>
-        `<div class="row"><span>${c.item.name}${c.item.qty ? " × " + c.qty : ""}</span><span>₱${(c.item.price * (c.item.qty ? c.qty : 1)).toLocaleString()}</span></div>`,
-    )
-    .join("");
+  const cartRows = addonCartRows("row");
   box.innerHTML = `
     <div class="summary">
       <div class="row"><span>Customer</span><span>${state.customerName || "—"}</span></div>
@@ -624,6 +810,9 @@ function attachPanelEvents() {
     } else err.style.display = "none";
     state.guests = v;
     renderSummary();
+    // keep an open picker's live totals and per-head cart rows in sync
+    if (state.picking || Object.keys(state.cart).length)
+      renderAdditionalServices(state.service.id);
   };
 
   document.querySelectorAll(".pkg-opt").forEach(
@@ -777,12 +966,7 @@ function openReviewModal() {
   const s = state.service;
   const pkg = s.packages[state.selectedPackage];
   const cartRows =
-    Object.values(state.cart)
-      .map(
-        (c) =>
-          `<div class="confirm-row"><span>${c.item.name}${c.item.qty ? " × " + c.qty : ""}</span><span>₱${(c.item.price * (c.item.qty ? c.qty : 1)).toLocaleString()}</span></div>`,
-      )
-      .join("") ||
+    addonCartRows("confirm-row") ||
     `<div class="confirm-row"><span>None selected</span><span>—</span></div>`;
   document.getElementById("reviewBody").innerHTML = `
     <div class="confirm-row"><span>Customer</span><span>${state.customerName}</span></div>
@@ -876,9 +1060,10 @@ document.getElementById("submitBtn").onclick = async () => {
   // Structured additional-services list: name, quantity, unit price, total price.
   const additionalServices = Object.values(state.cart).map((c) => ({
     name: c.item.name,
+    packageName: c.pkgName || null,
     quantity: c.item.qty ? c.qty : 1,
-    unitPrice: c.item.price,
-    totalPrice: c.item.price * (c.item.qty ? c.qty : 1),
+    unitPrice: c.unitPrice,
+    totalPrice: addonLineTotal(c),
   }));
 
   // Only the FORM data is sent. The backend generates the Reservation ID and the
@@ -948,7 +1133,12 @@ function showSuccess(r) {
   const e = pdrEscape;
   const extras = r.additionalServices.length
     ? r.additionalServices
-        .map((s) => e(s.name) + (s.quantity > 1 ? ` × ${s.quantity}` : ""))
+        .map(
+          (s) =>
+            e(s.name) +
+            (s.packageName ? ` — ${e(s.packageName)}` : "") +
+            (s.quantity > 1 ? ` × ${s.quantity}` : ""),
+        )
         .join(", ")
     : "None";
   document.getElementById("successBody").innerHTML = `
@@ -962,7 +1152,7 @@ function showSuccess(r) {
     </div>
     <p class="pin-warn"><strong>Please save your Reservation ID and Booking PIN.</strong> You will need both to check your reservation status later. The PIN will not be shown again.</p>
     <div class="section-label">BOOKING STATUS</div>
-    <p><span class="status-pill">${e(r.status)} — Awaiting Confirmation</span></p>
+    <p><span class="status-pill ${e(String(r.status || "").toLowerCase())}">${e(r.status)} — Awaiting Confirmation</span></p>
     <div class="section-label" style="margin-top:16px;">RESERVATION DETAILS</div>
     <div class="confirm-row"><span>Customer</span><span>${e(r.customerName)}</span></div>
     <div class="confirm-row"><span>Event Date</span><span>${e(r.eventDate)}</span></div>
@@ -993,6 +1183,8 @@ function showSuccess(r) {
     state.selectedPackage = null;
     state.mainCourses = [];
     state.cart = {};
+    state.picking = null;
+    state.pickingPkg = 0;
     state.notice = "";
     renderAll();
     refreshUnavailableDates(); // reload the taken dates for the fresh form
