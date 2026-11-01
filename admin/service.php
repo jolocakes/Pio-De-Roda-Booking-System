@@ -318,19 +318,81 @@
     </div>
  
     <script>
-    // I-set sa true kapag handa na ang update_price.php at database
-    const USE_SERVER = false;
- 
+    let csrfToken = '';
+
     const formatPeso = n => Number(n).toLocaleString('en-PH');
- 
-    function savePriceToServer(id, price) {
-        return fetch('update_price.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'id=' + encodeURIComponent(id) + '&price=' + encodeURIComponent(price)
-        }).then(res => res.json());
+
+    function loadServicesFromDatabase() {
+        fetch('../api/admin/services.php', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        })
+        .then(res => {
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = 'index.php';
+                throw new Error('Unauthorized');
+            }
+            if (!res.ok) {
+                throw new Error('Failed to load services');
+            }
+            const tokenHeader = res.headers.get('X-CSRF-Token');
+            if (tokenHeader) {
+                csrfToken = tokenHeader;
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (!data.ok || !data.services) {
+                throw new Error('Invalid server response');
+            }
+            if (data.csrf_token) {
+                csrfToken = data.csrf_token;
+            }
+
+            data.services.forEach(svc => {
+                const card = document.querySelector(`.service-card[data-service-id="${svc.id}"]`) || 
+                             document.querySelector(`.service-card[data-id="${svc.id}"]`);
+                if (card) {
+                    card.dataset.id = svc.id;
+                    const priceLabel = card.querySelector('.price-label');
+                    const priceValue = card.querySelector('.price-value');
+                    if (priceLabel && priceValue) {
+                        priceLabel.dataset.price = svc.base_price;
+                        priceValue.textContent = formatPeso(svc.base_price);
+                    }
+                }
+            });
+        })
+        .catch(err => {
+            console.error('Error loading services:', err);
+        });
     }
- 
+
+    function savePriceToServer(id, price) {
+        return fetch('../api/admin/services.php', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ id: id, base_price: price })
+        })
+        .then(res => {
+            if (res.status === 401 || res.status === 403) {
+                alert('Session expired or unauthorized. Please log in again.');
+                window.location.href = 'index.php';
+                throw new Error('Unauthorized');
+            }
+            return res.json();
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadServicesFromDatabase();
+    });
+
     document.querySelectorAll('.service-card').forEach(card => {
         const priceLabel = card.querySelector('.price-label');
         const priceValue = card.querySelector('.price-value');
@@ -339,7 +401,7 @@
         const btnEdit    = card.querySelector('.btn-edit-price');
         const btnSave    = card.querySelector('.btn-save-price');
         const btnCancel  = card.querySelector('.btn-cancel-price');
- 
+
         function enterEditMode() {
             priceInput.value = priceLabel.dataset.price;
             priceLabel.style.display = 'none';
@@ -350,7 +412,7 @@
             priceInput.focus();
             priceInput.select();
         }
- 
+
         function exitEditMode() {
             priceLabel.style.display = '';
             priceEdit.style.display  = 'none';
@@ -358,33 +420,48 @@
             btnSave.style.display    = 'none';
             btnCancel.style.display  = 'none';
         }
- 
+
         function applyPrice(newPrice) {
             priceLabel.dataset.price = newPrice;
             priceValue.textContent   = formatPeso(newPrice);
             exitEditMode();
         }
- 
+
         btnEdit.addEventListener('click', enterEditMode);
         btnCancel.addEventListener('click', exitEditMode);
- 
+
         btnSave.addEventListener('click', () => {
             const newPrice = parseFloat(priceInput.value);
- 
+
             if (isNaN(newPrice) || newPrice < 0) {
                 alert('Maglagay ng valid na presyo.');
                 return;
             }
- 
-            if (USE_SERVER) {
-                savePriceToServer(card.dataset.id, newPrice)
-                    .then(data => data.success ? applyPrice(newPrice) : alert('Hindi na-save ang presyo.'))
-                    .catch(() => alert('May error sa connection.'));
-            } else {
-                applyPrice(newPrice);
-            }
+
+            btnSave.disabled = true;
+            const originalHtml = btnSave.innerHTML;
+            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+            const serviceId = card.dataset.id || card.dataset.serviceId;
+
+            savePriceToServer(serviceId, newPrice)
+                .then(data => {
+                    if (data && data.ok) {
+                        applyPrice(newPrice);
+                    } else {
+                        alert('Hindi na-save ang presyo: ' + (data.reason || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('May error sa connection.');
+                })
+                .finally(() => {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = originalHtml;
+                });
         });
- 
+
         // Enter = save, Escape = cancel
         priceInput.addEventListener('keydown', e => {
             if (e.key === 'Enter')  btnSave.click();
