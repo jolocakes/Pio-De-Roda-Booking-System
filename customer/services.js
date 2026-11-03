@@ -1,4 +1,5 @@
 /* Shared service catalog, add-ons, and guidelines for Pio De Roda reservation pages */
+<<<<<<< Updated upstream
 /* ayusin mo pa ung "add to cart" feature mo, kung ilalagay mo rin ba ung mismong services sa gilid" */
 const SERVICES = [
   {
@@ -67,40 +68,13 @@ const SERVICES = [
       "Menu tasting may be arranged upon request, subject to availability.",
     ],
   },
+=======
+/* Loaded dynamically from ../api/test_services_stage4c5.php (Stage 4D database catalog integration). */
+>>>>>>> Stashed changes
 
-  {
-    id: "venue",
-    name: "Venue Rentals",
-    rates: [
-      ["Extension Hall (30 to 35 persons)", "₱15,000"],
-      ["Extension Hall (36 - 50 Persons)", "₱20,000"],
-      ["Main Hall (50 - 65 Persons)", "₱25,000"],
-      ["Main Hall (66 - 100 Persons)", "₱30,000"],
-    ],
-    price: "₱15,000",
-    inclusions: [
-      "Use of air-conditioned venue for 4 hours",
-      "Basic sound system set-up (player, speaker and microphone)",
-      "Basic Catering Set-up",
-      "Decorative stage and throne",
-      "Elegantly skirted buffet table",
-      "Tables for cake and gifts",
-      "Round table with floor length table cover",
-      "Table numbers & centerpiece for each table",
-      "Tiffany Chairs with thematic ribbon",
-      "Complete silverware, glassware and flatware",
-      "Professionally trained and uniformed staff",
-      "Provision for parking space",
-    ],
-    packages: [
-      ["Extension Hall (30 - 35 Persons)", 15000],
-      ["Extension Hall (36 - 50 Persons)", 20000],
-      ["Main Hall (50 - 65 Persons)", 25000],
-      ["Main Hall (66 - 100 Persons)", 30000],
-    ],
-    maxCap: 120,
-  },
+const CATALOG_API_URL = "../api/test_services_stage4c5.php";
 
+<<<<<<< Updated upstream
   {
     id: "dinein",
     name: "Dine-In Menu",
@@ -347,7 +321,43 @@ const SERVICES = [
     packages: [["Standard Rate", 300]],
     maxCap: null,
   },
+=======
+/* Original established customer service ordering */
+const SERVICE_ORDER = [
+  "catering-menu",
+  "venue",
+  "dinein",
+  "noncoffee",
+  "coffee",
+  "pizza",
+  "intimate",
+  "equipment",
+>>>>>>> Stashed changes
 ];
+
+/* Established customer-facing descriptions for the Additional Services cards */
+const ADDON_UI_DESCRIPTIONS = {
+  "catering-menu": "Add full catering with menu to your event.",
+  venue: "Add exclusive use of an additional venue/area.",
+  dinein: "Add a set menu (Menu A or Menu B) served per guest.",
+  noncoffee: "Add a non-coffee drinks booth to your event.",
+  coffee: "Add a coffee booth to your event.",
+  pizza: "Add a live pizza booth to your event.",
+  intimate: "Add intimate-celebration elements to your event.",
+  equipment: "Add extra equipment rental. Priced per item.",
+};
+
+/* Populated exclusively from the catalog API response — never hardcoded fallback data */
+const SERVICES = [];
+const addonCatalog = [];
+const guidelines = [];
+
+let _catalogLoadPromise = null;
+let _catalogState = {
+  loaded: false,
+  ok: false,
+  reason: null,
+};
 
 /* Service photos — the SAME pictures used on the homepage service cards
    (nav.html), shown at the top of each service's details panel in place of
@@ -364,15 +374,408 @@ const SERVICE_IMAGES = {
   equipment: "equipment.png",
 };
 
-/* Dine-In Menu: auto-generate its selectable packages from the grouped `menu`
-   above, so the Rates/Menu table and the "Selected Food / Package" list in the
-   booking panel always stay in sync with a single source of truth. */
-(function () {
-  const dinein = SERVICES.find((s) => s.id === "dinein");
-  dinein.packages = dinein.menu.flatMap((cat) =>
-    cat.items.map((item) => [item.name, item.price]),
+function _toNullableNumber(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function _normalizePackageTuple(pkg) {
+  if (!Array.isArray(pkg) || typeof pkg[0] !== "string" || !pkg[0].trim()) {
+    return null;
+  }
+  const name = pkg[0].trim();
+  const price = _toNullableNumber(pkg[1]);
+  const code =
+    pkg[2] !== null && pkg[2] !== undefined && String(pkg[2]).trim() !== ""
+      ? String(pkg[2]).trim()
+      : null;
+  const maxCap = _toNullableNumber(pkg[3]);
+  const menuCode =
+    pkg[4] !== null && pkg[4] !== undefined && String(pkg[4]).trim() !== ""
+      ? String(pkg[4]).trim()
+      : null;
+  return [name, price, code, maxCap, menuCode];
+}
+
+function _normalizeMenus(rawMenus) {
+  if (!Array.isArray(rawMenus)) return [];
+  return rawMenus
+    .filter((m) => m && typeof m === "object" && m.is_active !== false)
+    .map((m) => ({
+      menu_code: m.menu_code ? String(m.menu_code) : null,
+      category_name: m.category_name ? String(m.category_name) : "",
+      item_name: m.item_name ? String(m.item_name) : "",
+      price: _toNullableNumber(m.price),
+      dishes: Array.isArray(m.dishes) ? m.dishes.map((d) => String(d)) : [],
+      is_active: m.is_active !== false,
+    }))
+    .filter((m) => m.category_name && m.item_name);
+}
+
+function _normalizeGroupedMenu(rawMenu, normalizedMenus) {
+  let groups = [];
+  if (Array.isArray(rawMenu) && rawMenu.length > 0) {
+    groups = rawMenu
+      .filter((cat) => cat && typeof cat === "object" && Array.isArray(cat.items))
+      .map((cat) => ({
+        category: String(cat.category || ""),
+        items: cat.items
+          .filter((item) => item && typeof item === "object" && item.name)
+          .map((item) => ({
+            name: String(item.name),
+            price: _toNullableNumber(item.price),
+            dishes: Array.isArray(item.dishes)
+              ? item.dishes.map((d) => String(d))
+              : [],
+            menuCode:
+              item.menuCode !== undefined && item.menuCode !== null
+                ? String(item.menuCode)
+                : item.menu_code !== undefined && item.menu_code !== null
+                  ? String(item.menu_code)
+                  : null,
+          })),
+      }))
+      .filter((cat) => cat.category && cat.items.length > 0);
+  } else if (Array.isArray(normalizedMenus) && normalizedMenus.length > 0) {
+    const byCat = new Map();
+    normalizedMenus.forEach((m) => {
+      if (!byCat.has(m.category_name)) {
+        byCat.set(m.category_name, { category: m.category_name, items: [] });
+      }
+      byCat.get(m.category_name).items.push({
+        name: m.item_name,
+        price: m.price,
+        dishes: m.dishes.slice(),
+        menuCode: m.menu_code,
+      });
+    });
+    groups = Array.from(byCat.values());
+  }
+  return groups.length > 0 ? groups : undefined;
+}
+
+function _normalizeService(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const id = typeof raw.id === "string" ? raw.id.trim() : "";
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+  if (
+    !id ||
+    !name ||
+    !/^[a-z0-9-]+$/i.test(id) ||
+    !SERVICE_ORDER.includes(id) ||
+    !Array.isArray(raw.packages) ||
+    !Array.isArray(raw.menus) ||
+    !Array.isArray(raw.addons) ||
+    !Array.isArray(raw.inclusions)
+  ) {
+    return null;
+  }
+
+  const basePrice = _toNullableNumber(raw.base_price);
+  const priceDisplay =
+    raw.price_display !== null &&
+    raw.price_display !== undefined &&
+    String(raw.price_display).trim() !== ""
+      ? String(raw.price_display).trim()
+      : raw.price !== null &&
+          raw.price !== undefined &&
+          String(raw.price).trim() !== ""
+        ? String(raw.price).trim()
+        : basePrice !== null
+          ? `₱${basePrice.toLocaleString()}`
+          : null;
+
+  const perHead = _toNullableNumber(
+    raw.per_head !== undefined ? raw.per_head : raw.perHead,
   );
-})();
+  const perHeadByPkg = Boolean(
+    raw.per_head_by_pkg !== undefined ? raw.per_head_by_pkg : raw.perHeadByPkg,
+  );
+  const maxCap = _toNullableNumber(
+    raw.max_cap !== undefined ? raw.max_cap : raw.maxCap,
+  );
+
+  const menus = _normalizeMenus(raw.menus);
+  const menu = _normalizeGroupedMenu(raw.menu, menus);
+
+  let packages = Array.isArray(raw.packages)
+    ? raw.packages.map(_normalizePackageTuple).filter(Boolean)
+    : [];
+
+  // Dine-In Menu: if packages are not explicitly populated, derive selectable
+  // 5-element tuples from the grouped menu while keeping NULL menu prices intact.
+  if (id === "dinein" && packages.length === 0 && menu) {
+    packages = menu.flatMap((cat) =>
+      cat.items.map((item) => [
+        item.name,
+        item.price,
+        item.menuCode || null,
+        maxCap,
+        item.menuCode || null,
+      ]),
+    );
+  }
+
+  const rates = Array.isArray(raw.rates)
+    ? raw.rates
+        .filter((r) => Array.isArray(r) && r.length >= 2)
+        .map((r) => [String(r[0]), String(r[1])])
+    : [];
+
+  const inclusions = Array.isArray(raw.inclusions)
+    ? raw.inclusions.map((i) => String(i))
+    : [];
+
+  const inclusionsTable =
+    raw.inclusionsTable &&
+    typeof raw.inclusionsTable === "object" &&
+    Array.isArray(raw.inclusionsTable.headers) &&
+    Array.isArray(raw.inclusionsTable.rows)
+      ? {
+          headers: raw.inclusionsTable.headers.map((h) => String(h)),
+          rows: raw.inclusionsTable.rows.map((row) =>
+            Array.isArray(row) ? row.map((cell) => String(cell)) : [],
+          ),
+        }
+      : undefined;
+
+  const mainCourses =
+    Array.isArray(raw.mainCourses) && raw.mainCourses.length > 0
+      ? raw.mainCourses.map((c) => String(c))
+      : undefined;
+
+  const notes = Array.isArray(raw.notes)
+    ? raw.notes.map((n) => String(n))
+    : [];
+
+  const serviceGuidelines = Array.isArray(raw.guidelines)
+    ? raw.guidelines.map((g) => String(g))
+    : [];
+
+  const svc = {
+    id,
+    name,
+    category: raw.category ? String(raw.category) : null,
+    base_price: basePrice,
+    basePrice,
+    price_display: raw.price_display ?? null,
+    price: priceDisplay,
+    per_head: perHead,
+    perHead,
+    per_head_by_pkg: perHeadByPkg,
+    perHeadByPkg,
+    max_cap: maxCap,
+    maxCap,
+    description: raw.description ? String(raw.description) : "",
+    inclusions,
+    guidelines: serviceGuidelines,
+    sort_order: Number.isFinite(Number(raw.sort_order))
+      ? Number(raw.sort_order)
+      : 0,
+    rates,
+    packages,
+    menus,
+    notes,
+  };
+
+  if (menu) svc.menu = menu;
+  if (mainCourses) svc.mainCourses = mainCourses;
+  if (inclusionsTable) svc.inclusionsTable = inclusionsTable;
+
+  return svc;
+}
+
+function _serviceOrderRank(serviceId) {
+  const idx = SERVICE_ORDER.indexOf(serviceId);
+  return idx >= 0 ? idx : SERVICE_ORDER.length + 100;
+}
+
+async function loadCatalogFromApi(forceReload = false) {
+  if (_catalogLoadPromise && !forceReload) {
+    return _catalogLoadPromise;
+  }
+
+  _catalogLoadPromise = (async () => {
+    SERVICES.length = 0;
+    addonCatalog.length = 0;
+    guidelines.length = 0;
+    _catalogState = { loaded: false, ok: false, reason: null };
+
+    let res;
+    try {
+      res = await fetch(CATALOG_API_URL, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+    } catch (err) {
+      _catalogState = { loaded: true, ok: false, reason: "NETWORK_ERROR" };
+      return { ok: false, reason: "NETWORK_ERROR" };
+    }
+
+    if (!res.ok) {
+      _catalogState = { loaded: true, ok: false, reason: `HTTP_${res.status}` };
+      return { ok: false, reason: `HTTP_${res.status}` };
+    }
+
+    let data;
+    try {
+      const text = await res.text();
+      data = JSON.parse(text);
+    } catch (err) {
+      _catalogState = { loaded: true, ok: false, reason: "INVALID_JSON" };
+      return { ok: false, reason: "INVALID_JSON" };
+    }
+
+    if (
+      !data ||
+      data.ok !== true ||
+      !Array.isArray(data.services) ||
+      data.services.length === 0 ||
+      !Array.isArray(data.guidelines)
+    ) {
+      _catalogState = {
+        loaded: true,
+        ok: false,
+        reason: (data && data.reason) || "INVALID_CATALOG_PAYLOAD",
+      };
+      return { ok: false, reason: _catalogState.reason };
+    }
+
+    const rawServicesById = new Map();
+    const normalizedServices = [];
+
+    for (const rawSvc of data.services) {
+      const norm = _normalizeService(rawSvc);
+      if (!norm || rawServicesById.has(norm.id)) {
+        _catalogState = {
+          loaded: true,
+          ok: false,
+          reason: "INVALID_SERVICE_IDENTIFIER",
+        };
+        return { ok: false, reason: "INVALID_SERVICE_IDENTIFIER" };
+      }
+      rawServicesById.set(norm.id, rawSvc);
+      normalizedServices.push(norm);
+    }
+
+    normalizedServices.sort((a, b) => {
+      const rankDiff = _serviceOrderRank(a.id) - _serviceOrderRank(b.id);
+      if (rankDiff !== 0) return rankDiff;
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return a.id.localeCompare(b.id);
+    });
+
+    normalizedServices.forEach((s) => SERVICES.push(s));
+
+    // Flatten nested service add-ons in the established service order and
+    // hydrate package choices and per-head rates from their linked parent service.
+    normalizedServices.forEach((svc) => {
+      const rawSvc = rawServicesById.get(svc.id);
+      const rawAddons =
+        rawSvc && Array.isArray(rawSvc.addons) ? rawSvc.addons : [];
+      rawAddons.forEach((rawAddon) => {
+        if (!rawAddon || typeof rawAddon !== "object") return;
+        if (rawAddon.is_active === false) return;
+        const addonId =
+          typeof rawAddon.id === "string" ? rawAddon.id.trim() : "";
+        const serviceId =
+          typeof (rawAddon.serviceId || rawAddon.service_id) === "string"
+            ? String(rawAddon.serviceId || rawAddon.service_id).trim()
+            : svc.id;
+        if (!addonId || !serviceId) return;
+
+        const priceFrom =
+          rawAddon.price_from !== null &&
+          rawAddon.price_from !== undefined &&
+          String(rawAddon.price_from).trim() !== ""
+            ? String(rawAddon.price_from).trim()
+            : rawAddon.priceFrom !== null &&
+                rawAddon.priceFrom !== undefined &&
+                String(rawAddon.priceFrom).trim() !== ""
+              ? String(rawAddon.priceFrom).trim()
+              : null;
+
+        const linkedSvc = SERVICES.find(
+          (s) => s.id === (priceFrom || serviceId),
+        );
+
+        const pkgs = linkedSvc
+          ? linkedSvc.packages.map((p) => p.slice())
+          : Array.isArray(rawAddon.pkgs)
+            ? rawAddon.pkgs.map(_normalizePackageTuple).filter(Boolean)
+            : [];
+
+        const perHead = linkedSvc
+          ? linkedSvc.perHead
+          : _toNullableNumber(rawAddon.perHead);
+        const perHeadByPkg = linkedSvc
+          ? Boolean(linkedSvc.perHeadByPkg)
+          : Boolean(rawAddon.perHeadByPkg);
+        const fixedPrice = _toNullableNumber(rawAddon.fixed_price);
+
+        let startingPrice = fixedPrice;
+        if (startingPrice === null && priceFrom && linkedSvc) {
+          const firstPkg = pkgs[0];
+          if (firstPkg && firstPkg[1] !== null && firstPkg[1] !== undefined) {
+            startingPrice = firstPkg[1];
+          } else if (perHead !== null) {
+            startingPrice = perHead;
+          }
+        }
+
+        const allowQty = Boolean(
+          rawAddon.allow_qty !== undefined ? rawAddon.allow_qty : rawAddon.qty,
+        );
+
+        addonCatalog.push({
+          id: addonId,
+          service_id: serviceId,
+          serviceId,
+          name: rawAddon.name ? String(rawAddon.name) : svc.name,
+          description:
+            rawAddon.description !== undefined && rawAddon.description !== null
+              ? String(rawAddon.description)
+              : "",
+          desc:
+            ADDON_UI_DESCRIPTIONS[serviceId] ||
+            (rawAddon.desc ? String(rawAddon.desc) : "") ||
+            (rawAddon.description ? String(rawAddon.description) : ""),
+          price_from: priceFrom,
+          priceFrom,
+          fixed_price: fixedPrice,
+          allow_qty: allowQty,
+          qty: allowQty,
+          is_active: true,
+          pkgs,
+          perHead,
+          perHeadByPkg,
+          price: startingPrice,
+        });
+      });
+    });
+
+    data.guidelines.forEach((g) => {
+      if (!g || typeof g !== "object" || !g.heading || !Array.isArray(g.items)) {
+        return;
+      }
+      guidelines.push({
+        id: g.id ? String(g.id) : undefined,
+        heading: String(g.heading),
+        items: g.items.map((item) => String(item)),
+        sort_order: Number.isFinite(Number(g.sort_order))
+          ? Number(g.sort_order)
+          : 0,
+      });
+    });
+
+    _catalogState = { loaded: true, ok: true, reason: null };
+    return { ok: true, services: SERVICES, addons: addonCatalog, guidelines };
+  })();
+
+  return _catalogLoadPromise;
+}
 
 // =====================================================
 // SHARED AVAILABILITY SOURCE — see loadAvailability() in SECTION A below.
@@ -478,125 +881,40 @@ function isTimeAvailable(dateStr, timeStr, serviceName) {
   return !isTimeTakenFor(dateStr, timeStr, serviceName);
 }
 
-/* ---------------- DATA (placeholder — replace with real info) ---------------- */
-
-// =====================================================
-// ADDITIONAL SERVICES ("Add-ons" cart)
-// Services that already have their own page/packages (Coffee Booth, Pizza
-// Booth, Catering with Menu, Venue Rentals, Non-Coffee Booth, Intimate
-// Celebration) reuse that service's own FIRST package price via `priceFrom`
-// below, instead of a second, separately-invented number — so there is only
-// ONE place to update a price. Services with no single flat price yet
-// (Dine-In Menu is priced per menu item; Equipment Rental is priced per
-// item) are left as `price:null` and shown as "Price to be confirmed"
-// rather than guessing a number.
-// The plain physical add-ons (Tables, Chairs, Tents, Food Warmers, Sound
-// System, Decorations) were prototype placeholder prices, NOT confirmed
-// Pio De Roda prices — they are now `price:null` too. Replace null with an
-// actual number (e.g. `price:150`) once the real rate is confirmed.
-// =====================================================
-const addonCatalog = [
-  // `serviceId` links each add-on to the matching entry in SERVICES (same id
-  // used by SERVICE_ID on each service page). The booking panel hides the
-  // add-on whose serviceId equals the service currently being booked.
-  {
-    id: "catering-menu-addon",
-    serviceId: "catering-menu",
-    name: "Catering with Menu",
-    desc: "Add full catering with menu to your event.",
-    priceFrom: "catering-menu",
-    qty: false,
-  },
-  {
-    id: "venue-addon",
-    serviceId: "venue",
-    name: "Venue Rentals",
-    desc: "Add exclusive use of an additional venue/area.",
-    priceFrom: "venue",
-    qty: false,
-  },
-  {
-    id: "dinein-addon",
-    serviceId: "dinein",
-    name: "Dine-In Menu",
-    desc: "Add a set menu (Menu A or Menu B) served per guest.",
-    priceFrom: "dinein",
-    qty: false,
-  },
-  {
-    id: "noncoffee-booth-addon",
-    serviceId: "noncoffee",
-    name: "Non-Coffee Booth Package",
-    desc: "Add a non-coffee drinks booth to your event.",
-    priceFrom: "noncoffee",
-    qty: false,
-  },
-  {
-    id: "coffee-booth-addon",
-    serviceId: "coffee",
-    name: "Coffee Booth Package",
-    desc: "Add a coffee booth to your event.",
-    priceFrom: "coffee",
-    qty: false,
-  },
-  {
-    id: "pizza-booth-addon",
-    serviceId: "pizza",
-    name: "Pizza Booth",
-    desc: "Add a live pizza booth to your event.",
-    priceFrom: "pizza",
-    qty: false,
-  },
-  {
-    id: "intimate-addon",
-    serviceId: "intimate",
-    name: "Intimate Celebration Package",
-    desc: "Add intimate-celebration elements to your event.",
-    priceFrom: "intimate",
-    qty: false,
-  },
-  {
-    id: "equipment-addon",
-    serviceId: "equipment",
-    name: "Equipment Rental",
-    desc: "Add extra equipment rental. Priced per item.",
-    priceFrom: "equipment",
-    qty: true,
-  },
-];
-
-// Fill in each add-on from its linked SERVICES entry so the two never go
-// out of sync. Each add-on inherits the service's full `packages` list plus
-// its per-head flags, which power the INLINE PACKAGE PICKER in the booking
-// panel — `price` here is only ever the STARTING price ("From ₱…"); the
-// customer picks the exact package before the add-on enters the cart.
-addonCatalog.forEach((a) => {
-  const svc = SERVICES.find((s) => s.id === (a.priceFrom || a.serviceId));
-  if (!svc) return;
-  a.pkgs = svc.packages || [];
-  a.perHead = svc.perHead || 0; // Dine-In: keeps the numeric ₱600 per guest
-  a.perHeadByPkg = !!svc.perHeadByPkg; // Catering: rate depends on courses
-  if (a.priceFrom) {
-    const first = a.pkgs[0];
-    a.price = first && first[1] != null ? first[1] : svc.perHead || null;
-  }
-});
+/* ---------------- ADDITIONAL SERVICES HELPERS ---------------- */
 
 // Every choice the inline picker shows for an add-on (usually the linked
-// service's packages; Dine-In falls back to its per-head rate).
+// service's packages; Dine-In uses its Menu A / Menu B packages).
 function addonOptions(a) {
+  if (!a) return [];
   if (a.pkgs && a.pkgs.length) return a.pkgs;
-  if (a.perHead) return [[a.name, a.perHead]];
-  return [[a.name, a.price]];
+  if (a.perHead !== null && a.perHead !== undefined && a.perHead > 0) {
+    return [[a.name, a.perHead, null, null, null]];
+  }
+  return [[a.name, a.price ?? null, null, null, null]];
 }
 
 // The per-unit price of ONE option: per-head-by-package services use the
 // package's rate, plain per-head services use the service rate, everything
-// else uses the package's flat price.
+// else uses the package's flat price. Preserves NULL when a price is unresolved
+// (never converts NULL into 0).
 function addonOptionRate(a, pkg) {
-  if (a.perHeadByPkg) return (pkg && pkg[1]) || 0;
-  if (a.perHead) return a.perHead;
-  return (pkg && pkg[1]) || 0;
+  if (!a) return null;
+  if (a.perHeadByPkg) {
+    return pkg && pkg[1] !== null && pkg[1] !== undefined
+      ? _toNullableNumber(pkg[1])
+      : null;
+  }
+  if (a.perHead !== null && a.perHead !== undefined) {
+    return _toNullableNumber(a.perHead);
+  }
+  if (pkg && pkg[1] !== null && pkg[1] !== undefined) {
+    return _toNullableNumber(pkg[1]);
+  }
+  if (a.price !== null && a.price !== undefined) {
+    return _toNullableNumber(a.price);
+  }
+  return null;
 }
 
 // The ONE place that decides which services may be offered as add-ons:
@@ -604,39 +922,6 @@ function addonOptionRate(a, pkg) {
 function getAdditionalServices(currentServiceId) {
   return addonCatalog.filter((a) => a.serviceId !== currentServiceId);
 }
-
-const guidelines = [
-  {
-    heading: "Booking & Reservation",
-    items: [
-      "In order to reserve your chosen date, time and venue, we are requiring a non-refundable deposit of ₱2,000.00 which will be deducted from your final bill. No booking or reservation will be considered confirmed until a deposit is made.",
-      "Client should finalize the details of their event at least 2 weeks before the event and make a partial payment of 50% of their total bill.",
-      "A final confirmation of the total number of guests shall be made no later than 5 working days prior to the date of the event. This confirmed number will be the minimum number which will be charged. Additional guests shall be served and charged accordingly on a per plate / per head basis.",
-      "The remaining 50% shall be paid in full 1 day before the day of the event.",
-      "Additional and other incidental charges shall be settled on the day of the event, right after the said event.",
-      "Only the reserved venue shall be used for your event. Additional charges shall be imposed for the use of other venues.",
-    ],
-  },
-  {
-    heading: "Cancellation, Changes to the Reservation",
-    items: [
-      "All changes to your reservation must be made no later than 5 working days prior to the date of the event. All changes will be considered; however, we hold the right not to accept the change if prior preparation is already done.",
-    ],
-  },
-  {
-    heading: "Food, Catering Set-Up and Others",
-    items: [
-      "All allocations are based on experience in the food industry. We usually cater for more than necessary, but we cannot account for over average eaters.",
-      "Client may bring their own food to be served during their event provided prior arrangements are done. Though, we will not take responsibility for any other food and drinks not provided by Pio de Roda Café on the day of the event.",
-      "Pio de Roda Café will assist with any additional items during the event. However, we are not responsible for any items provided by the client for the event such as but not limited to flowers, cakes, souvenirs, etc.",
-      "Pio de Roda Café will serve you with our basic catering set-up which includes celebrant's stage and throne, buffet table, cake and gift tables, tables and chairs, complete silverware, flatware and dinnerware, basic sound system, and trained waiters. However, should you require more intricate details it will be under our event styling arrangements which will be on a separate transaction.",
-      "Outside providers or suppliers such as lights and sound system, projectors, LED screens, food carts, etc. shall have a corkage for the energy consumption.",
-      "Pio de Roda Café is practicing a per head and plate basis, however, children below 7 years old are free of charge. Please refrain from using another plate. Saucers will be provided for your desserts and other food use.",
-      "We are following the IATF regulation to limit the guests for every event. Senior Citizens and children are encouraged to take precautionary measures for their own safety. Please limit their exposure as well. Children shall be limited to a maximum of 5 kids only.",
-      "Remind your guests to bring and wear their face masks and face shields at all times. And also bring their vaccination cards and present at the contact tracing booth.",
-    ],
-  },
-];
 
 /* ############################################################################
    ############################################################################
