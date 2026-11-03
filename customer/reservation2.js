@@ -33,7 +33,8 @@ function showFieldError(errId, inputId, show) {
 // hard-coded one, so past months are not the default view.
 const _todayDS = getTodayLocalDate();
 let state = {
-  service: SERVICES.find((s) => s.id === SERVICE_ID) || SERVICES[0],
+  service: null,
+  catalogReady: false,
   customerName: "",
   contactNumber: "",
   email: "",
@@ -57,17 +58,30 @@ let state = {
 /* ---------------- RENDER: SERVICE DETAILS ---------------- */
 function renderDetails() {
   const s = state.service;
-  document.getElementById("serviceDetails").innerHTML = `
+  const el = document.getElementById("serviceDetails");
+  if (!el || !s) return;
+  const ratesRows = Array.isArray(s.rates)
+    ? s.rates.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")
+    : "";
+  const hasMenu = Array.isArray(s.menu) && s.menu.length > 0;
+  const hasMainCourses =
+    Array.isArray(s.mainCourses) && s.mainCourses.length > 0;
+  const startingPriceText =
+    s.price !== null && s.price !== undefined && String(s.price).trim() !== ""
+      ? s.price
+      : "Price to be confirmed";
+  const inclusionsList = Array.isArray(s.inclusions) ? s.inclusions : [];
+  el.innerHTML = `
     <h1>${s.name}</h1>
     <div class="venue-img">${SERVICE_IMAGES[s.id] ? `<img src="${SERVICE_IMAGES[s.id]}" alt="${s.name}">` : "[Pio De Roda Venue Image — placeholder]"}</div>
     <div class="section-label">RATES</div>
-    <table class="rates">${s.rates.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table>
-    ${s.menu ? renderMenuTable(s) : ""}
-    ${s.mainCourses ? renderMainCourses(s) : ""}
+    <table class="rates">${ratesRows}</table>
+    ${hasMenu ? renderMenuTable(s) : ""}
+    ${hasMainCourses ? renderMainCourses(s) : ""}
     <div class="section-label">STARTING PRICE</div>
-    <div class="price-hero"><div class="amt">${s.price}</div></div>
+    <div class="price-hero"><div class="amt">${startingPriceText}</div></div>
     <div class="section-label">INCLUSIONS</div>
-    ${s.inclusionsTable ? renderInclusionsTable(s.inclusionsTable) : `<ul class="plain check">${s.inclusions.map((i) => `<li>${i}</li>`).join("")}</ul>`}
+    ${s.inclusionsTable ? renderInclusionsTable(s.inclusionsTable) : `<ul class="plain check">${inclusionsList.map((i) => `<li>${i}</li>`).join("")}</ul>`}
     <div class="section-label">GUIDELINES</div>
     ${renderGuidelines(s)}
   `;
@@ -361,6 +375,7 @@ function refreshTimeOptions() {
 function renderPanel() {
   const s = state.service;
   const el = document.getElementById("bookingPanel");
+  if (!el || !s) return;
   el.innerHTML = `
     <h2>Book Your Event</h2>
     <p class="req-legend"><span class="req">*</span> Required field</p>
@@ -438,7 +453,7 @@ function renderPanel() {
         .map(
           (p, i) => `
         <div class="pkg-opt ${state.selectedPackage === i ? "sel" : ""}" data-idx="${i}">
-          <span class="nm">${p[0]}</span><span>${pkgPerHeadRate(s, p) > 0 ? "₱" + pkgPerHeadRate(s, p).toLocaleString() + " per head" : p[1] === null ? "" : p[1] ? "₱" + p[1].toLocaleString() : "₱XXX"}</span>
+          <span class="nm">${p[0]}</span><span>${pkgPerHeadRate(s, p) > 0 ? "₱" + pkgPerHeadRate(s, p).toLocaleString() + " per head" : p[1] === null || p[1] === undefined ? "" : Number.isFinite(Number(p[1])) && Number(p[1]) > 0 ? "₱" + Number(p[1]).toLocaleString() : "Price to be confirmed"}</span>
         </div>`,
         )
         .join("")}
@@ -462,13 +477,18 @@ function renderPanel() {
    multiply their rate by the guest count; quantity add-ons (Equipment)
    multiply by the chosen quantity; everything else is a flat price. */
 function addonLineUnit(c) {
-  return c.unitPrice || 0;
+  return c &&
+    c.unitPrice !== null &&
+    c.unitPrice !== undefined &&
+    Number.isFinite(Number(c.unitPrice))
+    ? Number(c.unitPrice)
+    : null;
 }
 function addonLineTotal(c) {
+  const unit = addonLineUnit(c);
+  if (unit === null) return null;
   const per = c.item.perHead || c.item.perHeadByPkg;
-  const base = per
-    ? addonLineUnit(c) * (parseInt(state.guests) || 0)
-    : addonLineUnit(c);
+  const base = per ? unit * (parseInt(state.guests) || 0) : unit;
   return base * (c.item.qty ? c.qty : 1);
 }
 
@@ -479,33 +499,46 @@ function addonCartRows(kind) {
   return Object.values(state.cart)
     .map((c) => {
       const per = c.item.perHead || c.item.perHeadByPkg;
+      const unit = addonLineUnit(c);
+      const lineTotal = addonLineTotal(c);
       const note = c.pkgName
         ? ` <small class="line-note">${c.pkgName}${
-            per && guests > 0
-              ? ` — ${guests} pax × ₱${addonLineUnit(c).toLocaleString()} per head`
+            per && guests > 0 && unit !== null
+              ? ` — ${guests} pax × ₱${unit.toLocaleString()} per head`
               : ""
           }</small>`
         : "";
       const label =
         c.item.name + (c.item.qty ? " × " + c.qty : "") + note;
-      return `<div class="${kind}"><span>${label}</span><span>₱${addonLineTotal(c).toLocaleString()}</span></div>`;
+      const amountLabel =
+        lineTotal !== null
+          ? `₱${lineTotal.toLocaleString()}`
+          : "Price to be confirmed";
+      return `<div class="${kind}"><span>${label}</span><span>${amountLabel}</span></div>`;
     })
     .join("");
 }
 
 /* Adds (or updates) a cart entry from the picker's selected package row. */
 function addAddonToCart(item, pkgIdx) {
-  if (!item || item.serviceId === state.service.id) return;
+  if (!item || !state.service || item.serviceId === state.service.id) return;
   const opts = addonOptions(item);
   const pkg =
     opts[Math.max(0, Math.min(pkgIdx || 0, opts.length - 1))] ||
     [item.name, item.price];
+  const unitPrice = addonOptionRate(item, pkg);
+  if (unitPrice === null || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+    state.picking = null;
+    state.notice = `${item.name} (${pkg[0]}) does not have a confirmed price yet and cannot be added to the reservation total.`;
+    renderAdditionalServices(state.service.id);
+    return;
+  }
   const prev = state.cart[item.id];
   state.cart[item.id] = {
     qty: prev && item.qty ? prev.qty : 1,
     item,
     pkgName: pkg[0],
-    unitPrice: addonOptionRate(item, pkg),
+    unitPrice,
   };
   state.picking = null;
   renderAdditionalServices(state.service.id);
@@ -539,7 +572,9 @@ function renderAdditionalServices(currentServiceId, animate = false) {
       .map((a) => {
         const inCart = state.cart[a.id];
         const opts = addonOptions(a);
-        const rates = opts.map((o) => addonOptionRate(a, o)).filter((r) => r > 0);
+        const rates = opts
+          .map((o) => addonOptionRate(a, o))
+          .filter((r) => r !== null && Number.isFinite(r) && r > 0);
         const min = rates.length ? Math.min(...rates) : null;
         const perHeadish = a.perHead || a.perHeadByPkg;
         const anim = animate ? " fade-in" : "";
@@ -550,12 +585,15 @@ function renderAdditionalServices(currentServiceId, animate = false) {
             .map((o, i) => {
               const rate = addonOptionRate(a, o);
               const sel = i === state.pickingPkg ? " sel" : "";
-              const amt = perHeadish
-                ? `₱${rate.toLocaleString()} / head` +
-                  (guests > 0
-                    ? ` · ₱${(rate * guests).toLocaleString()} (${guests} pax)`
-                    : "")
-                : `₱${rate.toLocaleString()}`;
+              const amt =
+                rate === null || !Number.isFinite(rate) || rate <= 0
+                  ? "Price to be confirmed"
+                  : perHeadish
+                    ? `₱${rate.toLocaleString()} / head` +
+                      (guests > 0
+                        ? ` · ₱${(rate * guests).toLocaleString()} (${guests} pax)`
+                        : "")
+                    : `₱${rate.toLocaleString()}`;
               return `<div class="addon-pkg${sel}" data-idx="${i}" role="radio" aria-checked="${sel ? "true" : "false"}" tabindex="0">
                 <span class="nm">${o[0]}</span><span class="amt">${amt}</span></div>`;
             })
@@ -572,17 +610,23 @@ function renderAdditionalServices(currentServiceId, animate = false) {
 
         // ---- already in the cart: chosen package + computed amount ----
         if (inCart) {
+          const unit = addonLineUnit(inCart);
+          const lineTotal = addonLineTotal(inCart);
           const breakdown = perHeadish
-            ? guests > 0
-              ? `${guests} pax × ₱${addonLineUnit(inCart).toLocaleString()} per head`
+            ? guests > 0 && unit !== null
+              ? `${guests} pax × ₱${unit.toLocaleString()} per head`
               : "per guest"
-            : a.qty
-              ? `₱${addonLineUnit(inCart).toLocaleString()} per item`
+            : a.qty && unit !== null
+              ? `₱${unit.toLocaleString()} per item`
               : "";
+          const totalDisplay =
+            lineTotal !== null
+              ? `₱${lineTotal.toLocaleString()}`
+              : "Price to be confirmed";
           return `<div class="addon in-cart${anim}">
             <div style="flex:1">
               <div class="nm">✓ ${a.name}</div>
-              <div class="price">${inCart.pkgName || ""} — ₱${addonLineTotal(inCart).toLocaleString()}</div>
+              <div class="price">${inCart.pkgName || ""} — ${totalDisplay}</div>
               ${breakdown ? `<div class="desc">${breakdown}</div>` : ""}
             </div>
             ${
@@ -729,23 +773,72 @@ function removeMainServiceFromCart() {
    Every other service keeps its flat package price (this returns 0). */
 function pkgPerHeadRate(s, pkg) {
   if (!s) return 0;
-  if (s.perHeadByPkg) return pkg ? pkg[1] || 0 : 0;
-  if (s.perHead) return s.perHead;
+  if (s.perHeadByPkg) {
+    return pkg &&
+      pkg[1] !== null &&
+      pkg[1] !== undefined &&
+      Number.isFinite(Number(pkg[1])) &&
+      Number(pkg[1]) > 0
+      ? Number(pkg[1])
+      : 0;
+  }
+  if (
+    s.perHead !== null &&
+    s.perHead !== undefined &&
+    Number.isFinite(Number(s.perHead)) &&
+    Number(s.perHead) > 0
+  ) {
+    return Number(s.perHead);
+  }
   return 0;
+}
+
+function isPackagePriceResolved(s, pkg) {
+  if (!s || !pkg) return false;
+  if (pkgPerHeadRate(s, pkg) > 0) return true;
+  if (s.perHeadByPkg || (s.perHead !== null && s.perHead !== undefined)) {
+    return false;
+  }
+  return (
+    pkg[1] !== null &&
+    pkg[1] !== undefined &&
+    Number.isFinite(Number(pkg[1])) &&
+    Number(pkg[1]) > 0
+  );
+}
+
+function hasUnresolvedPricing() {
+  if (!state.service || state.selectedPackage === null) return true;
+  const pkg = state.service.packages[state.selectedPackage];
+  if (!isPackagePriceResolved(state.service, pkg)) return true;
+  for (const c of Object.values(state.cart)) {
+    const unit = addonLineUnit(c);
+    const lineTotal = addonLineTotal(c);
+    if (
+      unit === null ||
+      unit <= 0 ||
+      lineTotal === null ||
+      !Number.isFinite(lineTotal)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /* The selected package's contribution to the estimated total:
    per-head services multiply their rate by the guest count; all other
-   services just add their flat package price. */
+   services just add their flat package price. Never treats NULL as 0 when checking resolved status. */
 function pkgTotal(s, pkg, guests) {
+  if (!isPackagePriceResolved(s, pkg)) return 0;
   const per = pkgPerHeadRate(s, pkg);
   if (per > 0) return per * (parseInt(guests) || 0);
-  return (pkg && pkg[1]) || 0;
+  return Number(pkg[1]);
 }
 
 /* How the selected package is shown in the summary and review:
    per-head services show the computed amount (rate × pax); other services
-   keep their flat package price, or just the name if the package has none. */
+   keep their flat package price, or "Price to be confirmed" if NULL. */
 function pkgLabel(s, pkg, guests) {
   if (!pkg) return "—";
   const per = pkgPerHeadRate(s, pkg);
@@ -762,12 +855,15 @@ function pkgLabel(s, pkg, guests) {
           " per head)"
       : pkg[0] + " — ₱" + per.toLocaleString() + " per head";
   }
-  return pkg[1] === null ? pkg[0] : pkg[0] + " — ₱" + pkg[1].toLocaleString();
+  if (pkg[1] === null || pkg[1] === undefined) {
+    return pkg[0] + " — Price to be confirmed";
+  }
+  return pkg[0] + " — ₱" + Number(pkg[1]).toLocaleString();
 }
 
 function computeTotal() {
   let total = 0;
-  if (state.selectedPackage !== null) {
+  if (state.service && state.selectedPackage !== null) {
     total += pkgTotal(
       state.service,
       state.service.packages[state.selectedPackage],
@@ -775,19 +871,26 @@ function computeTotal() {
     );
   }
   Object.values(state.cart).forEach((c) => {
-    total += addonLineTotal(c);
+    const lineTotal = addonLineTotal(c);
+    if (lineTotal !== null && Number.isFinite(lineTotal)) {
+      total += lineTotal;
+    }
   });
   return total;
 }
 
 function renderSummary() {
   const box = document.getElementById("summaryBox");
-  if (!box) return;
+  if (!box || !state.service) return;
   const pkg =
     state.selectedPackage !== null
       ? state.service.packages[state.selectedPackage]
       : null;
   const cartRows = addonCartRows("row");
+  const totalDisplay =
+    state.selectedPackage !== null && hasUnresolvedPricing()
+      ? "Price to be confirmed"
+      : `₱${computeTotal().toLocaleString()}`;
   box.innerHTML = `
     <div class="summary">
       <div class="row"><span>Customer</span><span>${state.customerName || "—"}</span></div>
@@ -799,7 +902,7 @@ function renderSummary() {
       <div class="row"><span>Food Package</span><span>${pkgLabel(state.service, pkg, state.guests)}</span></div>
       ${state.service.mainCourses && state.mainCourses.length ? `<div class="row"><span>Main Courses</span><span>${state.mainCourses.join(", ")}</span></div>` : ""}
       ${cartRows ? `<div class="row"><span><strong>Additional Services</strong></span><span></span></div>${cartRows}` : ""}
-      <div class="row total"><span>Estimated Total</span><span>₱${computeTotal().toLocaleString()}</span></div>
+      <div class="row total"><span>Estimated Total</span><span>${totalDisplay}</span></div>
     </div>`;
 }
 
@@ -960,9 +1063,11 @@ function revalidateEventTime(notify = true) {
 
 /* ---------------- VALIDATION + CONTINUE ---------------- */
 function handleContinue() {
+  if (!state.catalogReady || !state.service) return;
   let ok = true;
   const setErr = (id, show) => {
-    document.getElementById(id).style.display = show ? "block" : "none";
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? "block" : "none";
     if (show) ok = false;
   };
   setErr("errName", !state.customerName.trim());
@@ -1019,6 +1124,13 @@ function handleContinue() {
       firstErr.scrollIntoView({ behavior: "smooth", block: "center" });
     return;
   }
+  // Block submission if any selected package or add-on has an unresolved/NULL price.
+  if (hasUnresolvedPricing()) {
+    alert(
+      "The selected package or additional service has an unconfirmed price and cannot be priced safely right now.",
+    );
+    return;
+  }
   // Final duplicate check: main service must never also be an additional service.
   const removed = removeMainServiceFromCart();
   if (removed.length) {
@@ -1033,6 +1145,7 @@ function handleContinue() {
 
 function openReviewModal() {
   const s = state.service;
+  if (!s || state.selectedPackage === null) return;
   const pkg = s.packages[state.selectedPackage];
   const cartRows =
     addonCartRows("confirm-row") ||
@@ -1065,7 +1178,12 @@ function openReviewModal() {
 function checkChecks() {
   const c1 = document.getElementById("chkCorrect").checked;
   const c2 = document.getElementById("chkGuidelines").checked;
-  document.getElementById("submitBtn").disabled = !(c1 && c2);
+  document.getElementById("submitBtn").disabled = !(
+    c1 &&
+    c2 &&
+    state.catalogReady &&
+    state.service
+  );
 }
 document.getElementById("chkCorrect").onchange = checkChecks;
 document.getElementById("chkGuidelines").onchange = checkChecks;
@@ -1074,6 +1192,10 @@ document.getElementById("editBtn").onclick = () =>
 
 /* ---------------- SUBMIT ---------------- */
 document.getElementById("submitBtn").onclick = async () => {
+  if (!state.catalogReady || !state.service) {
+    alert("Service catalog is unavailable. Reservation submission is disabled.");
+    return;
+  }
   if (!isValidPhone(state.contactNumber) || !isValidEmail(state.email)) {
     alert("Please enter a valid 11-digit contact number and email address.");
     document.getElementById("reviewModal").classList.remove("open");
@@ -1088,6 +1210,13 @@ document.getElementById("submitBtn").onclick = async () => {
     state.selectedPackage === null
   ) {
     alert("Please complete all required fields.");
+    return;
+  }
+  if (hasUnresolvedPricing()) {
+    alert(
+      "The selected package or additional service has an unconfirmed price and cannot be submitted.",
+    );
+    document.getElementById("reviewModal").classList.remove("open");
     return;
   }
   // FINAL re-validation before submission (the calendar may have changed since
@@ -1155,6 +1284,7 @@ document.getElementById("submitBtn").onclick = async () => {
     eventType:
       state.eventType === "Other" ? state.eventTypeOther : state.eventType,
     guests: parseInt(state.guests),
+    serviceId: state.service.id,
     mainService: state.service.name,
     selectedPackage: state.service.packages[state.selectedPackage][0],
     ...(state.service.mainCourses
@@ -1283,6 +1413,7 @@ function showSuccess(r) {
   };
 }
 
+<<<<<<< Updated upstream
 /* ---------------- AVAILABILITY REFRESH ---------------- */
 // Load the CURRENTLY DISPLAYED month's availability (taken dates, per-date
 // counts, per-service time slots) then redraw the open/closed calendar and the
@@ -1292,6 +1423,13 @@ function showSuccess(r) {
 async function refreshAvailability(year, month) {
   const y = year !== undefined && year !== null ? year : state.calYear;
   const m = month !== undefined && month !== null ? month : state.calMonth + 1;
+=======
+/* ---------------- UNAVAILABLE DATES ---------------- */
+// Load the taken dates from the backend area, then redraw the open/closed calendar.
+// (Top-level so the submit handler can also call it after a DATE_TAKEN rejection.)
+async function refreshUnavailableDates() {
+  if (!state.catalogReady || !state.service) return;
+>>>>>>> Stashed changes
   try {
     await loadAvailability(y, m);
   } catch (e) {
@@ -1307,10 +1445,107 @@ async function refreshAvailability(year, month) {
   refreshTimeOptions();
 }
 
+/* ---------------- LOADING & ERROR STATES ---------------- */
+function renderLoadingState() {
+  const detailsEl = document.getElementById("serviceDetails");
+  const panelEl = document.getElementById("bookingPanel");
+  if (detailsEl) {
+    detailsEl.innerHTML = `<p class="note">Loading service details…</p>`;
+  }
+  if (panelEl) {
+    panelEl.innerHTML = `
+      <h2>Book Your Event</h2>
+      <p class="note">Loading booking options…</p>
+      <button type="button" class="btn-main" disabled>Continue Reservation</button>
+    `;
+  }
+}
+
+function renderCatalogErrorState(heading, message) {
+  state.service = null;
+  state.catalogReady = false;
+
+  const reviewModal = document.getElementById("reviewModal");
+  if (reviewModal) reviewModal.classList.remove("open");
+  const submitBtn = document.getElementById("submitBtn");
+  if (submitBtn) submitBtn.disabled = true;
+
+  const detailsEl = document.getElementById("serviceDetails");
+  const panelEl = document.getElementById("bookingPanel");
+
+  if (detailsEl) {
+    detailsEl.innerHTML = `
+      <h1>${pdrEscape(heading)}</h1>
+      <p class="note">${pdrEscape(message)}</p>
+    `;
+  }
+  if (panelEl) {
+    panelEl.innerHTML = `
+      <h2>Book Your Event</h2>
+      <div class="field">
+        <div class="err" style="display:block">${pdrEscape(message)}</div>
+      </div>
+      <button type="button" class="btn-main" id="continueBtn" disabled>Reservation Unavailable</button>
+    `;
+  }
+}
+
 /* ---------------- INIT ---------------- */
 function renderAll() {
+  if (!state.catalogReady || !state.service) return;
   renderDetails();
   renderPanel();
 }
+<<<<<<< Updated upstream
 renderAll();
 refreshAvailability(); // fill the calendar as soon as the data arrives
+=======
+
+async function initReservationPage() {
+  renderLoadingState();
+
+  if (typeof loadCatalogFromApi !== "function") {
+    renderCatalogErrorState(
+      "Service Catalog Unavailable",
+      "Unable to initialize the service catalog loader. Please try again later.",
+    );
+    return;
+  }
+
+  let catalogResult;
+  try {
+    catalogResult = await loadCatalogFromApi();
+  } catch (e) {
+    catalogResult = { ok: false, reason: "LOAD_EXCEPTION" };
+  }
+
+  if (!catalogResult || !catalogResult.ok) {
+    renderCatalogErrorState(
+      "Service Catalog Unavailable",
+      "We could not load the service catalog right now. Please check your connection and refresh the page.",
+    );
+    return;
+  }
+
+  const requestedId =
+    typeof SERVICE_ID === "string" ? SERVICE_ID.trim() : "";
+  const matchedService = requestedId
+    ? SERVICES.find((s) => s.id === requestedId)
+    : null;
+
+  if (!matchedService) {
+    renderCatalogErrorState(
+      "Service Not Available",
+      "The requested service is not currently available for online reservation. Please return to the homepage and select an active service.",
+    );
+    return;
+  }
+
+  state.service = matchedService;
+  state.catalogReady = true;
+  renderAll();
+  await refreshUnavailableDates();
+}
+
+initReservationPage();
+>>>>>>> Stashed changes
