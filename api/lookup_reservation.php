@@ -45,6 +45,7 @@ try {
         'contactPerson' => $res['contact_person'],
         'contactNumberMasked' => $phoneMasked,
         'emailMasked' => $emailMasked,
+        'address' => $res['address'],
         'eventDate' => $res['event_date'],
         'eventTime' => $res['event_time'],
         'eventType' => $res['event_type'],

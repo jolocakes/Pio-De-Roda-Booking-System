@@ -19,6 +19,7 @@ try {
             'contactPerson' => $r['contact_person'],
             'contactNumber' => $r['contact_number'],
             'email' => $r['email'],
+            'address' => $r['address'],
             'service' => $r['main_service'],
             'eventDate' => $r['event_date'],
             'eventTime' => $r['event_time'],

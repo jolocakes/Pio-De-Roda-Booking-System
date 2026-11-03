@@ -246,6 +246,53 @@ body {
   background: var(--cream-soft);
 }
 
+/* CLOSED date (2 services booked, or the venue is booked that day).
+   Same gray treatment as the customer calendars so admin and customer
+   views can never look like they disagree. Reason shows on hover. */
+.day-cell.day-taken {
+  background: #EFE6D2;
+  color: #BBA98F;
+  cursor: not-allowed;
+}
+
+.day-cell.day-taken .day-number {
+  color: #BBA98F;
+}
+
+.day-cell.day-taken .event-chip {
+  opacity: 0.65;
+}
+
+/* Small tags shown inside a day cell */
+.closed-tag {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #8C1414;
+  background: rgba(140, 20, 20, 0.12);
+  border-radius: 4px;
+  padding: 2px 5px;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slots-tag {
+  display: block;
+  font-size: 9px;
+  color: var(--text-muted);
+  background: rgba(184, 134, 46, 0.14);
+  border-radius: 4px;
+  padding: 2px 5px;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .day-cell.other-month { 
   opacity: 0.4; 
 }
@@ -301,7 +348,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   color: var(--text-dark);
+}
+
+/* The date label sits beside the panel title; let it move to its own line
+   instead of colliding with the title in narrow panels. */
+.panel-section-title span {
+  white-space: nowrap;
 }
 
 .availability-card {

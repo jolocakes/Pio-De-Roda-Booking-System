@@ -1,7 +1,7 @@
-// Filled from getUnavailableDates() (services.js backend area), so this booking
-// calendar and the homepage availability calendar always agree. Starts empty and
-// is refreshed as soon as the data arrives (see refreshUnavailableDates below).
-let unavailableDates = [];
+// Availability comes from AVAIL (services.js) — one shared object holding the
+// current month's taken dates, per-date booking counts and the time slots each
+// service already holds. It backs BOTH this booking calendar and the homepage
+// calendar, so they can never disagree. Refreshed via refreshAvailability().
 
 /* ---------------- FIELD VALIDATION HELPERS ---------------- */
 // Contact number: digits only, exactly 11 (e.g. 09171234567).
@@ -37,6 +37,7 @@ let state = {
   customerName: "",
   contactNumber: "",
   email: "",
+  address: "", // delivery/setup address — collected only when the service requires it
   eventDate: null,
   eventTime: "",
   eventType: "",
@@ -308,16 +309,52 @@ function renderCalendar() {
       cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — past date">${d}</div>`;
       continue;
     }
-    const unavail = unavailableDates.includes(ds);
+    const unavail = isDateTaken(ds);
     const sel = state.eventDate === ds;
+    const meta = AVAIL.meta[ds];
+    const hint = unavail
+      ? (meta && meta.hasVenue ? "venue booked" : "fully booked")
+      : (meta && meta.count > 0
+          ? `${meta.count} of ${(AVAIL.rules && AVAIL.rules.maxPerDay) || 2} slots booked`
+          : "");
     cells += `<div class="day ${unavail ? "unavail" : "avail"} ${sel ? "sel" : ""} ${isToday ? "today" : ""}"
       data-date="${unavail ? "" : ds}" ${unavail ? 'aria-disabled="true" ' : ""}role="button" tabindex="0"
-      aria-label="${ds} — ${unavail ? "unavailable" : isToday ? "today, available" : "available"}${sel ? ", selected" : ""}">${d}</div>`;
+      ${hint ? `title="${hint}" ` : ""}aria-label="${ds} — ${unavail ? "unavailable" : isToday ? "today, available" : "available"}${hint ? ", " + hint : ""}${sel ? ", selected" : ""}">${d}</div>`;
   }
   return `
     <div class="cal-head"><button type="button" data-nav="-1" aria-label="Previous month">‹</button><span>${monthName} ${y}</span><button type="button" data-nav="1" aria-label="Next month">›</button></div>
     <div class="cal-grid">${cells}</div>
   `;
+}
+
+/* The service the customer is currently booking — the per-service time rule
+   needs it. Falls back to whatever mainService the form last held. */
+function currentServiceName() {
+  if (state.service && state.service.name) return state.service.name;
+  return state.mainService || "";
+}
+
+/* Options for the Event Time select. Slots already held by THIS service on
+   the chosen date are rendered disabled, so the picker itself is the first
+   line of defence — submit_reservation.php re-checks the same rule. */
+function timeOptionsHTML() {
+  const svc = currentServiceName();
+  const open = state.eventDate ? timeSlotState(state.eventDate, svc) : null;
+  let html = `<option value="">-- Select Time --</option>`;
+  html += EVENT_TIME_SLOTS.map((t) => {
+    const taken = open ? open.some((s) => s.time === t && s.taken) : false;
+    const sel = state.eventTime === t;
+    const label = fmtEventTime(t) + (taken ? " — unavailable" : "");
+    return `<option value="${t}" ${sel ? "selected" : ""} ${taken ? "disabled" : ""}>${label}</option>`;
+  }).join("");
+  return html;
+}
+
+/* Re-render ONLY the time select (keeps the date calendar open state intact) */
+function refreshTimeOptions() {
+  const sel = document.getElementById("fTime");
+  if (!sel) return;
+  sel.innerHTML = timeOptionsHTML();
 }
 
 /* ---------------- RENDER: BOOKING PANEL ---------------- */
@@ -343,6 +380,13 @@ function renderPanel() {
       <input type="email" id="fEmail" autocomplete="email" placeholder="you@gmail.com" value="${state.email}">
       <div class="err" id="errEmail">Please enter a valid email address, including @ and the domain (e.g. name@gmail.com)</div>
     </div>
+    ${s.requiresAddress ? `
+    <div class="field">
+      <label>Address <span class="req" title="Required">*</span></label>
+      <input type="text" id="fAddress" autocomplete="street-address" placeholder="Enter Address" value="${state.address}">
+      <div class="cap">Complete address where the service will be set up or delivered (street, barangay, municipality)</div>
+      <div class="err" id="errAddress">Please enter the address for setup or delivery.</div>
+    </div>` : ""}
     <div class="field">
       <label>Event Date <span class="req" title="Required">*</span></label>
       <input type="text" id="fDate" class="date-input" readonly placeholder="Select a date" value="${state.eventDate || ""}">
@@ -352,10 +396,11 @@ function renderPanel() {
     <div class="field">
       <label>Event Time <span class="req" title="Required">*</span></label>
       <select id="fTime">
-        <option value="">-- Select Time --</option>
-        ${EVENT_TIME_SLOTS.map((t) => `<option value="${t}" ${state.eventTime === t ? "selected" : ""}>${fmtEventTime(t)}</option>`).join("")}
+        ${timeOptionsHTML()}
       </select>
-      <div class="cap">Placeholder schedule — event time slots are subject to confirmation by Pio De Roda staff.</div>
+      <div class="cap">${state.eventDate
+        ? "Unavailable times are already booked by another customer for your service."
+        : "Pick an event date first — unavailable times appear once a date is chosen."}</div>
       <div class="err" id="errTime">Please select an event time.</div>
     </div>
     <div class="field">
@@ -780,6 +825,18 @@ function attachPanelEvents() {
   document.getElementById("fEmail").onblur = (e) =>
     showFieldError("errEmail", "fEmail", !isValidEmail(e.target.value));
 
+  // Address exists only on the services that require it (booths, catering,
+  // equipment rental) — guard so pages without the field never throw.
+  const addrInput = document.getElementById("fAddress");
+  if (addrInput) {
+    addrInput.oninput = (e) => {
+      state.address = e.target.value;
+      if (state.address.trim()) showFieldError("errAddress", "fAddress", false);
+    };
+    addrInput.onblur = (e) =>
+      showFieldError("errAddress", "fAddress", !e.target.value.trim());
+  }
+
   const dateInput = document.getElementById("fDate");
   dateInput.onclick = () =>
     document.getElementById("calBox").classList.toggle("open");
@@ -835,7 +892,7 @@ function bindCalendar() {
   const calBox = document.getElementById("calBox");
   calBox.querySelectorAll("[data-nav]").forEach(
     (b) =>
-      (b.onclick = () => {
+      (b.onclick = async () => {
         let m = state.calMonth + parseInt(b.dataset.nav);
         let y = state.calYear;
         if (m < 0) {
@@ -848,6 +905,9 @@ function bindCalendar() {
         }
         state.calMonth = m;
         state.calYear = y;
+        // Each month has its own availability — fetch it BEFORE redrawing so
+        // the new month never paints with the previous month's data.
+        await loadAvailability(y, m + 1);
         calBox.innerHTML = renderCalendar();
         calBox.classList.add("open");
         bindCalendar();
@@ -861,7 +921,10 @@ function bindCalendar() {
       state.eventDate = d.dataset.date;
       document.getElementById("fDate").value = state.eventDate;
       document.getElementById("errDate").style.display = "none";
-      revalidateEventTime(); // the DATE changed — re-check the chosen time
+      // The date changed — refresh the time picker and drop a time that the
+      // new date no longer offers for this service (the customer is told).
+      refreshTimeOptions();
+      revalidateEventTime(); // re-check the chosen time against the new date
       calBox.classList.remove("open");
       renderSummary();
       calBox.innerHTML = renderCalendar();
@@ -882,7 +945,7 @@ function bindCalendar() {
    the field — the selection is never silently changed. */
 function revalidateEventTime(notify = true) {
   if (!state.eventTime) return true;
-  if (isTimeAvailable(state.eventDate, state.eventTime)) return true;
+  if (isTimeAvailable(state.eventDate, state.eventTime, currentServiceName())) return true;
   state.eventTime = "";
   const sel = document.getElementById("fTime");
   if (sel) sel.value = "";
@@ -912,17 +975,20 @@ function handleContinue() {
   else if (isPastDate(state.eventDate))
     dateMsg =
       "That date has already passed. Please select a current or future date.";
-  else if (unavailableDates.includes(state.eventDate))
-    dateMsg = "That date is no longer available. Please choose another date.";
+  else if (isDateTaken(state.eventDate))
+    dateMsg =
+      (AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue)
+        ? "The venue is already booked for that date. Please choose another date."
+        : "That date is fully booked. Please choose another date.";
   if (dateMsg) document.getElementById("errDate").textContent = dateMsg;
   setErr("errDate", !!dateMsg);
 
   // EVENT TIME — required and still offered for the chosen date.
   let timeMsg = "";
   if (!state.eventTime) timeMsg = "Please select an event time.";
-  else if (!isTimeAvailable(state.eventDate, state.eventTime))
+  else if (!isTimeAvailable(state.eventDate, state.eventTime, currentServiceName()))
     timeMsg =
-      "The selected event time is not available for this date. Please choose another event time.";
+      "That time is already booked for your service on this date. Please choose another event time.";
   if (timeMsg) document.getElementById("errTime").textContent = timeMsg;
   setErr("errTime", !!timeMsg);
 
@@ -943,7 +1009,10 @@ function handleContinue() {
   const emailBad = !isValidEmail(state.email);
   showFieldError("errPhone", "fPhone", phoneBad);
   showFieldError("errEmail", "fEmail", emailBad);
-  if (phoneBad || emailBad) ok = false;
+  // Address is required ONLY on the services that ask for it.
+  const addrBad = !!state.service.requiresAddress && !state.address.trim();
+  showFieldError("errAddress", "fAddress", addrBad);
+  if (phoneBad || emailBad || addrBad) ok = false;
   if (!ok) {
     const firstErr = document.querySelector(".err[style*='block'], .invalid");
     if (firstErr)
@@ -972,6 +1041,7 @@ function openReviewModal() {
     <div class="confirm-row"><span>Customer</span><span>${state.customerName}</span></div>
     <div class="confirm-row"><span>Contact Number</span><span>${state.contactNumber}</span></div>
     <div class="confirm-row"><span>Email</span><span>${state.email}</span></div>
+    ${state.service.requiresAddress ? `<div class="confirm-row"><span>Address</span><span>${pdrEscape(state.address)}</span></div>` : ""}
     <div class="confirm-row"><span>Event Date</span><span>${state.eventDate}</span></div>
     <div class="confirm-row"><span>Event Time</span><span>${fmtEventTime(state.eventTime)}</span></div>
     <div class="confirm-row"><span>Event Type</span><span>${state.eventType === "Other" ? state.eventTypeOther : state.eventType}</span></div>
@@ -1031,17 +1101,21 @@ document.getElementById("submitBtn").onclick = async () => {
     renderPanel();
     return;
   }
-  if (!isTimeAvailable(state.eventDate, state.eventTime)) {
+  if (!isTimeAvailable(state.eventDate, state.eventTime, currentServiceName())) {
     alert(
-      "The selected event time is not available for this date. Please go back and choose another event time.",
+      "That time is already booked for your service on this date. Please go back and choose another event time.",
     );
     document.getElementById("reviewModal").classList.remove("open");
     state.eventTime = "";
     renderPanel();
     return;
   }
-  if (unavailableDates.includes(state.eventDate)) {
-    alert("Please select an available event date.");
+  if (isDateTaken(state.eventDate)) {
+    alert(
+      (AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue)
+        ? "The venue is already booked for that date. Please select an available event date."
+        : "That date is fully booked. Please select an available event date.",
+    );
     return;
   }
   if (removeMainServiceFromCart().length) {
@@ -1073,6 +1147,9 @@ document.getElementById("submitBtn").onclick = async () => {
     contactPerson: state.customerName, // the form has one "Customer Name / Contact Person" field
     contactNumber: state.contactNumber,
     email: state.email,
+    // Only sent on the services that collect it; others leave it null server-side.
+    address: state.service.requiresAddress ? state.address.trim() : "",
+    serviceId: state.service.id, // lets the backend apply per-service rules (e.g. address required)
     eventDate: state.eventDate,
     eventTime: state.eventTime,
     eventType:
@@ -1099,12 +1176,25 @@ document.getElementById("submitBtn").onclick = async () => {
 
   if (!result.ok) {
     if (result.reason === "DATE_TAKEN") {
+      // cause distinguishes WHY the date closed: VENUE (exclusive per date)
+      // or FULL (2 services already booked).
       alert(
-        "Sorry, that date was just reserved by someone else. Please choose another date.",
+        result.cause === "VENUE"
+          ? "Sorry, the venue was just booked for that date by another customer. Please choose another date."
+          : "Sorry, that date just reached its booking limit. Please choose another date.",
       );
       document.getElementById("reviewModal").classList.remove("open");
       state.eventDate = null;
-      await refreshUnavailableDates();
+      state.eventTime = "";
+      await refreshAvailability();
+      renderPanel();
+    } else if (result.reason === "TIME_TAKEN") {
+      alert(
+        "Sorry, that time was just booked for your service by another customer. Please choose another event time.",
+      );
+      document.getElementById("reviewModal").classList.remove("open");
+      state.eventTime = "";
+      await refreshAvailability();
       renderPanel();
     } else if (result.reason === "INVALID") {
       alert(
@@ -1118,7 +1208,7 @@ document.getElementById("submitBtn").onclick = async () => {
     return;
   }
 
-  unavailableDates.push(state.eventDate);
+  await refreshAvailability(); // this booking may have just closed a date/time
   document.getElementById("reviewModal").classList.remove("open");
   showSuccess(
     Object.assign({}, payload, {
@@ -1156,6 +1246,7 @@ function showSuccess(r) {
     <div class="section-label" style="margin-top:16px;">RESERVATION DETAILS</div>
     <div class="confirm-row"><span>Customer</span><span>${e(r.customerName)}</span></div>
     <div class="confirm-row"><span>Event Date</span><span>${e(r.eventDate)}</span></div>
+    ${r.address ? `<div class="confirm-row"><span>Address</span><span>${e(r.address)}</span></div>` : ""}
     <div class="confirm-row"><span>Event Time</span><span>${e(fmtEventTime(r.eventTime))}</span></div>
     <div class="confirm-row"><span>Event Type</span><span>${e(r.eventType)}</span></div>
     <div class="confirm-row"><span>Guests</span><span>${e(r.guests)} pax</span></div>
@@ -1175,6 +1266,7 @@ function showSuccess(r) {
     state.customerName = "";
     state.contactNumber = "";
     state.email = "";
+    state.address = "";
     state.eventDate = null;
     state.eventTime = "";
     state.eventType = "";
@@ -1187,16 +1279,21 @@ function showSuccess(r) {
     state.pickingPkg = 0;
     state.notice = "";
     renderAll();
-    refreshUnavailableDates(); // reload the taken dates for the fresh form
+    refreshAvailability(); // reload availability for the fresh form
   };
 }
 
-/* ---------------- UNAVAILABLE DATES ---------------- */
-// Load the taken dates from the backend area, then redraw the open/closed calendar.
-// (Top-level so the submit handler can also call it after a DATE_TAKEN rejection.)
-async function refreshUnavailableDates() {
+/* ---------------- AVAILABILITY REFRESH ---------------- */
+// Load the CURRENTLY DISPLAYED month's availability (taken dates, per-date
+// counts, per-service time slots) then redraw the open/closed calendar and the
+// time picker. Call it after any change that could alter availability: month
+// navigation, a rejected submission, or a fresh form.
+// (Top-level so the submit handler can call it after a DATE_TAKEN rejection.)
+async function refreshAvailability(year, month) {
+  const y = year !== undefined && year !== null ? year : state.calYear;
+  const m = month !== undefined && month !== null ? month : state.calMonth + 1;
   try {
-    unavailableDates = await getUnavailableDates();
+    await loadAvailability(y, m);
   } catch (e) {
     /* keep what we have */
   }
@@ -1207,6 +1304,7 @@ async function refreshUnavailableDates() {
     box.classList.toggle("open", wasOpen);
     bindCalendar();
   }
+  refreshTimeOptions();
 }
 
 /* ---------------- INIT ---------------- */
@@ -1215,4 +1313,4 @@ function renderAll() {
   renderPanel();
 }
 renderAll();
-refreshUnavailableDates(); // fill the calendar as soon as the data arrives
+refreshAvailability(); // fill the calendar as soon as the data arrives

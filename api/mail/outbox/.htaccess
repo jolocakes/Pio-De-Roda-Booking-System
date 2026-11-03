@@ -1,0 +1,9 @@
+# The outbox holds unsent confirmation emails, which contain customer Booking
+# PINs. Never serve these files over HTTP — they are for local viewing only.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

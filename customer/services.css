@@ -895,3 +895,18 @@ ul.plain.dot li:before {
   color:var(--danger);
   margin:0 0 14px;
 }
+
+/* ---- Availability: taken time slots in the Event Time select ----
+   A slot is disabled when THIS service already holds it that day. Rendered
+   grey + struck through so it reads as "taken", not "broken". */
+.field select option:disabled {
+  color:#9a8f80;
+  background:#f1ead9;
+  text-decoration:line-through;
+  cursor:not-allowed;
+}
+
+/* Hover hint on a partially-booked date (title attribute does the rest) */
+.cal-grid .day.avail[title] {
+  cursor:help;
+}

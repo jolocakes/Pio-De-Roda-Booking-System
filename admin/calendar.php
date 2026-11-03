@@ -110,51 +110,26 @@
                 <!-- Right Side Information Panel -->
                 <div>
                     <!-- Venue Availability Tracker -->
+                    <!-- Filled by updateSidePanels() from the SAME availability
+                         rules the customer calendars use. Placeholder only. -->
                     <div class="card" id="venueAvailabilityCard" style="margin-bottom: 20px;">
                         <div class="panel-section-title">
-                            <span>Venue Availability</span>
-                            <span style="font-size: 11px; color: var(--text-muted);">Sept 20, 2026</span>
+                            <span>Availability</span>
+                            <span id="availDateLabel" style="font-size: 11px; color: var(--text-muted);">—</span>
                         </div>
-
-                        <div class="availability-card">
-                            <div class="venue-name">Events Place</div>
-                            <div class="venue-status text-booked">Booked (10:00 AM - 02:00 PM)</div>
-                            <div class="time-slot">Available after 03:00 PM</div>
-                        </div>
-
-                        <div class="availability-card">
-                            <div class="venue-name">Restaurant</div>
-                            <div class="venue-status text-booked">Available All Day</div>
-                            <div class="time-slot">Full Open Slot</div>
-                        </div>
-
-                        <div class="availability-card">
-                            <div class="venue-name">Cafe</div>
-                            <div class="venue-status text-available">Available All Day</div>
-                            <div class="time-slot">Full Open Slot</div>
+                        <div id="availabilityPanel">
+                            <p style="font-size: 12px; color: #718096; padding: 10px 0;">Loading availability…</p>
                         </div>
                     </div>
 
                     <!-- Events & Pending List -->
+                    <!-- Filled by updateSidePanels() with this date's real bookings. -->
                     <div class="card" id="scheduleDetailsCard">
                         <div class="panel-section-title">
                             <span>Schedule Details</span>
                         </div>
-
-                        <div class="event-detail-item">
-                            <div class="event-title">Wedding Reception</div>
-                            <div class="event-meta"><i class="fa-solid fa-calendar"></i> Sept 18, 2026</div>
-                            <div class="event-meta"><i class="fa-solid fa-clock"></i> 05:00 PM - 10:00 PM</div>
-                            <div class="event-meta"><i class="fa-solid fa-location-dot"></i>Events PLace</div>
-                            <span class="event-chip chip-confirmed" style="display:inline-block; margin-top:5px;">Confirmed Event</span>
-                        </div>
-
-                        <div class="event-detail-item">
-                            <div class="event-title">Cafe</div>
-                            <div class="event-meta"><i class="fa-solid fa-calendar"></i> Sept 20, 2026</div>
-                            <div class="event-meta"><i class="fa-solid fa-clock"></i> 02:00 PM - 03:30 PM</div>
-                            <div class="event-meta"><i class="fa-solid fa-location-dot"></i>Cafe</div>
-                            <span class="event-chip chip-pending" style="display:inline-block; margin-top:5px;">Pending Reservation</span>
+                        <div id="scheduleDetailsPanel">
+                            <p style="font-size: 12px; color: #718096; padding: 10px 0;">Loading bookings…</p>
                         </div>
                     </div>
                 </div>
@@ -164,7 +139,6 @@
     </div>
     <script>
 let eventsData = [];
-const venueList = ['Events Place', 'Restaurant', 'Cafe'];
 function getBadgeInfo(status) {
     const s = (status || '').toLowerCase();
     if (s === 'confirmed') return { cls: 'chip-confirmed', label: 'Confirmed Event' };
@@ -180,6 +154,48 @@ let currentDate = new Date();
 let selectedDateStr = new Date().toISOString().split('T')[0];
 
 let fetchSequence = 0;
+
+/* ------------------------------------------------------------------
+   AVAILABILITY — the SAME endpoint the customer landing page and the
+   booking section use (api/availability.php -> api/capacity.php).
+   Reading one shared source is what keeps the admin calendar in sync:
+   max 2 services/day, venue exclusive per date, per-service time slots.
+   ------------------------------------------------------------------ */
+let avail = { dates: [], times: {}, meta: {}, rules: null };
+
+function isAvailTaken(dateStr) {
+    return avail.dates.indexOf(dateStr) !== -1;
+}
+
+// Reason a date is closed, or how full it is, in plain words.
+function availHint(dateStr) {
+    const m = avail.meta[dateStr];
+    if (!m) return '';
+    if (m.hasVenue) return 'Venue booked — date closed';
+    const cap = (avail.rules && avail.rules.maxPerDay) || 2;
+    if (m.count >= cap) return `${m.count} of ${cap} slots used — date closed`;
+    if (m.count > 0) return `${m.count} of ${cap} slots used`;
+    return '';
+}
+
+async function fetchAvailability() {
+    const y = currentDate.getFullYear();
+    const m = currentDate.getMonth() + 1;
+    try {
+        const res = await fetch(`../api/availability.php?year=${y}&month=${m}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('availability request failed');
+        const data = await res.json();
+        avail = {
+            dates: data.dates || [],
+            times: data.times || {},
+            meta: data.meta || {},
+            rules: data.rules || null
+        };
+    } catch (e) {
+        // keep the last known picture rather than blanking the calendar
+    }
+    renderCalendar();
+}
 
 async function fetchAdminReservations() {
     const currentSeq = ++fetchSequence;
@@ -201,6 +217,7 @@ async function fetchAdminReservations() {
             customer: r.customerName,
             contactNumber: r.contactNumber || 'Not provided',
             email: r.email || 'Not provided',
+            address: r.address || '',
             eventType: r.eventType || 'Not provided',
             guests: r.guests || 0,
             selectedPackage: r.selectedPackage || 'Not provided',
@@ -214,15 +231,20 @@ async function fetchAdminReservations() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', fetchAdminReservations);
+document.addEventListener('DOMContentLoaded', () => {
+    fetchAdminReservations();
+    fetchAvailability();
+});
 
 window.addEventListener('pageshow', (event) => {
     fetchAdminReservations();
+    fetchAvailability();
 });
 
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         fetchAdminReservations();
+        fetchAvailability();
     }
 });
 
@@ -267,18 +289,40 @@ function renderCalendar() {
         const formattedDay = String(i).padStart(2, '0');
         const dateString = `${year}-${formattedMonth}-${formattedDay}`;
 
-        // Dagdag styling kapag napili ang araw
-        if (dateString === selectedDateStr) {
-            cell.style.border = '2px solid #500a18';
-            cell.style.backgroundColor = '#fff5f7';
-        }
-
         let eventsHTML = `<div class="day-number">${i}</div>`;
         const dayEvents = eventsData.filter(e => e.date === dateString && (e.status === 'confirmed' || e.status === 'pending'));
+
+        // Same rules as the customer calendars: a date is CLOSED when the venue
+        // is booked or the day has hit its service cap. Gray it out + say why.
+        const taken = isAvailTaken(dateString);
+        const hint = availHint(dateString);
+
+        // Dagdag styling kapag napili ang araw.
+        // NOTE: the selected-day background must NEVER touch a closed date —
+        // an inline style would beat the .day-taken gray and make a closed
+        // day look open. The border still marks it as selected.
+        if (dateString === selectedDateStr) {
+            cell.style.border = '2px solid #500a18';
+            if (!taken) cell.style.backgroundColor = '#fff5f7';
+        }
+
+        if (taken) {
+            cell.classList.add('day-taken');
+            cell.title = hint || 'Fully booked';
+        } else if (hint) {
+            cell.title = hint;
+        }
+
         dayEvents.forEach(evt => {
             const badge = getBadgeInfo(evt.rawStatus);
             eventsHTML += `<span class="event-chip ${badge.cls}">${evt.title}</span>`;
         });
+
+        if (taken) {
+            eventsHTML += `<span class="closed-tag">Date closed</span>`;
+        } else if (hint) {
+            eventsHTML += `<span class="slots-tag">${hint}</span>`;
+        }
 
         cell.innerHTML = eventsHTML;
         
@@ -312,7 +356,8 @@ function changeMonth(direction) {
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
     selectedDateStr = `${year}-${month}-01`;
-    renderCalendar();
+    renderCalendar(); // draw immediately with what we know...
+    fetchAvailability(); // ...then refresh with the new month's real rules
 }
 
 // Function para mag-update ang Venue Availability at Schedule Details sa Side Panels
@@ -321,18 +366,18 @@ function updateSidePanels(dateStr) {
     const options = { month: 'short', day: 'numeric', year: 'numeric' };
     const formattedDate = d.toLocaleDateString('en-US', options);
 
-    // 1. Update Venue Availability Section Header Date
-    const availHeader = document.querySelector('.availability-card')?.parentElement?.querySelector('span:last-child');
-    if(availHeader) availHeader.innerText = formattedDate;
+    // 1. Header date on the availability card
+    const availDateLabel = document.getElementById('availDateLabel');
+    if (availDateLabel) availDateLabel.innerText = formattedDate;
 
     // 2. Filter Events sa napiling araw (Pending and Confirmed only)
     const dayEvents = eventsData.filter(e => e.date === dateStr && (e.status === 'confirmed' || e.status === 'pending'));
 
-    // Update Schedule Details Container
-    const scheduleCard = document.querySelectorAll('.card')[2]; // Pangatlong card sa layout
+    // Update Schedule Details Container (by id — no fragile card indexing)
+    const scheduleCard = document.getElementById('scheduleDetailsCard');
     if (scheduleCard) {
         let detailsHTML = `<div class="panel-section-title"><span>Schedule Details (${formattedDate})</span></div>`;
-        
+
         if (dayEvents.length === 0) {
             detailsHTML += `<p style="font-size: 12px; color: #718096; padding: 10px 0;">No bookings or events for this date.</p>`;
         } else {
@@ -345,6 +390,7 @@ function updateSidePanels(dateStr) {
                         <div class="event-meta"><i class="fa-solid fa-calendar"></i> ${formattedDate}</div>
                         <div class="event-meta"><i class="fa-solid fa-clock"></i> ${evt.time}</div>
                         <div class="event-meta"><i class="fa-solid fa-location-dot"></i> ${evt.venue}</div>
+                        ${evt.address ? `<div class="event-meta"><i class="fa-solid fa-house"></i> ${evt.address}</div>` : ""}
                         <span class="event-chip ${badgeClass}" style="display:inline-block; margin-top:5px;">${statusLabel}</span>
                     </div>
                 `;
@@ -353,35 +399,79 @@ function updateSidePanels(dateStr) {
         scheduleCard.innerHTML = detailsHTML;
     }
 
-    // 3. Dynamic Venue Availability Cards
-    const availCardContainer = document.querySelectorAll('.card')[1]; // Pangalawang card sa layout
-    if (availCardContainer) {
-        let availHTML = `
+    // 3. Availability panel — the SAME three rules the customer side enforces:
+    //    max 2 services/day, venue exclusive per date, per-service time slots.
+    const availCard = document.getElementById('venueAvailabilityCard');
+    if (availCard) {
+        const meta = avail.meta[dateStr] || { count: 0, hasVenue: false, taken: false };
+        const cap = (avail.rules && avail.rules.maxPerDay) || 2;
+        const exclusive = (avail.rules && avail.rules.exclusiveService) || 'Venue Rentals';
+        const closed = isAvailTaken(dateStr);
+
+        let html = `
             <div class="panel-section-title">
-                <span>Venue Availability</span>
+                <span>Availability</span>
                 <span style="font-size: 11px; color: var(--text-muted);">${formattedDate}</span>
             </div>`;
 
-        venueList.forEach(v => {
-            const bookedEvt = dayEvents.find(e => e.status === 'confirmed' && (e.venue === v || v === 'Events Place'));
-            if (bookedEvt) {
-                availHTML += `
-                    <div class="availability-card">
-                        <div class="venue-name">${v}</div>
-                        <div class="venue-status text-booked">Booked (${bookedEvt.time})</div>
-                        <div class="time-slot">Slot occupied</div>
-                    </div>`;
-            } else {
-                availHTML += `
-                    <div class="availability-card">
-                        <div class="venue-name">${v}</div>
-                        <div class="venue-status text-available">Available All Day</div>
-                        <div class="time-slot">Full Open Slot</div>
-                    </div>`;
-            }
-        });
+        // Date status
+        if (meta.hasVenue) {
+            html += `
+            <div class="availability-card">
+                <div class="venue-name">Date status</div>
+                <div class="venue-status text-booked">Closed — venue booked</div>
+                <div class="time-slot">${exclusive} is exclusive: one booking closes the whole date</div>
+            </div>`;
+        } else if (meta.count >= cap) {
+            html += `
+            <div class="availability-card">
+                <div class="venue-name">Date status</div>
+                <div class="venue-status text-booked">Closed — ${meta.count} of ${cap} slots used</div>
+                <div class="time-slot">No further bookings accepted for this date</div>
+            </div>`;
+        } else {
+            html += `
+            <div class="availability-card">
+                <div class="venue-name">Date status</div>
+                <div class="venue-status text-available">Open</div>
+                <div class="time-slot">${meta.count} of ${cap} slots used — ${cap - meta.count} remaining</div>
+            </div>`;
+        }
 
-        availCardContainer.innerHTML = availHTML;
+        // Slot usage
+        html += `
+            <div class="availability-card">
+                <div class="venue-name">Daily slots</div>
+                <div class="venue-status ${meta.count >= cap ? 'text-booked' : 'text-available'}">${meta.count} / ${cap} used</div>
+                <div class="time-slot">Maximum ${cap} services per day</div>
+            </div>`;
+
+        // Venue exclusivity
+        html += `
+            <div class="availability-card">
+                <div class="venue-name">${exclusive}</div>
+                <div class="venue-status ${meta.hasVenue ? 'text-booked' : 'text-available'}">${meta.hasVenue ? 'Booked' : 'Not booked'}</div>
+                <div class="time-slot">${meta.hasVenue ? 'Closes this date for every service' : 'Date remains open to other services'}</div>
+            </div>`;
+
+        // Taken time slots (per-service — a slot blocks only its own service)
+        const slots = avail.times[dateStr];
+        const slotKeys = slots ? Object.keys(slots).sort() : [];
+        html += `
+            <div class="availability-card">
+                <div class="venue-name">Booked time slots</div>`;
+        if (slotKeys.length === 0) {
+            html += `<div class="venue-status text-available">None</div>
+                     <div class="time-slot">Every time is open for all services</div>`;
+        } else {
+            html += `<div class="venue-status text-booked">${slotKeys.length} booked</div>`;
+            slotKeys.forEach(t => {
+                html += `<div class="time-slot">${t} — ${(slots[t] || []).join(', ')}</div>`;
+            });
+        }
+        html += `</div>`;
+
+        availCard.innerHTML = html;
     }
 }
 
