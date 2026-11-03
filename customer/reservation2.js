@@ -327,10 +327,12 @@ function renderCalendar() {
     const sel = state.eventDate === ds;
     const meta = AVAIL.meta[ds];
     const hint = unavail
-      ? (meta && meta.hasVenue ? "venue booked" : "fully booked")
-      : (meta && meta.count > 0
-          ? `${meta.count} of ${(AVAIL.rules && AVAIL.rules.maxPerDay) || 2} slots booked`
-          : "");
+      ? meta && meta.hasVenue
+        ? "venue booked"
+        : "fully booked"
+      : meta && meta.count > 0
+        ? `${meta.count} of ${(AVAIL.rules && AVAIL.rules.maxPerDay) || 2} slots booked`
+        : "";
     cells += `<div class="day ${unavail ? "unavail" : "avail"} ${sel ? "sel" : ""} ${isToday ? "today" : ""}"
       data-date="${unavail ? "" : ds}" ${unavail ? 'aria-disabled="true" ' : ""}role="button" tabindex="0"
       ${hint ? `title="${hint}" ` : ""}aria-label="${ds} — ${unavail ? "unavailable" : isToday ? "today, available" : "available"}${hint ? ", " + hint : ""}${sel ? ", selected" : ""}">${d}</div>`;
@@ -395,13 +397,17 @@ function renderPanel() {
       <input type="email" id="fEmail" autocomplete="email" placeholder="you@gmail.com" value="${state.email}">
       <div class="err" id="errEmail">Please enter a valid email address, including @ and the domain (e.g. name@gmail.com)</div>
     </div>
-    ${s.requiresAddress ? `
+    ${
+      s.requiresAddress
+        ? `
     <div class="field">
       <label>Address <span class="req" title="Required">*</span></label>
       <input type="text" id="fAddress" autocomplete="street-address" placeholder="Enter Address" value="${state.address}">
       <div class="cap">Complete address where the service will be set up or delivered (street, barangay, municipality)</div>
       <div class="err" id="errAddress">Please enter the address for setup or delivery.</div>
-    </div>` : ""}
+    </div>`
+        : ""
+    }
     <div class="field">
       <label>Event Date <span class="req" title="Required">*</span></label>
       <input type="text" id="fDate" class="date-input" readonly placeholder="Select a date" value="${state.eventDate || ""}">
@@ -413,9 +419,11 @@ function renderPanel() {
       <select id="fTime">
         ${timeOptionsHTML()}
       </select>
-      <div class="cap">${state.eventDate
-        ? "Unavailable times are already booked by another customer for your service."
-        : "Pick an event date first — unavailable times appear once a date is chosen."}</div>
+      <div class="cap">${
+        state.eventDate
+          ? "Unavailable times are already booked by another customer for your service."
+          : "Pick an event date first — unavailable times appear once a date is chosen."
+      }</div>
       <div class="err" id="errTime">Please select an event time.</div>
     </div>
     <div class="field">
@@ -508,8 +516,7 @@ function addonCartRows(kind) {
               : ""
           }</small>`
         : "";
-      const label =
-        c.item.name + (c.item.qty ? " × " + c.qty : "") + note;
+      const label = c.item.name + (c.item.qty ? " × " + c.qty : "") + note;
       const amountLabel =
         lineTotal !== null
           ? `₱${lineTotal.toLocaleString()}`
@@ -523,9 +530,10 @@ function addonCartRows(kind) {
 function addAddonToCart(item, pkgIdx) {
   if (!item || !state.service || item.serviceId === state.service.id) return;
   const opts = addonOptions(item);
-  const pkg =
-    opts[Math.max(0, Math.min(pkgIdx || 0, opts.length - 1))] ||
-    [item.name, item.price];
+  const pkg = opts[Math.max(0, Math.min(pkgIdx || 0, opts.length - 1))] || [
+    item.name,
+    item.price,
+  ];
   const unitPrice = addonOptionRate(item, pkg);
   if (unitPrice === null || !Number.isFinite(unitPrice) || unitPrice <= 0) {
     state.picking = null;
@@ -1048,7 +1056,8 @@ function bindCalendar() {
    the field — the selection is never silently changed. */
 function revalidateEventTime(notify = true) {
   if (!state.eventTime) return true;
-  if (isTimeAvailable(state.eventDate, state.eventTime, currentServiceName())) return true;
+  if (isTimeAvailable(state.eventDate, state.eventTime, currentServiceName()))
+    return true;
   state.eventTime = "";
   const sel = document.getElementById("fTime");
   if (sel) sel.value = "";
@@ -1082,7 +1091,7 @@ function handleContinue() {
       "That date has already passed. Please select a current or future date.";
   else if (isDateTaken(state.eventDate))
     dateMsg =
-      (AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue)
+      AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue
         ? "The venue is already booked for that date. Please choose another date."
         : "That date is fully booked. Please choose another date.";
   if (dateMsg) document.getElementById("errDate").textContent = dateMsg;
@@ -1091,7 +1100,9 @@ function handleContinue() {
   // EVENT TIME — required and still offered for the chosen date.
   let timeMsg = "";
   if (!state.eventTime) timeMsg = "Please select an event time.";
-  else if (!isTimeAvailable(state.eventDate, state.eventTime, currentServiceName()))
+  else if (
+    !isTimeAvailable(state.eventDate, state.eventTime, currentServiceName())
+  )
     timeMsg =
       "That time is already booked for your service on this date. Please choose another event time.";
   if (timeMsg) document.getElementById("errTime").textContent = timeMsg;
@@ -1193,7 +1204,9 @@ document.getElementById("editBtn").onclick = () =>
 /* ---------------- SUBMIT ---------------- */
 document.getElementById("submitBtn").onclick = async () => {
   if (!state.catalogReady || !state.service) {
-    alert("Service catalog is unavailable. Reservation submission is disabled.");
+    alert(
+      "Service catalog is unavailable. Reservation submission is disabled.",
+    );
     return;
   }
   if (!isValidPhone(state.contactNumber) || !isValidEmail(state.email)) {
@@ -1230,7 +1243,9 @@ document.getElementById("submitBtn").onclick = async () => {
     renderPanel();
     return;
   }
-  if (!isTimeAvailable(state.eventDate, state.eventTime, currentServiceName())) {
+  if (
+    !isTimeAvailable(state.eventDate, state.eventTime, currentServiceName())
+  ) {
     alert(
       "That time is already booked for your service on this date. Please go back and choose another event time.",
     );
@@ -1241,7 +1256,7 @@ document.getElementById("submitBtn").onclick = async () => {
   }
   if (isDateTaken(state.eventDate)) {
     alert(
-      (AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue)
+      AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue
         ? "The venue is already booked for that date. Please select an available event date."
         : "That date is fully booked. Please select an available event date.",
     );
@@ -1284,7 +1299,6 @@ document.getElementById("submitBtn").onclick = async () => {
     eventType:
       state.eventType === "Other" ? state.eventTypeOther : state.eventType,
     guests: parseInt(state.guests),
-    serviceId: state.service.id,
     mainService: state.service.name,
     selectedPackage: state.service.packages[state.selectedPackage][0],
     ...(state.service.mainCourses
@@ -1413,7 +1427,6 @@ function showSuccess(r) {
   };
 }
 
-<<<<<<< Updated upstream
 /* ---------------- AVAILABILITY REFRESH ---------------- */
 // Load the CURRENTLY DISPLAYED month's availability (taken dates, per-date
 // counts, per-service time slots) then redraw the open/closed calendar and the
@@ -1421,15 +1434,9 @@ function showSuccess(r) {
 // navigation, a rejected submission, or a fresh form.
 // (Top-level so the submit handler can call it after a DATE_TAKEN rejection.)
 async function refreshAvailability(year, month) {
+  if (!state.catalogReady || !state.service) return;
   const y = year !== undefined && year !== null ? year : state.calYear;
   const m = month !== undefined && month !== null ? month : state.calMonth + 1;
-=======
-/* ---------------- UNAVAILABLE DATES ---------------- */
-// Load the taken dates from the backend area, then redraw the open/closed calendar.
-// (Top-level so the submit handler can also call it after a DATE_TAKEN rejection.)
-async function refreshUnavailableDates() {
-  if (!state.catalogReady || !state.service) return;
->>>>>>> Stashed changes
   try {
     await loadAvailability(y, m);
   } catch (e) {
@@ -1496,10 +1503,6 @@ function renderAll() {
   renderDetails();
   renderPanel();
 }
-<<<<<<< Updated upstream
-renderAll();
-refreshAvailability(); // fill the calendar as soon as the data arrives
-=======
 
 async function initReservationPage() {
   renderLoadingState();
@@ -1527,8 +1530,7 @@ async function initReservationPage() {
     return;
   }
 
-  const requestedId =
-    typeof SERVICE_ID === "string" ? SERVICE_ID.trim() : "";
+  const requestedId = typeof SERVICE_ID === "string" ? SERVICE_ID.trim() : "";
   const matchedService = requestedId
     ? SERVICES.find((s) => s.id === requestedId)
     : null;
@@ -1544,8 +1546,7 @@ async function initReservationPage() {
   state.service = matchedService;
   state.catalogReady = true;
   renderAll();
-  await refreshUnavailableDates();
+  await refreshAvailability();
 }
 
 initReservationPage();
->>>>>>> Stashed changes

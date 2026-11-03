@@ -1,327 +1,8 @@
 /* Shared service catalog, add-ons, and guidelines for Pio De Roda reservation pages */
-<<<<<<< Updated upstream
-/* ayusin mo pa ung "add to cart" feature mo, kung ilalagay mo rin ba ung mismong services sa gilid" */
-const SERVICES = [
-  {
-    id: "catering-menu",
-    name: "Catering with Menu",
-    requiresAddress: true, // off-site setup — the booking form collects an address
-    rates: [
-      ["2 Main Courses", "₱1,000 per head"],
-      ["3 Main Courses", "₱1,100 per head"],
-      ["4 Main Courses", "₱1,300 per head"],
-    ],
-    price: "₱1,000 per head",
-    /* `perHeadByPkg:true` means each package's price is a PER-HEAD rate and the
-       booking total = rate × number of guests (2 choices ₱1,000/head,
-       3 ₱1,100/head, 4 ₱1,300/head). The customer picks the main courses in
-       the booking panel (minimum 2); the matching package is then selected
-       automatically from the count — see syncMainCoursePackage in
-       reservation2.js. */
-    perHeadByPkg: true,
-    inclusions: [
-      "Tables and chairs",
-      "Food and beverages",
-      "Basic decorations",
-      "Serving staff",
-      "Venue setup",
-      "Cleanup",
-    ],
-    /* Fixed menu included in EVERY catering package (display-only — no Select
-       button, unlike Dine-In's `menu`). `mainCourses` below are the only
-       dishes the customer actually chooses. */
-    menu: [
-      {
-        category: "Included Dishes",
-        items: [
-          {
-            name: "Included Dishes",
-            price: null,
-            dishes: [
-              "Chips for Pica-Pica",
-              "Steamed Pandan Rice",
-              "Soup",
-              "Vegetable Recipe",
-              "Beverages",
-              "Dessert",
-              "Pancit/Pasta Recipe",
-            ],
-          },
-        ],
-      },
-    ],
-    mainCourses: [
-      "Chicken Recipe",
-      "Beef Recipe",
-      "Pork Recipe",
-      "Fish or Seafood Recipe",
-    ],
-    packages: [
-      ["2 Main Courses", 1000],
-      ["3 Main Courses", 1100],
-      ["4 Main Courses", 1300],
-    ],
-    maxCap: 150,
-    /* Example of SERVICE-SPECIFIC NOTES (see point 1 below). Placeholder — replace with real notes. */
-    notes: [
-      "A minimum of 50 pax applies for this package.",
-      "Menu tasting may be arranged upon request, subject to availability.",
-    ],
-  },
-=======
 /* Loaded dynamically from ../api/test_services_stage4c5.php (Stage 4D database catalog integration). */
->>>>>>> Stashed changes
 
 const CATALOG_API_URL = "../api/test_services_stage4c5.php";
 
-<<<<<<< Updated upstream
-  {
-    id: "dinein",
-    name: "Dine-In Menu",
-    rates: [
-      ["Per Head", "₱600"],
-      ["10 Persons", "₱6,000"],
-      ["20 Persons", "₱12,000"],
-      ["30 Persons", "₱18,000"],
-    ],
-    price: "600",
-    perHead: 600,
-    inclusions: [
-      "Dine-in at Al-Fresco Restaurant Area for 1-1.5 hours",
-      "Complete silverware, glassware,and flatware",
-      "Professionally trained and uniformed staff",
-      "Provision for parking space",
-    ],
-    /* See point 3 below: this is the only service with a `menu` field.
-       Its `packages` array is auto-generated from `menu` further down this file,
-       so the booking panel's package list always matches this table.
-       `perHead:600` is the per-guest rate from the Rates table above: when a
-       set menu (Menu A / Menu B) is selected, the total adds ₱600 × guests. */
-    menu: [
-      {
-        category: "Menu A",
-        items: [
-          {
-            name: "Menu A",
-            price: null,
-            dishes: [
-              "Plain Rice",
-              "Crab & Corn Soup",
-              "Creamy Mixed Veggies w/ Quail Eggs",
-              "Garlic Chicken w/ Gravy Sauce",
-              "Pork w/ Mushroom Sauce",
-              "Lemon Iced Tea",
-              "Peach Mango Graham",
-            ],
-          },
-        ],
-      },
-      {
-        category: "Menu B",
-        items: [
-          {
-            name: "Menu B",
-            price: null,
-            dishes: [
-              "Plain Rice",
-              "Creamy Mushroom Soup",
-              "Special Chopseuy w/ Quail Eggs",
-              "Chicken Cordon Bleu w/ White Sauce",
-              "Pork w/ Oyster Sauce & Brocolli",
-              "Blue Lemonade",
-              "Frozen Cookies & Cream",
-            ],
-          },
-        ],
-      },
-    ],
-    packages: [],
-    maxCap: null,
-  },
-
-  {
-    id: "noncoffee",
-    name: "Non-Coffee Booth Package",
-    requiresAddress: true, // off-site setup — the booking form collects an address
-    rates: [
-      ["Sparkling Refreshers", "₱85 per cup"],
-      ["Creamy Milk Tea", "₱85 per cup"],
-    ],
-    price: "₱85 per cup",
-    inclusions: ["Booth setup", "Assigned staff", "Assorted drinks menu"],
-    packages: [
-      ["Sparkling Refreshers (50 Cups)", 4250],
-      ["Sparkling Refreshers (100 Cups)", 8500],
-      ["Creamy Milk Tea (50 Cups)", 4250],
-      ["Creamy Milk Tea (100 Cups)", 8500],
-    ],
-    maxCap: 80,
-    inclusionsTable: {
-      headers: ["Sparkling Refreshers", "Creamy Milk Tea"],
-      rows: [
-        ["16 oz Iced Drinks", "16 oz Iced Drinks"],
-        [
-          "5 Flavors: Strawberry, Green Apple, Peach, Passion Fruit, Blue Raspberry",
-          "5 Flavors: Matcha, Cookies & Cream, Dark Chocolate, Salted Caramel, Okinawa",
-        ],
-      ],
-    },
-    notes: [
-      "Transportation Fee applies outside Indang, Cavite",
-      "50% Down Payment to book your event",
-      "50% Full Payment must be made 1 day before the event",
-      "Additional charge of 500.00 per hour for every succeeding hour",
-      "Ensure that there will be a nearby power outlet",
-      "Corkage or electricity fees shall be shouldered by the client",
-    ],
-  },
-
-  /* gusto q maglagay nung inclusions mismo ung may check check pero ask mo pa */
-  {
-    id: "coffee",
-    name: "Coffee Booth Package",
-    requiresAddress: true, // off-site setup — the booking form collects an address
-    rates: [
-      ["Intimate", "₱125 per cup"],
-      ["Classic", "₱145 per cup"],
-      ["Ultimate", "₱165 per cup"],
-    ],
-    price: "₱145 per cup",
-    inclusions: [
-      "Premium Quality Coffee Beans",
-      "Premium Sauces and Syrups",
-      "Quality Espresso Machine and Grinder",
-      "Complete Coffee Booth Set-up",
-      "3-4 Hours of Service",
-      "2-3 Experienced and Uniformed Barista",
-      "Claiming Stub for the guests (optional)",
-      "Free Transportation for 100 cups and above within Indang, Trece, Mendez or Tagaytay",
-    ],
-    packages: [
-      ["Intimate Package (50 Cups)", 6250],
-      ["Intimate Package (100 Cups)", 12500],
-      ["Classic Package (50 Cups)", 7250],
-      ["Classic Package (100 Cups)", 14500],
-      ["Ultimate Package (50 Cups)", 8250],
-      ["Ultimate Package (100 Cups)", 16500],
-    ],
-    maxCap: 80,
-    inclusionsTable: {
-      headers: ["Intimate", "Classic", "Ultimate"],
-      rows: [
-        ["12 oz Hot Drinks", "12 oz Hot Drinks", "12 oz Hot Drinks"],
-        ["12 oz Iced Drinks", "12 oz Iced Drinks", "12 oz Iced Drinks"],
-        [
-          "4 Coffee Flavors: Americano, Caffe Latte, Cappuccino, Caramel Macchiato",
-          "5 Coffee Flavors: Americano, Caffe Latte, Cappuccino, Caramel Macchiato, Vanilla Latte",
-          "7 Coffee Flavors: Americano, Caffe Latte, Cappuccino, Caramel Macchiato, Vanilla Latte, Spanish Latte, Mocha, 1 Non-Coffee Flavor: Chocolate",
-        ],
-      ],
-    },
-    notes: [
-      "Transportation Fee applies outside Indang, Cavite",
-      "50% Down Payment to book your event",
-      "50% Full Payment must be made 1 day before the event",
-      "Additional charge of 500.00 per hour for every succeeding hour",
-      "Ensure that there will be a nearby power outlet",
-      "Corkage or electricity fees shall be shouldered by the client",
-    ],
-  },
-
-  {
-    id: "pizza",
-    name: "Pizza Booth",
-    requiresAddress: true, // off-site setup — the booking form collects an address
-    rates: [
-      ["15 Pizza", "₱7,500"],
-      ["20 Pizza", "₱10,000"],
-      ["25 Pizza", "₱12,000"],
-      ["30 Pizza", "₱14,500"],
-    ],
-    price: "₱7,500",
-    inclusions: [
-      "Freshly Made Pizza Dough",
-      "Premium Quality Mozarella Cheese, Sauces, & Ingredients",
-      "Pugon-Quality Pizza Oven for Authentic Wood-Fired Flavor",
-      "Complete Pizza Booth Set-up",
-      "2-3 hours of Service",
-      "2-3 Experienced and Uniformed Pizza Masters",
-      "Claiming Stub for Guests (optional)",
-      "Free Transportation within Indang, Cavite",
-      "Minimal Transportation for Trece, Amadeo, Mendez, Tagaytay, Silang, and Alfonso",
-    ],
-    packages: [
-      ["Intimate Package (50 Persons) with 15 Pizza", 7500],
-      ["Intimate Package (50 Persons) with 20 Pizza", 10000],
-      ["Classic Package (80 Persons) with 25 Pizza", 12000],
-      ["Classic Package (80 Persons) with 30 Pizza", 14500],
-    ],
-    maxCap: 80,
-    notes: [
-      "50% Down Payment to book your event",
-      "50% Full Payment must be made 1 day before the event",
-      "Additional charge of ₱500 per hour for every succeeding hour",
-      "Ensure that the venue allows LPG tank for the pugon pizza oven",
-      "In such case, corkage or electricity fees shall be shouldered by the client",
-    ],
-  },
-
-  {
-    id: "intimate",
-    name: "Intimate Celebration Package",
-    rates: [
-      ["Intimate", "₱4,000"],
-      ["Ultimate", "₱14,000"],
-      ["Classic", "₱8,000"],
-    ],
-    price: "₱4,000",
-    packages: [
-      ["Intimate Package", 4000],
-      ["Ultimate Package", 14000],
-      ["Classic Package", 8000],
-    ],
-    maxCap: 20,
-    inclusionsTable: {
-      headers: ["Intimate", "Ultimate", "Classic"],
-      rows: [
-        ["Coffee Shop", "Extension Hall with 25-35 Persons", "Kamayan 1"],
-        ["6-8 Persons", "Air-Conditioned", "15-20 Persons"],
-        ["Air-Conditioned", "Basic Sound System", "Al-Fresco Area"],
-        [
-          "2 Hours Exclusive Events Place",
-          "2 Hours Exclusive Events Place",
-          "2 Hours Exclusive Events Place",
-        ],
-        [
-          "Consumable Drinks and Food",
-          "Consumable Drinks and Food",
-          "Consumable Drinks and Food",
-        ],
-      ],
-    },
-    notes: [
-      "For intimate celebrations such as Bridal Shower, Gender Reveal, Baby SHower, and small birthday parties only.",
-      "Provision of one (1) rectangular table with table cover is included for buffet set-up.",
-      "Outside food and drinks are highly discouraged. Food corkage will be implmented.",
-      "Booking will be confrimed upon receipt of a 50% downpayment.",
-      "Additional charges apply for themed set-ups. Guests may bring their own decor, but only limited decorations are allowed.",
-      "Use of nails, glue, double sided tape, confetti, or any materials that may damage the property is strictly prohibited.",
-      "Standard party duration is 2 hours. Extension is subject to availability and additional charges.",
-      "Use of venue equipment (e.g. sound system) must be requested in advance.",
-    ],
-  },
-
-  {
-    id: "equipment",
-    name: "Equipment Rental",
-    requiresAddress: true, // delivery location — the booking form collects an address
-    rates: [["Per Item", "₱300"]],
-    price: "300",
-    inclusions: ["Delivery within service area", "Basic setup"],
-    packages: [["Standard Rate", 300]],
-    maxCap: null,
-  },
-=======
 /* Original established customer service ordering */
 const SERVICE_ORDER = [
   "catering-menu",
@@ -332,7 +13,15 @@ const SERVICE_ORDER = [
   "pizza",
   "intimate",
   "equipment",
->>>>>>> Stashed changes
+];
+
+/* Off-site / delivery services that require a setup or delivery address */
+const ADDRESS_REQUIRED_SERVICES = [
+  "catering-menu",
+  "noncoffee",
+  "coffee",
+  "pizza",
+  "equipment",
 ];
 
 /* Established customer-facing descriptions for the Additional Services cards */
@@ -553,9 +242,17 @@ function _normalizeService(raw) {
     ? raw.guidelines.map((g) => String(g))
     : [];
 
+  const requiresAddress =
+    raw.requires_address !== undefined
+      ? Boolean(raw.requires_address)
+      : raw.requiresAddress !== undefined
+        ? Boolean(raw.requiresAddress)
+        : ADDRESS_REQUIRED_SERVICES.includes(id);
+
   const svc = {
     id,
     name,
+    requiresAddress,
     category: raw.category ? String(raw.category) : null,
     base_price: basePrice,
     basePrice,
