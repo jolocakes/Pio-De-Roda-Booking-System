@@ -143,6 +143,7 @@
           ${row("Contact Person", val(reservation.contactPerson))}
           ${row("Contact Number", val(reservation.contactNumberMasked || reservation.contactNumber))}
           ${row("Email Address", val(reservation.emailMasked || reservation.email))}
+          ${optRow("Address", reservation.address)}
 
           <h3 class="bs-section-title">EVENT INFORMATION</h3>
           ${row("Event Date", fmtDay(reservation.eventDate))}

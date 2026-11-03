@@ -4,6 +4,7 @@ const SERVICES = [
   {
     id: "catering-menu",
     name: "Catering with Menu",
+    requiresAddress: true, // off-site setup — the booking form collects an address
     rates: [
       ["2 Main Courses", "₱1,000 per head"],
       ["3 Main Courses", "₱1,100 per head"],
@@ -167,6 +168,7 @@ const SERVICES = [
   {
     id: "noncoffee",
     name: "Non-Coffee Booth Package",
+    requiresAddress: true, // off-site setup — the booking form collects an address
     rates: [
       ["Sparkling Refreshers", "₱85 per cup"],
       ["Creamy Milk Tea", "₱85 per cup"],
@@ -204,6 +206,7 @@ const SERVICES = [
   {
     id: "coffee",
     name: "Coffee Booth Package",
+    requiresAddress: true, // off-site setup — the booking form collects an address
     rates: [
       ["Intimate", "₱125 per cup"],
       ["Classic", "₱145 per cup"],
@@ -254,6 +257,7 @@ const SERVICES = [
   {
     id: "pizza",
     name: "Pizza Booth",
+    requiresAddress: true, // off-site setup — the booking form collects an address
     rates: [
       ["15 Pizza", "₱7,500"],
       ["20 Pizza", "₱10,000"],
@@ -336,6 +340,7 @@ const SERVICES = [
   {
     id: "equipment",
     name: "Equipment Rental",
+    requiresAddress: true, // delivery location — the booking form collects an address
     rates: [["Per Item", "₱300"]],
     price: "300",
     inclusions: ["Delivery within service area", "Basic setup"],
@@ -370,12 +375,11 @@ const SERVICE_IMAGES = {
 })();
 
 // =====================================================
-// SHARED AVAILABILITY SOURCE
+// SHARED AVAILABILITY SOURCE — see loadAvailability() in SECTION A below.
 // Both the homepage availability calendar (availability.js) and the
-// per-service booking calendar (reservation2.js) call this SAME function,
-// so there is exactly one place that defines "unavailable" and both
-// calendars always agree. Do not maintain a second unavailableDates list
-// anywhere else in the project.
+// per-service booking calendar (reservation2.js) read the SAME AVAIL object,
+// so there is exactly one place that defines "unavailable" and both calendars
+// always agree. Do not maintain a second availability list anywhere else.
 // =====================================================
 // =====================================================
 // SHARED CONSTANTS + UI HELPERS (front-end — NOT part of the backend area)
@@ -463,12 +467,15 @@ function fmtEventTime(t) {
   return `${h}:${m[2]} ${ap}`;
 }
 
-// Is this time still offered for the given date? Time slots are currently a
-// static placeholder list, so this only checks that the time is a known slot.
-// PRODUCTION: the backend must re-check date+time conflicts before accepting
-// a reservation (see BACKEND note in createReservation below).
-function isTimeAvailable(dateStr, timeStr) {
-  return EVENT_TIME_SLOTS.includes(timeStr);
+// Is this time still offered for the given date?
+// With a service name (the normal path) it applies the PER-SERVICE rule: the
+// slot is blocked only if that same service already holds it that day.
+// Without one it falls back to "is this a known slot at all", for legacy
+// callers that predate service-aware availability.
+function isTimeAvailable(dateStr, timeStr, serviceName) {
+  if (EVENT_TIME_SLOTS.indexOf(timeStr) === -1) return false;
+  if (!serviceName) return true;
+  return !isTimeTakenFor(dateStr, timeStr, serviceName);
 }
 
 /* ---------------- DATA (placeholder — replace with real info) ---------------- */
@@ -665,14 +672,57 @@ const API_BASE_URL = window.location.pathname.includes("/customer")
    Every function returns a Promise. "ok:false" results carry a `reason` code.
    =========================================================================== */
 
-async function getUnavailableDates() {
+/* ---- Availability (shared by both calendars and the time picker) ----------
+   AVAIL holds the CURRENT month's picture: which dates are fully taken and
+   which services already hold which time slots on each date. Every surface
+   reads this one object, so the landing page, the booking calendar and the
+   time picker can never disagree. Rules live in api/capacity.php. */
+let AVAIL = { dates: [], times: {}, meta: {}, rules: null, year: null, month: null };
+
+// Fetch one month's availability into AVAIL. Safe to call repeatedly; a
+// failed fetch keeps the previous data rather than blanking the calendar.
+async function loadAvailability(year, month) {
   try {
-    const res = await fetch(`${API_BASE_URL}/availability.php`);
+    const res = await fetch(
+      `${API_BASE_URL}/availability.php?year=${year}&month=${month}`,
+    );
     const data = await res.json();
-    return data.dates || [];
+    if (!data || !Array.isArray(data.dates)) return AVAIL;
+    AVAIL = {
+      dates: data.dates || [],
+      times: data.times || {},
+      meta: data.meta || {},
+      rules: data.rules || null,
+      year: year,
+      month: month,
+    };
   } catch (e) {
-    return [];
+    /* offline / API down — keep whatever we already have */
   }
+  return AVAIL;
+}
+
+// Is this date fully taken? (venue-exclusive OR at the per-day service cap)
+function isDateTaken(dateStr) {
+  return AVAIL.dates.indexOf(dateStr) !== -1;
+}
+
+// Is this time blocked ON THIS DATE for THIS SERVICE? (per-service rule:
+// another service sharing the same time does NOT block it)
+function isTimeTakenFor(dateStr, timeStr, serviceName) {
+  if (!dateStr || !timeStr || !serviceName) return false;
+  const byTime = AVAIL.times[dateStr];
+  if (!byTime || !byTime[timeStr]) return false;
+  return byTime[timeStr].indexOf(serviceName) !== -1;
+}
+
+// Time slots offered to the customer, each flagged available for their service.
+// Used to render the Event Time select with taken slots disabled.
+function timeSlotState(dateStr, serviceName) {
+  const byTime = (dateStr && AVAIL.times[dateStr]) || {};
+  return EVENT_TIME_SLOTS.map(function (t) {
+    return { time: t, taken: (byTime[t] || []).indexOf(serviceName) !== -1 };
+  });
 }
 
 async function createReservation(data) {

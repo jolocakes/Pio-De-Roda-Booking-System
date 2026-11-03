@@ -5,6 +5,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/capacity.php';
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
@@ -19,6 +20,7 @@ $customerName = trim($data['customerName'] ?? '');
 $contactPerson = trim($data['contactPerson'] ?? $customerName);
 $contactNumber = trim($data['contactNumber'] ?? '');
 $email = trim($data['email'] ?? '');
+$address = trim($data['address'] ?? '');
 $eventDate = trim($data['eventDate'] ?? '');
 $eventTime = trim($data['eventTime'] ?? '');
 $eventType = trim($data['eventType'] ?? '');
@@ -47,6 +49,18 @@ if (empty($customerName) || empty($eventDate) || empty($eventTime) || empty($mai
     exit();
 }
 
+// Address is REQUIRED for the off-site services (booths, catering, equipment
+// rental) — same list the customer form uses (services.requiresAddress).
+$ADDRESS_REQUIRED_SERVICES = ['coffee', 'noncoffee', 'pizza', 'catering-menu', 'equipment'];
+if (in_array($serviceId, $ADDRESS_REQUIRED_SERVICES, true) && $address === '') {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'address']);
+    exit();
+}
+if ($address === '') {
+    $address = null; // services that don't collect it store NULL
+}
+
 // Check if date is in the past
 if (strtotime($eventDate) < strtotime(date('Y-m-d'))) {
     http_response_code(400);
@@ -55,12 +69,31 @@ if (strtotime($eventDate) < strtotime(date('Y-m-d'))) {
 }
 
 try {
-    // Check if date is already taken by a Pending or Confirmed reservation
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM reservations WHERE event_date = ? AND status IN ('Pending', 'Confirmed')");
-    $stmt->execute([$eventDate]);
-    if ($stmt->fetchColumn() > 0) {
+    // RULE 2 — Venue Rentals is exclusive per DATE. One customer per venue-day.
+    // RULE 1 — a date holds at most PDR_MAX_SERVICES_PER_DAY active bookings.
+    $dateCheck = pdrDateTaken($pdo, $eventDate);
+    if ($dateCheck['taken']) {
         http_response_code(409);
-        echo json_encode(['ok' => false, 'reason' => 'DATE_TAKEN']);
+        echo json_encode([
+            'ok'     => false,
+            'reason' => 'DATE_TAKEN',
+            'cause'  => $dateCheck['reason'], // 'VENUE' or 'FULL'
+            'count'  => $dateCheck['count'],
+        ]);
+        exit();
+    }
+
+    // RULE 3 — time slots are blocked PER SERVICE. Another service may share
+    // this time; only the SAME service already holding it blocks it.
+    $takenTimes = pdrTakenTimes($pdo, $eventDate, $mainService);
+    if (in_array($eventTime, $takenTimes, true)) {
+        http_response_code(409);
+        echo json_encode([
+            'ok'     => false,
+            'reason' => 'TIME_TAKEN',
+            'time'   => $eventTime,
+            'service'=> $mainService,
+        ]);
         exit();
     }
 
@@ -88,23 +121,52 @@ try {
     // Insert into database
     $insert = $pdo->prepare("INSERT INTO reservations (
         reservation_id, booking_pin_hash, status, customer_name, contact_person,
-        contact_number, email, service_id, main_service, event_date, event_time,
+        contact_number, email, address, service_id, main_service, event_date, event_time,
         event_type, guests, selected_package, main_courses, additional_services,
         estimated_total, payment_method
-    ) VALUES (?, ?, 'Pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ) VALUES (?, ?, 'Pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     $insert->execute([
         $reservationId, $pinHash, $customerName, $contactPerson,
-        $contactNumber, $email, $serviceId, $mainService, $eventDate, $eventTime,
+        $contactNumber, $email, $address, $serviceId, $mainService, $eventDate, $eventTime,
         $eventType, $guests, $selectedPackage, $mainCourses, $additionalServices,
         $estimatedTotal, $paymentMethod
     ]);
+
+    // Send the confirmation email (thank you + pending staff confirmation ->
+    // payment + Booking ID and PIN). Best effort: a mail problem must NEVER
+    // fail or slow down a reservation that is already saved — pdrSendMail
+    // catches everything and reports instead of throwing.
+    $emailResult = ['ok' => false, 'mode' => 'none', 'error' => 'not attempted'];
+    try {
+        require_once __DIR__ . '/mail/mailer.php';
+        require_once __DIR__ . '/mail/confirmation_template.php';
+        $tpl = pdrConfirmEmail([
+            'reservationId'  => $reservationId,
+            'bookingPin'     => $bookingPin,          // plaintext PIN, only known here
+            'customerName'   => $customerName,
+            'mainService'    => $mainService,
+            'selectedPackage'=> $selectedPackage,
+            'eventDate'      => $eventDate,
+            'eventTime'      => $eventTime,
+            'eventType'      => $eventType,
+            'guests'         => $guests,
+            'address'        => $address,
+            'estimatedTotal' => $estimatedTotal,
+        ]);
+        $emailResult = pdrSendMail($email, $tpl['subject'], $tpl['html'], $tpl['text']);
+    } catch (Throwable $me) {
+        $emailResult = ['ok' => false, 'mode' => 'none', 'error' => $me->getMessage()];
+    }
 
     echo json_encode([
         'ok' => true,
         'reservationId' => $reservationId,
         'bookingPin' => $bookingPin,
-        'status' => 'Pending'
+        'status' => 'Pending',
+        // Where the confirmation email went: 'smtp' (real send), 'outbox'
+        // (saved locally until SMTP is configured) or 'none' (failed).
+        'email' => $emailResult['mode'],
     ]);
 
 } catch (Exception $e) {
