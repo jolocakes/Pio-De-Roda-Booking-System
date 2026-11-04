@@ -12,7 +12,7 @@ try {
             'customer' => $r['customer_name'],
             'phone' => $r['contact_number'],
             'email' => $r['email'],
-            'address' => $r['address'],
+            'address' => $r['address'] ?? null,
             'service' => $r['main_service'],
             'date' => $r['event_date'],
             'time' => $r['event_time'],

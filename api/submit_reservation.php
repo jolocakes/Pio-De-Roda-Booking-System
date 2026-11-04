@@ -69,6 +69,9 @@ if (strtotime($eventDate) < strtotime(date('Y-m-d'))) {
 }
 
 try {
+    // Ensure the `address` column exists on older databases created before the schema update.
+    $pdo->exec("ALTER TABLE `reservations` ADD COLUMN IF NOT EXISTS `address` VARCHAR(255) DEFAULT NULL AFTER `email`");
+
     // RULE 2 — Venue Rentals is exclusive per DATE. One customer per venue-day.
     // RULE 1 — a date holds at most PDR_MAX_SERVICES_PER_DAY active bookings.
     $dateCheck = pdrDateTaken($pdo, $eventDate);
