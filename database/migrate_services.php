@@ -60,6 +60,11 @@ try {
         CONSTRAINT `fk_service_addons_service` FOREIGN KEY (`service_id`) REFERENCES `services` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    // 5. Ensure `address` column exists on `reservations` table
+    $pdo->exec("ALTER TABLE `reservations`
+        ADD COLUMN IF NOT EXISTS `address` VARCHAR(255) DEFAULT NULL AFTER `email`
+    ");
+
     echo "Migration completed successfully.\n";
 } catch (Exception $e) {
     echo "Migration failed: " . $e->getMessage() . "\n";
