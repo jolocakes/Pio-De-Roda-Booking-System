@@ -238,7 +238,7 @@ try {
 <input type="time" name="time" id="edit_time">
 <input type="number" name="guest_count" id="edit_guest_count">
 <select name="status" id="edit_status">
-    
+
     <option value="Pending">Pending</option>
     <option value="Confirmed">Confirmed</option>
     <option value="Cancelled">Cancelled</option>
@@ -317,9 +317,7 @@ function resetFilters() {
 
         // Update Reservation Status (Approve, Reject, Cancel)
         async function updateStatus(id, newStatus) {
-            if (newStatus === 'Rejected') {
-                newStatus = 'Cancelled';
-            }
+           
             const validStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed'];
             if (!validStatuses.includes(newStatus)) {
                 alert('Invalid status: ' + newStatus);
