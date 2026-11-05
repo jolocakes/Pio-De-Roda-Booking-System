@@ -112,13 +112,18 @@ try {
             <!-- Search & Filter Controls -->
             <div class="filter-bar">
                 <input type="text" id="searchInput" class="search-input" placeholder="Search by customer name or reservation ID..." onkeyup="filterTable()">
+                
+                <input type="date" id="dateFilter" class="filter-date" onchange="filterTable()">
+
                 <select id="statusFilter" class="filter-select" onchange="filterTable()">
                     <option value="">All Statuses</option>
                     <option value="Confirmed">Confirmed</option>
                     <option value="Pending">Pending</option>
                     <option value="Cancelled">Cancelled</option>
-                    <option value="Rejected">Rejected</option>
+                    <option value="Completed">Completed</option>
+
                 </select>
+                <button type="button" class="btn-reset" onclick="resetFilters()">Reset</button>
             </div>
 
             <div class="dashboard-card">
@@ -225,6 +230,21 @@ try {
                     <option value="Cancelled">Cancelled</option>
                     <option value="Completed">Completed</option>
                 </select>
+
+                <!-- Halimbawa ng mga form inputs na dapat naroon -->
+<input type="hidden" name="reservation_id" id="edit_reservation_id">
+<select name="service" id="edit_service">...</select>
+<input type="date" name="date" id="edit_date">
+<input type="time" name="time" id="edit_time">
+<input type="number" name="guest_count" id="edit_guest_count">
+<select name="status" id="edit_status">
+    
+    <option value="Pending">Pending</option>
+    <option value="Confirmed">Confirmed</option>
+    <option value="Cancelled">Cancelled</option>
+    <option value="Completed">Completed</option>
+</select>
+
             </div>
             <div class="modal-footer">
                 <button class="btn btn-cancel" onclick="closeModal('editModal')">Cancel</button>
@@ -236,18 +256,45 @@ try {
     <script>
         // Search & Filter Logic
         function filterTable() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            const status = document.getElementById('statusFilter').value.toLowerCase();
-            const rows = document.querySelectorAll('#reservationsTable tbody tr');
+    const searchInput = document.getElementById('searchInput').value.toLowerCase();
+    const dateFilter = document.getElementById('dateFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
+    
+    const rows = document.querySelectorAll('#reservationsTable tbody tr');
 
-            rows.forEach(row => {
-                const text = row.innerText.toLowerCase();
-                const matchesSearch = text.includes(search);
-                const matchesStatus = status === '' || text.includes(status);
+    rows.forEach(row => {
+        // Kunin ang text mula sa mga angkop na column (halimbawa: Name/ID, Date, Status)
+        const rowText = row.innerText.toLowerCase();
+        
+        // I-check kung nag-a-match ang search input (pangalan o ID)
+        const matchesSearch = rowText.includes(searchInput);
+        
+        // I-check ang date filter (siguraduhing meron kang data attribute o saktong cell para sa date)
+        // Halimbawa kung ang date ay nasa partikular na cell ng row:
+        const rowDate = row.cells[3] ? row.cells[3].innerText.trim() : ''; 
+        const matchesDate = !dateFilter || rowDate.includes(dateFilter);
 
-                row.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
-            });
+        // I-check ang status filter
+        const rowStatus = row.cells[4] ? row.cells[4].innerText.toLowerCase() : '';
+        const matchesStatus = !statusFilter || rowStatus.includes(statusFilter);
+
+        // Pagsabayin silang lahat (lahat ay dapat mag-true)
+        if (matchesSearch && matchesDate && matchesStatus) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
         }
+    });
+}
+
+// Function para sa pag-reset ng mga filters
+function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('dateFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    filterTable(); // I-refresh ang table para lumabas ulit ang lahat
+}
+
 
         // View Reservation Details Modal
         function viewDetails(id, customer, phone, email, service, date, time, guests, amount, notes) {
@@ -332,20 +379,46 @@ try {
         }
 
         // Save Edit / Reschedule
-        async function saveEdit() {
-            const id = document.getElementById('editResId').value;
-            const newStatus = document.getElementById('editStatus').value;
-            
-            const success = await updateStatus(id, newStatus);
-            if (success) {
-                closeModal('editModal');
-                alert('Reservation updated successfully!');
-            }
-        }
+        // Save Edit / Reschedule
+async function saveEdit() {
+    const id = document.getElementById('editResId').value;
+    const service = document.getElementById('editService').value;
+    const date = document.getElementById('editDate').value;
+    const time = document.getElementById('editTime').value;
+    const guests = document.getElementById('editGuests').value;
+    const status = document.getElementById('editStatus').value;
 
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
+    try {
+        const res = await fetch('../api/admin/update_reservation.php', {
+            method: 'POST', // O kaya PATCH depende sa API endpoint ninyo
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                reservationId: id,
+                service: service,
+                date: date,
+                time: time,
+                guests: guests,
+                status: status
+            })
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (res.ok && data && data.ok) {
+            closeModal('editModal');
+            alert('Reservation updated successfully!');
+            location.reload(); // Para mag-reflect agad ang bagong data pagkatapos i-refresh
+        } else {
+            const errorMsg = (data && data.reason) ? data.reason : 'Failed to update reservation.';
+            alert('Error updating reservation: ' + errorMsg);
         }
+    } catch (err) {
+        alert('Network error while updating reservation.');
+    }
+}
+
     </script>
 </body>
 </html>
