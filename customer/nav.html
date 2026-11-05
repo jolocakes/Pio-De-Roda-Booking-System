@@ -164,6 +164,7 @@
           <!-- 1. Catering with Menu -->
           <article
             class="service-card"
+            data-service-id="catering-menu"
             data-details="Our catering-with-menu service brings a full spread to your venue, with menu options spanning Filipino favorites, pasta, and grilled dishes. A minimum guest count applies, and menus can be customized to dietary needs."
           >
             <a href="CwM.html">
@@ -190,6 +191,7 @@
           <!-- 2. Venue Rentals -->
           <article
             class="service-card"
+            data-service-id="venue"
             data-details="Rent the Pio De Roda venue for private events, complete with seating arrangement and basic ambiance. Rental duration and inclusions vary by event size."
           >
             <a href="VR.html">
@@ -216,6 +218,7 @@
           <!-- 3. Dine-In Menu -->
           <article
             class="service-card"
+            data-service-id="dinein"
             data-details="Enjoy the regular dine-in menu, featuring coffee, pastries, all-day breakfast, and main courses. Walk-ins are welcome, and reservations are recommended for groups."
           >
             <a href="DN.html">
@@ -242,6 +245,7 @@
           <!-- 4. Non-Coffee Booth Package -->
           <article
             class="service-card"
+            data-service-id="noncoffee"
             data-details="A refreshment booth serving non-coffee drinks such as fruit teas, milk-based beverages, and mocktails — ideal for guests who prefer something other than coffee."
           >
             <a href="NCB.html">
@@ -268,6 +272,7 @@
           <!-- 5. Coffee Booth Package -->
           <article
             class="service-card"
+            data-service-id="coffee"
             data-details="A staffed coffee booth serving espresso-based drinks for your event, including cups, condiments, and setup. Great for corporate events, weddings, and parties."
           >
             <a href="CB.html">
@@ -294,6 +299,7 @@
           <!-- 6. Pizza Booth -->
           <article
             class="service-card"
+            data-service-id="pizza"
             data-details="A live pizza booth serving freshly made pizza slices for your guests, with a choice of classic flavors. Ideal as a fun food station for parties and gatherings."
           >
             <a href="PZ.html">
@@ -320,6 +326,7 @@
           <!-- 7. Intimate Celebration Package -->
           <article
             class="service-card"
+            data-service-id="intimate"
             data-details="A package designed for smaller, more intimate celebrations, with a cozy setup, curated menu, and simple decor suited for close friends and family."
           >
             <a href="INT.html">
@@ -346,6 +353,7 @@
           <!-- 8. Equipment Rental -->
           <article
             class="service-card"
+            data-service-id="equipment"
             data-details="Rent tables, chairs, tents, food warmers, and other event equipment on their own, whether or not you book catering. Delivery and pick-up options may be available."
           >
             <a href="ER.html">
@@ -513,6 +521,12 @@
     <!-- services.js MUST load before availability.js (it defines loadAvailability/AVAIL) -->
     <script src="services.js?v=3.3"></script>
     <script src="availability.js?v=3.2"></script>
+    <!-- Syncs the service cards above with the catalog API: names,
+         descriptions and starting prices come from the database, and a
+         deactivated service's card disappears on the next reload. The static
+         card text stays in place as the fallback when the API can't be
+         reached. -->
+    <script src="homepage-catalog.js?v=1.0"></script>
 
     <!-- Mobile menu + header scroll state — same bindNav() behavior as the
        Booking Status and Payment pages (this page had no wiring for it). -->
