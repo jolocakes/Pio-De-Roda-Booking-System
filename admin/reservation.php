@@ -89,7 +89,7 @@ try {
             </ul>
         </div>
         <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;"><a href="#"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
+            <li class="nav-item" style="list-style: none;"><a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
         </div>
     </aside>
 
