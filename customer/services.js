@@ -1,7 +1,7 @@
 /* Shared service catalog, add-ons, and guidelines for Pio De Roda reservation pages */
 /* Loaded dynamically from ../api/test_services_stage4c5.php (Stage 4D database catalog integration). */
 
-const CATALOG_API_URL = "../api/test_services_stage4c5.php";
+const CATALOG_API_URL = "../api/services.php";
 
 /* Original established customer service ordering */
 const SERVICE_ORDER = [
@@ -106,7 +106,9 @@ function _normalizeGroupedMenu(rawMenu, normalizedMenus) {
   let groups = [];
   if (Array.isArray(rawMenu) && rawMenu.length > 0) {
     groups = rawMenu
-      .filter((cat) => cat && typeof cat === "object" && Array.isArray(cat.items))
+      .filter(
+        (cat) => cat && typeof cat === "object" && Array.isArray(cat.items),
+      )
       .map((cat) => ({
         category: String(cat.category || ""),
         items: cat.items
@@ -234,9 +236,7 @@ function _normalizeService(raw) {
       ? raw.mainCourses.map((c) => String(c))
       : undefined;
 
-  const notes = Array.isArray(raw.notes)
-    ? raw.notes.map((n) => String(n))
-    : [];
+  const notes = Array.isArray(raw.notes) ? raw.notes.map((n) => String(n)) : [];
 
   const serviceGuidelines = Array.isArray(raw.guidelines)
     ? raw.guidelines.map((g) => String(g))
@@ -454,7 +454,12 @@ async function loadCatalogFromApi(forceReload = false) {
     });
 
     data.guidelines.forEach((g) => {
-      if (!g || typeof g !== "object" || !g.heading || !Array.isArray(g.items)) {
+      if (
+        !g ||
+        typeof g !== "object" ||
+        !g.heading ||
+        !Array.isArray(g.items)
+      ) {
         return;
       }
       guidelines.push({
@@ -659,7 +664,14 @@ const API_BASE_URL = window.location.pathname.includes("/customer")
    which services already hold which time slots on each date. Every surface
    reads this one object, so the landing page, the booking calendar and the
    time picker can never disagree. Rules live in api/capacity.php. */
-let AVAIL = { dates: [], times: {}, meta: {}, rules: null, year: null, month: null };
+let AVAIL = {
+  dates: [],
+  times: {},
+  meta: {},
+  rules: null,
+  year: null,
+  month: null,
+};
 
 // Fetch one month's availability into AVAIL. Safe to call repeatedly; a
 // failed fetch keeps the previous data rather than blanking the calendar.
