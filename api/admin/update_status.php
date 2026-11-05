@@ -11,6 +11,10 @@ $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
 
 $reservationId = trim($data['reservationId'] ?? '');
+$service = trim($data['service'] ?? '');
+$date = trim($data['date'] ?? '');
+$time = trim($data['time'] ?? '');
+$guests = trim($data['guests'] ?? '');
 $newStatus = trim($data['status'] ?? '');
 
 $allowedStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed'];
@@ -32,8 +36,8 @@ try {
     }
 
     if ($current['status'] !== $newStatus) {
-        $stmt = $pdo->prepare("UPDATE reservations SET status = ? WHERE reservation_id = ?");
-        $stmt->execute([$newStatus, $reservationId]);
+        $stmt = $pdo->prepare("UPDATE reservations SET service = ?, date = ?, time = ?, guests = ?, status = ? WHERE reservation_id = ?");
+$stmt->execute([$service, $date, $time, $guests, $newStatus, $reservationId]);
     }
 
     echo json_encode(['ok' => true, 'reservationId' => $reservationId, 'status' => $newStatus]);
