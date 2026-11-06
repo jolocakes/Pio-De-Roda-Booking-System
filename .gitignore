@@ -1,0 +1,7 @@
+# Local secrets / environment-specific config
+config/xendit.php
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.log
