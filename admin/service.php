@@ -305,18 +305,6 @@
             equipment: 'pio1.jpg',
         };
 
-        /* Presentation-only price suffixes (amounts always come from the DB). */
-        const PRICE_UNITS = {
-            'catering-menu': ' / head',
-            venue: '',
-            dinein: ' / head',
-            noncoffee: ' / package',
-            coffee: ' / package',
-            pizza: ' / package',
-            intimate: ' / package',
-            equipment: ' / item',
-        };
-
         const TAB_LABELS = { packages: 'Package', menus: 'Menu', addons: 'Add-on' };
         const TAB_ACTION = { packages: 'package_save', menus: 'menu_save', addons: 'addon_save' };
         const TAB_KIND = { packages: 'package', menus: 'menu', addons: 'addon' };
@@ -460,10 +448,10 @@
         }
 
         function renderServiceViewCard(svc) {
-            const unit = esc(PRICE_UNITS[svc.id] || '');
-            const priceText = svc.base_price === null
-                ? 'Price to be confirmed'
-                : 'Starting at ' + fmtPeso(svc.base_price);
+            const displayText = svc.price_display && String(svc.price_display).trim();
+            const priceText = displayText
+                ? (/^\d+(?:\.\d+)?$/.test(displayText) ? fmtPeso(Number(displayText)) : displayText)
+                : (svc.base_price === null ? 'Price to be confirmed' : fmtPeso(svc.base_price));
             const itemCount = svc.packages.length + svc.menus.length + svc.addons.length;
 
             return `
@@ -478,7 +466,7 @@
                             <span class="badge ${svc.is_active ? 'badge-on' : 'badge-off'}">${svc.is_active ? 'Active' : 'Inactive'}</span>
                         </div>
                         <p class="service-desc">${esc(svc.description || '')}</p>
-                        <div class="price-label">${esc(priceText)}<span class="price-unit">${unit}</span></div>
+                        <div class="price-label">Customer price: ${esc(priceText)}</div>
                         <p class="svc-id">Service ID: <code>${esc(svc.id)}</code></p>
                         <p class="svc-counts">${svc.packages.length} packages &middot; ${svc.menus.length} menus &middot; ${svc.addons.length} add-ons</p>
                         <div class="card-actions">
