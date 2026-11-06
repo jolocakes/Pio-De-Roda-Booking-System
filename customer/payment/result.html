@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Result | Pio De Roda</title>
+  <link rel="stylesheet" href="../nav.css" />
+  <link rel="stylesheet" href="payment.css" />
+</head>
+<body>
+  <header id="site-header">
+    <nav class="navbar">
+      <a href="../nav.html" class="brand">Pio De Roda</a>
+      <div class="nav-links" id="navLinks">
+        <a href="../nav.html">Home</a>
+        <a href="../booking-status.html">Booking Status</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </nav>
+  </header>
+  <main class="pay-wrap">
+    <section class="pay-card">
+      <p class="kicker">PAYMENT</p>
+      <h1 id="title">Checking payment…</h1>
+      <div id="msg" class="notice">Please wait while we confirm your payment status.</div>
+      <div id="summary" class="summary" hidden></div>
+      <p class="back"><a id="backLink" href="../booking-status.html">Back to Booking Status</a></p>
+    </section>
+  </main>
+  <script src="result.js"></script>
+</body>
+</html>

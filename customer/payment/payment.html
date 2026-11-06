@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment | Pio De Roda</title>
+  <link rel="stylesheet" href="../nav.css" />
+  <link rel="stylesheet" href="payment.css" />
+</head>
+<body>
+  <header id="site-header">
+    <nav class="navbar">
+      <a href="../nav.html" class="brand">Pio De Roda</a>
+      <div class="nav-links" id="navLinks">
+        <a href="../nav.html">Home</a>
+        <a href="../booking-status.html">Booking Status</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main class="pay-wrap">
+    <section class="pay-card" id="payCard">
+      <p class="kicker">SECURE TEST PAYMENT</p>
+      <h1>Complete your payment</h1>
+      <p class="muted">Payments are processed via Xendit (test mode). Available on the checkout: e-wallets such as GCash and bank transfer (as enabled on the test account).</p>
+
+      <div id="stateLoading" class="notice">Loading your booking…</div>
+      <div id="stateError" class="notice error" hidden></div>
+
+      <div id="payBody" hidden>
+        <div class="summary">
+          <div class="row"><span>Reservation ID</span><strong id="rId">—</strong></div>
+          <div class="row"><span>Booking status</span><strong id="rStatus">—</strong></div>
+          <div class="row"><span>Estimated total</span><strong id="rTotal">—</strong></div>
+          <div class="row"><span>Amount paid</span><strong id="rPaid">—</strong></div>
+          <div class="row"><span>Balance</span><strong id="rBalance">—</strong></div>
+          <div class="row"><span>Payment status</span><strong id="rPayStatus">—</strong></div>
+        </div>
+
+        <div id="payAction" hidden>
+          <h2>Choose payment amount</h2>
+          <form id="payForm">
+            <label class="choice">
+              <input type="radio" name="paymentType" value="full" checked />
+              <span><strong>Pay full balance</strong> <span id="fullAmt" class="amt"></span></span>
+            </label>
+            <label class="choice" id="depositChoice">
+              <input type="radio" name="paymentType" value="deposit" />
+              <span><strong>Pay deposit (<span id="depPct">50</span>%)</strong> <span id="depAmt" class="amt"></span></span>
+            </label>
+            <p class="muted small">You’ll be redirected to Xendit’s test checkout to pay via GCash or bank transfer. Do not use real payment details in test mode.</p>
+            <button type="submit" class="btn-primary" id="payBtn">Proceed to Xendit Checkout</button>
+          </form>
+        </div>
+
+        <div id="payDone" class="notice success" hidden></div>
+        <p class="back"><a id="backLink" href="../booking-status.html">Back to Booking Status</a></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="../services.js"></script>
+  <script src="payment.js"></script>
+</body>
+</html>
