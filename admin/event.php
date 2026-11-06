@@ -1,4 +1,16 @@
-<?php require_once __DIR__ . '/auth_check.php'; ?>
+<?php 
+require_once __DIR__ . '/auth_check.php'; 
+require_once __DIR__ . '/../../config/db.php';
+
+$reservations = [];
+try {
+    $stmt = $pdo->query("SELECT * FROM reservations ORDER BY date ASC");
+    $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $reservations = [];
+}
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -143,65 +155,9 @@
 
     <!-- Client-Side JavaScript Logic -->
     <script>
-        // Sample Static Dataset
-        let eventsData = [
-            {
-                id: 1,
-                event_name: 'Cruzada Wedding Reception',
-                customer_name: 'Jolo Cruzada',
-                event_type: 'Wedding',
-                event_date: '2026-10-18',
-                start_time: '17:00',
-                end_time: '22:00',
-                number_of_guests: 100,
-                venue: 'Events Place',
-                catering_package: 'Catering with Menu (Full Course)',
-                additional_services: 'Coffee Booth Package, Pizza Station',
-                special_requests: 'Vegetarian options for 10 guests. Elegant floral backdrop.'
-            },
-            {
-                id: 2,
-                event_name: 'Ruzelle 18th Debut',
-                customer_name: 'Ruzelle Peji',
-                event_type: 'Birthday / Debut',
-                event_date: '2026-12-06',
-                start_time: '16:00',
-                end_time: '22:00',
-                number_of_guests: 80,
-                venue: 'Events Place',
-                catering_package: 'Intimate Celebration Package',
-                additional_services: 'Non-Coffee Booth Package',
-                special_requests: 'Provide high chairs near the main presidential table.'
-            },
-            {
-                id: 3,
-                event_name: 'Dimaranans Reunion',
-                customer_name: 'Puso Dimaranan',
-                event_type: 'Reunion',
-                event_date: '2026-10-25',
-                start_time: '16:00',
-                end_time: '21:00',
-                number_of_guests: 100,
-                venue: 'Events Place',
-                catering_package: 'Intimate Celebration Package',
-                additional_services: 'Coffee Booth Package, Pizza Station',
-                special_requests: 'Elegant floral backdrop.'
-            },
-            {
-                id: 4,
-                event_name: 'Digno Family Dinner',
-                customer_name: 'Khean Digno',
-                event_type: 'Dinner',
-                event_date: '2026-11-5',
-                start_time: '18:00',
-                end_time: '20:00',
-                number_of_guests: 15,
-                venue: 'Restaurant Dine',
-                catering_package: '4 Main Course',
-                additional_services: 'N/A',
-                special_requests: 'N/A'
-            }
-        ];
+       
+       // Kunin ang data na galing sa PHP database query
+        let eventsData = <?php echo json_encode($reservations); ?>;
 
         // Format Date String for Display
         function formatDate(dateStr) {
