@@ -442,11 +442,22 @@
                 Indang, Philippines, 4122
               </li>
               <li><strong>Phone</strong>(046) 415 0390 / (0926) 684 5833</li>
-              <li><strong>Email</strong>pioderodabooking@gmail.com</li>
+              <li>
+                <strong>Email</strong>
+                <a href="mailto:pioderoda.booking@gmail.com"
+                  >pioderoda.booking@gmail.com</a
+                >
+              </li>
               <li><strong>Hours</strong>Open daily, 8:00 AM – 10:00 PM</li>
             </ul>
           </div>
-          <form class="contact-form" id="contactForm">
+          <form
+            class="contact-form"
+            id="contactForm"
+            action="api/process_contact.php"
+            method="POST"
+            onsubmit="handleContactFormSubmit(event)"
+          >
             <label for="cf-name">Name</label>
             <input
               type="text"
@@ -560,7 +571,7 @@
         // Scroll-spy: highlight the nav link of whichever section is in view,
         // so the active item follows the user as they scroll the page.
         const navAnchors = Array.from(
-          document.querySelectorAll(".nav-link[data-nav]")
+          document.querySelectorAll(".nav-link[data-nav]"),
         );
         const spySections = navAnchors
           .map((a) => document.querySelector(a.getAttribute("href")))
@@ -589,7 +600,108 @@
         window.addEventListener("resize", runSpy);
         window.addEventListener("hashchange", runSpy);
         runSpy();
-      })();
+      });
+
+      // Contact form: send message via PHP backend (no redirect to email client)
+      function handleContactFormSubmit(event) {
+        event.preventDefault();
+        
+        // Gather form data
+        const name = document.getElementById("cf-name").value.trim();
+        const email = document.getElementById("cf-email").value.trim();
+        const message = document.getElementById("cf-message").value.trim();
+        
+        // Validate
+        if (!name || !email || !message) {
+          alert("Please fill in all required fields.");
+          return;
+        }
+        
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(email)) {
+          alert("Please enter a valid email address.");
+          return;
+        }
+        
+        // Show loading state on the button
+        const button = event.submitter;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "Sending...";
+        
+        // Send data to PHP processor via fetch (AJAX - no redirect)
+        // Go up from customer/ to pdrsystem/, then into api/
+        fetch("../api/process_contact.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: name,
+            email: email,
+            message: message
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.ok) {
+            // Show success message (includes Reply-To info from Option C)
+            showMessage(data.message, "success");
+            document.getElementById("contactForm").reset();
+          } else {
+            showMessage("❌ Failed to send: " + (data.error || "Unknown error"), "error");
+          }
+        })
+        .catch(error => {
+          console.error("Fetch error:", error);
+          // Show specific error if it's a JSON response from PHP
+          if (error instanceof TypeError) {
+            showMessage("❌ Could not connect to the server. Is Apache running?", "error");
+          } else {
+            showMessage("❌ Error sending message. Please try again.", "error");
+          }
+        })
+        .finally(() => {
+          // Restore button
+          button.disabled = false;
+          button.textContent = originalText;
+        });
+      }
+      
+      // Helper: show success/error message on page
+      function showMessage(text, type) {
+        // Remove any existing message
+        const existing = document.querySelector('.contact-message-status');
+        if (existing) existing.remove();
+        
+        const statusDiv = document.createElement('div');
+        statusDiv.className = `contact-message-status ${type}`;
+        statusDiv.textContent = text;
+        
+        // Insert after the form
+        const form = document.getElementById("contactForm");
+        form.parentNode.insertBefore(statusDiv, form.nextSibling);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+          if (statusDiv.parentNode) {
+            statusDiv.parentNode.removeChild(statusDiv);
+          }
+        }, 5000);
+      }
+      
+      // Initialize mailto link on the email list item (still works for direct clicks)
+      document.addEventListener("DOMContentLoaded", () => {
+        const emailLink = document.querySelector(
+          '.contact-list a[href^="mailto"]'
+        );
+        if (emailLink) {
+          emailLink.addEventListener("click", function () {
+            // Ensure the mailto link opens the email client
+            // (already handled by the href, but we add tracking if needed)
+          });
+        }
+      });
     </script>
   </body>
 </html>
