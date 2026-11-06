@@ -157,6 +157,7 @@
         .empty-note { font-size: 13px; color: var(--text-muted); padding: 14px 4px; }
         .dishes-count { display: inline-block; background: rgba(91,8,8,.07); border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
     </style>
+    <link rel="stylesheet" href="responsive.css" />
 </head>
 <body>
 
@@ -1114,5 +1115,6 @@
     })();
     </script>
 
+<script src="responsive.js"></script>
 </body>
 </html>
