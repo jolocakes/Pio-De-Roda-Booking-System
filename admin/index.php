@@ -132,6 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
         }
     </style>
+    <link rel="stylesheet" href="responsive.css" />
 </head>
 <body class="login-body">
     <div class="login-card">
