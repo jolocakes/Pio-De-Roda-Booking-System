@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="archive.css" />
+    <link rel="stylesheet" href="responsive.css" />
 </head>
 <body>
 
@@ -310,5 +311,6 @@
 
         document.addEventListener('DOMContentLoaded', renderArchiveTable);
     </script>
+<script src="responsive.js"></script>
 </body>
 </html>

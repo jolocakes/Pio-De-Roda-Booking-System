@@ -150,6 +150,7 @@ $recent_reservations = [
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <link rel="stylesheet" href="dashboard.css" />
+    <link rel="stylesheet" href="responsive.css" />
 
 </head>
 <body>
@@ -424,5 +425,6 @@ updateLiveDateTime();
 setInterval(updateLiveDateTime, 1000);
 
     </script>
+<script src="responsive.js"></script>
 </body>
 </html>
