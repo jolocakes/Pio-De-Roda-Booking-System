@@ -7,7 +7,7 @@
     <title>Calendar & Availability - Pio De Roda</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="calendar.css" />
     <link rel="stylesheet" href="responsive.css" />
 
@@ -101,6 +101,13 @@
     </div>
 
     <!-- Calendar Grid -->
+    <div class="calendar-legend" aria-label="Reservation status legend">
+        <span class="legend-item"><span class="legend-dot confirmed"></span> Confirmed</span>
+        <span class="legend-item"><span class="legend-dot pending"></span> Pending</span>
+        <span class="legend-item"><span class="legend-dot cancelled"></span> Cancelled</span>
+        <span class="legend-item"><span class="legend-dot completed"></span> Completed</span>
+    </div>
+
     <div class="calendar-grid" id="calendarDaysGrid">
         <!-- I-ge-generate ito ng JavaScript -->
     </div>
@@ -140,6 +147,19 @@
     </div>
     <script>
 let eventsData = [];
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function (ch) {
+        return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[ch];
+    });
+}
+
 function getBadgeInfo(status) {
     const s = (status || '').toLowerCase();
     if (s === 'confirmed') return { cls: 'chip-confirmed', label: 'Confirmed Event' };
@@ -291,7 +311,9 @@ function renderCalendar() {
         const dateString = `${year}-${formattedMonth}-${formattedDay}`;
 
         let eventsHTML = `<div class="day-number">${i}</div>`;
-        const dayEvents = eventsData.filter(e => e.date === dateString && (e.status === 'confirmed' || e.status === 'pending'));
+        // Show every status here. Availability still uses the separate
+        // capacity endpoint, which only counts Pending and Confirmed bookings.
+        const dayEvents = eventsData.filter(e => e.date === dateString);
 
         // Same rules as the customer calendars: a date is CLOSED when the venue
         // is booked or the day has hit its service cap. Gray it out + say why.
@@ -316,7 +338,12 @@ function renderCalendar() {
 
         dayEvents.forEach(evt => {
             const badge = getBadgeInfo(evt.rawStatus);
-            eventsHTML += `<span class="event-chip ${badge.cls}">${evt.title}</span>`;
+            const customer = evt.customer || 'Unknown customer';
+            const service = evt.title || 'Reservation';
+            const chipTitle = `${customer} — ${service} (${evt.time || 'All Day'}) · ${evt.rawStatus || 'Pending'}`;
+            eventsHTML += `<span class="event-chip ${badge.cls}" title="${escapeHtml(chipTitle)}">` +
+                `<span class="chip-customer">${escapeHtml(customer)}</span> — ${escapeHtml(service)}` +
+                `</span>`;
         });
 
         if (taken) {
@@ -371,8 +398,9 @@ function updateSidePanels(dateStr) {
     const availDateLabel = document.getElementById('availDateLabel');
     if (availDateLabel) availDateLabel.innerText = formattedDate;
 
-    // 2. Filter Events sa napiling araw (Pending and Confirmed only)
-    const dayEvents = eventsData.filter(e => e.date === dateStr && (e.status === 'confirmed' || e.status === 'pending'));
+    // 2. Show every booking on the selected day. The availability panel
+    //    below still counts only Pending/Confirmed via api/availability.php.
+    const dayEvents = eventsData.filter(e => e.date === dateStr);
 
     // Update Schedule Details Container (by id — no fragile card indexing)
     const scheduleCard = document.getElementById('scheduleDetailsCard');
@@ -383,16 +411,23 @@ function updateSidePanels(dateStr) {
             detailsHTML += `<p style="font-size: 12px; color: #718096; padding: 10px 0;">No bookings or events for this date.</p>`;
         } else {
             dayEvents.forEach(evt => {
-                const badgeClass = evt.status === 'confirmed' ? 'chip-confirmed' : 'chip-pending';
-                const statusLabel = evt.status === 'confirmed' ? 'Confirmed Event' : 'Pending Reservation';
+                const badge = getBadgeInfo(evt.rawStatus);
+                const customer = evt.customer || 'Unknown customer';
+                const service = evt.title || 'Reservation';
+                const guests = Number(evt.guests) || 0;
+
                 detailsHTML += `
                     <div class="event-detail-item">
-                        <div class="event-title">${evt.title}</div>
+                        <div class="event-title">${escapeHtml(customer)}</div>
+                        <div class="event-meta"><i class="fa-solid fa-concierge-bell"></i> ${escapeHtml(service)}${evt.eventType ? ' · ' + escapeHtml(evt.eventType) : ''}</div>
                         <div class="event-meta"><i class="fa-solid fa-calendar"></i> ${formattedDate}</div>
-                        <div class="event-meta"><i class="fa-solid fa-clock"></i> ${evt.time}</div>
-                        <div class="event-meta"><i class="fa-solid fa-location-dot"></i> ${evt.venue}</div>
-                        ${evt.address ? `<div class="event-meta"><i class="fa-solid fa-house"></i> ${evt.address}</div>` : ""}
-                        <span class="event-chip ${badgeClass}" style="display:inline-block; margin-top:5px;">${statusLabel}</span>
+                        <div class="event-meta"><i class="fa-solid fa-clock"></i> ${escapeHtml(evt.time || 'All Day')}</div>
+                        <div class="event-meta"><i class="fa-solid fa-users"></i> ${guests} guests</div>
+                        <div class="event-meta"><i class="fa-solid fa-phone"></i> ${escapeHtml(evt.contactNumber || 'Not provided')}</div>
+                        <div class="event-meta"><i class="fa-solid fa-envelope"></i> ${escapeHtml(evt.email || 'Not provided')}</div>
+                        <div class="event-meta"><i class="fa-solid fa-box"></i> ${escapeHtml(evt.selectedPackage || 'Not provided')}</div>
+                        ${evt.address ? `<div class="event-meta"><i class="fa-solid fa-house"></i> ${escapeHtml(evt.address)}</div>` : ""}
+                        <span class="event-chip ${badge.cls}" style="display:inline-block; margin-top:5px;">${escapeHtml(badge.label)}</span>
                     </div>
                 `;
             });

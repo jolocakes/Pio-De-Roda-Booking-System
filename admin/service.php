@@ -7,6 +7,7 @@
     <title>Service Management - Pio De Roda Cafe</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="service.css" />
     <style>
         /* ---- Additions for the editable catalog (kept scoped to this page) ---- */
@@ -180,7 +181,7 @@
                     <a href="reservation.php"><i class="fa-solid fa-calendar-check"></i> Reservations</a>
                 </li>
                 <li class="nav-item">
-                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> calendar</a>
+                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
                 </li>
                 <li class="nav-item active">
                     <a href="service.php"><i class="fa-solid fa-concierge-bell"></i> Services</a>

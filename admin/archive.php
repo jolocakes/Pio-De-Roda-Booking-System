@@ -35,7 +35,7 @@
                 </li>
 
                 <li class="nav-item">
-                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> calendar</a>
+                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
                 </li>
 
                 <li class="nav-item">
