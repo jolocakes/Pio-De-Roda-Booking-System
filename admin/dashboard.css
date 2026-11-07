@@ -422,3 +422,15 @@ body {
   background-color: rgba(91, 8, 8, 0.1); 
   color: var(--crimson); 
 }
+
+.badge-completed {
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.empty-state {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 16px 0;
+  text-align: center;
+}

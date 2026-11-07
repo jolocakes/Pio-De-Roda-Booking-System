@@ -430,3 +430,36 @@
         width: 160px;
         font-family: var(--font-display);
     }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .status-pending {
+        background: rgba(184, 134, 46, 0.15);
+        color: #9a6a14;
+    }
+
+    .status-confirmed {
+        background: rgba(95, 111, 82, 0.16);
+        color: #4f6144;
+    }
+
+    .status-cancelled {
+        background: rgba(91, 8, 8, 0.10);
+        color: var(--crimson);
+    }
+
+    .status-completed {
+        background: rgba(59, 130, 246, 0.12);
+        color: #1d4ed8;
+    }
+
+    .btn-outline-sm i {
+        margin-right: 4px;
+    }

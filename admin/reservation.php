@@ -34,6 +34,7 @@ try {
     <title>Reservation Management - Pio De Roda</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="reservation.css" />
     <link rel="stylesheet" href="responsive.css" />
@@ -61,7 +62,7 @@ try {
                 </li>
 
                 <li class="nav-item">
-                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> calendar</a>
+                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
                 </li>
 
                 <li class="nav-item">
@@ -110,6 +111,8 @@ try {
         </header>
 
         <div class="content-body">
+            <div id="pageAlert" class="page-alert" role="status" aria-live="polite"></div>
+
             <!-- Search & Filter Controls -->
             <div class="filter-bar">
                 <input type="text" id="searchInput" class="search-input" placeholder="Search by customer name or reservation ID..." onkeyup="filterTable()">
@@ -169,7 +172,13 @@ try {
                                         </button>
 
                                         <!-- Reschedule / Edit -->
-                                        <button class="btn btn-edit" title="Edit / Reschedule" onclick="openEditModal('<?php echo $row['id']; ?>', '<?php echo$row['service']; ?>', '<?php echo $row['date']; ?>', '<?php echo$row['time']; ?>', '<?php echo $row['guests']; ?>', '<?php echo$row['status']; ?>')">
+                                        <button class="btn btn-edit" title="Edit / Reschedule" data-id="<?php echo htmlspecialchars((string) $row['id'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-service="<?php echo htmlspecialchars((string) $row['service'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-date="<?php echo htmlspecialchars((string) $row['date'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-time="<?php echo htmlspecialchars((string) $row['time'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-guests="<?php echo htmlspecialchars((string) $row['guests'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-status="<?php echo htmlspecialchars((string) $row['status'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            onclick="openEditModal(this)">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
 
@@ -212,40 +221,28 @@ try {
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editResId">
-                <label>Service</label>
-                <input type="text" id="editService">
-                
-                <label>Date</label>
-                <input type="date" id="editDate">
-                
-                <label>Time</label>
-                <input type="text" id="editTime">
 
-                <label>Guests</label>
-                <input type="number" id="editGuests">
+                <label for="editService">Service</label>
+                <input type="text" id="editService" maxlength="100" required>
 
-                <label>Update Status</label>
+                <label for="editDate">Date</label>
+                <input type="date" id="editDate" required>
+
+                <label for="editTime">Time</label>
+                <input type="time" id="editTime" required>
+
+                <label for="editGuests">Guests</label>
+                <input type="number" id="editGuests" min="1" step="1" required>
+
+                <label for="editStatus">Update Status</label>
                 <select id="editStatus">
-                    <option value="Confirmed">Confirmed</option>
                     <option value="Pending">Pending</option>
+                    <option value="Confirmed">Confirmed</option>
                     <option value="Cancelled">Cancelled</option>
                     <option value="Completed">Completed</option>
                 </select>
 
-                <!-- Halimbawa ng mga form inputs na dapat naroon -->
-<input type="hidden" name="reservation_id" id="edit_reservation_id">
-<select name="service" id="edit_service">...</select>
-<input type="date" name="date" id="edit_date">
-<input type="time" name="time" id="edit_time">
-<input type="number" name="guest_count" id="edit_guest_count">
-<select name="status" id="edit_status">
-
-    <option value="Pending">Pending</option>
-    <option value="Confirmed">Confirmed</option>
-    <option value="Cancelled">Cancelled</option>
-    <option value="Completed">Completed</option>
-</select>
-
+                <div id="editMessage" class="form-message" role="alert" aria-live="polite"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-cancel" onclick="closeModal('editModal')">Cancel</button>
@@ -295,6 +292,49 @@ function resetFilters() {
     document.getElementById('statusFilter').value = '';
     filterTable(); // I-refresh ang table para lumabas ulit ang lahat
 }
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.style.display = 'none';
+}
+
+function showEditMessage(message, type) {
+    const el = document.getElementById('editMessage');
+    if (!el) return;
+    el.textContent = message;
+    el.className = 'form-message ' + (type || '');
+    el.style.display = 'block';
+}
+
+function clearEditMessage() {
+    const el = document.getElementById('editMessage');
+    if (!el) return;
+    el.textContent = '';
+    el.className = 'form-message';
+    el.style.display = 'none';
+}
+
+function showPageAlert(message, type) {
+    const el = document.getElementById('pageAlert');
+    if (!el) return;
+    el.textContent = message;
+    el.className = 'page-alert ' + (type || '');
+    el.style.display = 'block';
+    window.setTimeout(() => {
+        el.style.display = 'none';
+    }, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        if (sessionStorage.getItem('pdrReservationUpdated') === '1') {
+            sessionStorage.removeItem('pdrReservationUpdated');
+            showPageAlert('Reservation updated successfully.', 'success');
+        }
+    } catch (err) {
+        // sessionStorage may be unavailable in private mode.
+    }
+});
 
 
         // View Reservation Details Modal
@@ -367,56 +407,106 @@ function resetFilters() {
         }
 
         // Edit / Reschedule Modal Open
-        function openEditModal(id, service, date, time, guests, status) {
-            document.getElementById('editResId').value = id;
-            document.getElementById('editService').value = service;
-            document.getElementById('editDate').value = date;
-            document.getElementById('editTime').value = time;
-            document.getElementById('editGuests').value = guests;
-            document.getElementById('editStatus').value = status;
+        function openEditModal(button) {
+            const data = button.dataset;
+            document.getElementById('editResId').value = data.id || '';
+            document.getElementById('editService').value = data.service || '';
+            document.getElementById('editDate').value = data.date || '';
+            document.getElementById('editTime').value = data.time || '';
+            document.getElementById('editGuests').value = data.guests || '';
+            document.getElementById('editStatus').value = data.status || 'Pending';
+            clearEditMessage();
             document.getElementById('editModal').style.display = 'flex';
         }
 
         // Save Edit / Reschedule
-        // Save Edit / Reschedule
-async function saveEdit() {
-    const id = document.getElementById('editResId').value;
-    const service = document.getElementById('editService').value;
-    const date = document.getElementById('editDate').value;
-    const time = document.getElementById('editTime').value;
-    const guests = document.getElementById('editGuests').value;
-    const status = document.getElementById('editStatus').value;
+        async function saveEdit() {
+            const id = document.getElementById('editResId').value.trim();
+            const service = document.getElementById('editService').value.trim();
+            const date = document.getElementById('editDate').value;
+            const time = document.getElementById('editTime').value;
+            const guests = Number(document.getElementById('editGuests').value);
+            const status = document.getElementById('editStatus').value;
+            const saveBtn = document.querySelector('#editModal .btn-primary');
+            const originalLabel = saveBtn ? saveBtn.textContent : 'Save Changes';
 
-    try {
-        const res = await fetch('../api/admin/update_reservation.php', {
-            method: 'POST', // O kaya PATCH depende sa API endpoint ninyo
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                reservationId: id,
-                service: service,
-                date: date,
-                time: time,
-                guests: guests,
-                status: status
-            })
-        });
+            clearEditMessage();
 
-        const data = await res.json().catch(() => null);
+            if (!id || !service || !date || !time) {
+                showEditMessage('Please fill in the service, date, and time.', 'error');
+                return;
+            }
 
-        if (res.ok && data && data.ok) {
-            closeModal('editModal');
-            alert('Reservation updated successfully!');
-            location.reload(); // Para mag-reflect agad ang bagong data pagkatapos i-refresh
-        } else {
-            const errorMsg = (data && data.reason) ? data.reason : 'Failed to update reservation.';
-            alert('Error updating reservation: ' + errorMsg);
+            if (!Number.isInteger(guests) || guests < 1) {
+                showEditMessage('Guest count must be at least 1.', 'error');
+                return;
+            }
+
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving...';
+            }
+
+            try {
+                const res = await fetch('../api/admin/update_reservation.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reservationId: id,
+                        service: service,
+                        date: date,
+                        time: time,
+                        guests: guests,
+                        status: status
+                    })
+                });
+
+                const data = await res.json().catch(() => null);
+
+                if (res.ok && data && data.ok) {
+                    showEditMessage('Reservation updated successfully.', 'success');
+                    try {
+                        sessionStorage.setItem('pdrReservationUpdated', '1');
+                    } catch (err) {
+                        // Ignore storage failures.
+                    }
+                    window.setTimeout(() => location.reload(), 700);
+                    return;
+                }
+
+                const reason = data && data.reason ? data.reason : 'SERVER_ERROR';
+                const fieldLabels = {
+                    reservationId: 'reservation ID',
+                    service: 'service',
+                    date: 'date',
+                    time: 'time',
+                    guests: 'guest count',
+                    status: 'status'
+                };
+                let message = 'Failed to update reservation.';
+
+                if (reason === 'UNAUTHORIZED') {
+                    message = 'Your session expired. Please log in again.';
+                } else if (reason === 'NOT_FOUND') {
+                    message = 'Reservation not found. Refresh the page and try again.';
+                } else if (reason === 'INVALID' && data && data.field) {
+                    message = 'Please check the ' + (fieldLabels[data.field] || data.field) + ' value.';
+                } else if (reason === 'SERVER_ERROR') {
+                    message = 'Could not save changes. Please try again.';
+                }
+
+                showEditMessage(message, 'error');
+            } catch (err) {
+                showEditMessage('Network error while updating reservation.', 'error');
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalLabel;
+                }
+            }
         }
-    } catch (err) {
-        alert('Network error while updating reservation.');
-    }
-}
 
     </script>
 <script src="responsive.js"></script>

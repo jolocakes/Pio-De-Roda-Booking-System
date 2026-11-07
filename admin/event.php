@@ -1,10 +1,27 @@
 <?php 
 require_once __DIR__ . '/auth_check.php'; 
-require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../config/db.php';
 
 $reservations = [];
 try {
-    $stmt = $pdo->query("SELECT * FROM reservations ORDER BY date ASC");
+    $stmt = $pdo->query(
+        "SELECT
+            reservation_id,
+            customer_name,
+            contact_number,
+            email,
+            event_type,
+            main_service,
+            event_date,
+            event_time,
+            guests,
+            selected_package,
+            additional_services,
+            estimated_total,
+            status
+         FROM reservations
+         ORDER BY event_date ASC, event_time ASC"
+    );
     $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     $reservations = [];
@@ -19,6 +36,7 @@ try {
     <title>Event Management - Pio De Roda Cafe</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="event.css" />
     <link rel="stylesheet" href="responsive.css" />
@@ -48,7 +66,7 @@ try {
                 </li>
 
                 <li class="nav-item">
-                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> calendar</a>
+                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
                 </li>
 
                 <li class="nav-item">
@@ -114,7 +132,7 @@ try {
                             <th>Event / Service</th>
                             <th>Customer</th>
                             <th>Type</th>
-                            <th>Date & Time</th>
+                            <th>Date &amp; Time</th>
                             <th>Guests</th>
                             <th>Package</th>
                             <th>Status</th>
@@ -140,7 +158,7 @@ try {
             <div class="detail-row"><strong>Email:</strong> <span id="v_email"></span></div>
             <div class="detail-row"><strong>Event Type:</strong> <span id="v_type"></span></div>
             <div class="detail-row"><strong>Event Date:</strong> <span id="v_date"></span></div>
-            <div class="detail-row"><strong>Schedule:</strong> <span id="v_time"></span></div>
+            <div class="detail-row"><strong>Event Time:</strong> <span id="v_time"></span></div>
             <div class="detail-row"><strong>Guest Count:</strong> <span id="v_guests"></span></div>
             <div class="detail-row"><strong>Status:</strong> <span id="v_status"></span></div>
             <hr style="border:0; border-top: 1px solid var(--border-color); margin: 15px 0;">
@@ -156,99 +174,133 @@ try {
 
     <!-- Client-Side JavaScript Logic -->
     <script>
-       
-       // Kunin ang data na galing sa PHP database query
-        let eventsData = <?php echo json_encode($reservations); ?>;
+        // Reservation data from the PHP query
+        const eventsData = <?php echo json_encode($reservations, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
 
-        // Format Date String for Display
-        function formatDate(dateStr) {
-            const options = { year: 'numeric', month: 'short', day: 'numeric' };
-            return new Date(dateStr).toLocaleDateString('en-US', options);
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function (ch) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[ch];
+            });
         }
 
-        // Render Events to Table
+        // Format a YYYY-MM-DD date without timezone drift.
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            const date = new Date(dateStr + 'T00:00:00');
+            if (isNaN(date.getTime())) return dateStr;
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function statusClass(status) {
+            const value = String(status || '').toLowerCase();
+            if (['pending', 'confirmed', 'cancelled', 'completed'].indexOf(value) !== -1) {
+                return 'status-' + value;
+            }
+            return 'status-pending';
+        }
+
+        function formatCurrency(value) {
+            const amount = Number(value);
+            if (!isFinite(amount)) return '₱0.00';
+            return '₱' + amount.toLocaleString('en-PH', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function additionalServicesText(raw) {
+            if (!raw) return 'None';
+
+            try {
+                const items = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (!Array.isArray(items) || items.length === 0) return 'None';
+
+                const names = items.map(function (item) {
+                    if (typeof item === 'string') return item;
+                    if (item && typeof item === 'object') {
+                        return item.name || item.packageName || '';
+                    }
+                    return '';
+                }).filter(Boolean);
+
+                return names.length ? names.join(', ') : 'None';
+            } catch (err) {
+                return String(raw);
+            }
+        }
+
         function renderEventsTable() {
             const tbody = document.getElementById('eventsTableBody');
             tbody.innerHTML = '';
 
-            if (eventsData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding:30px;">No events available.</td></tr>';
+            if (!Array.isArray(eventsData) || eventsData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: var(--text-muted); padding:30px;">No events available.</td></tr>';
                 return;
             }
 
-            eventsData.forEach((event, index) => {
+            eventsData.forEach(function (event, index) {
                 const tr = document.createElement('tr');
-                // Inside renderEventsTable() function:
-tr.innerHTML = `
-    <td><strong>${event.event_name}</strong></td>
-    <td>${event.customer_name}</td>
-    <td>${event.event_type}</td>
-    <td>${formatDate(event.event_date)}<br><small style="color:var(--text-muted);">${event.start_time} - ${event.end_time}</small></td>
-    <td>${event.number_of_guests} pax</td>
-    <td>${event.venue}</td>
-    <td>${event.catering_package}</td>
-`;
-                
+                const guests = Number(event.guests) || 0;
+
+                tr.innerHTML = `
+                    <td><strong>${escapeHtml(event.reservation_id)}</strong></td>
+                    <td>${escapeHtml(event.main_service || '—')}</td>
+                    <td>${escapeHtml(event.customer_name || '—')}</td>
+                    <td>${escapeHtml(event.event_type || '—')}</td>
+                    <td>
+                        ${escapeHtml(formatDate(event.event_date))}
+                        <br><small style="color:var(--text-muted);">${escapeHtml(event.event_time || '—')}</small>
+                    </td>
+                    <td>${guests} pax</td>
+                    <td>${escapeHtml(event.selected_package || '—')}</td>
+                    <td><span class="status-badge ${statusClass(event.status)}">${escapeHtml(event.status || 'Pending')}</span></td>
+                    <td style="text-align: right;">
+                        <button type="button" class="btn-outline-sm" onclick="viewDetails(${index})">
+                            <i class="fa-solid fa-eye"></i> View
+                        </button>
+                    </td>
+                `;
+
                 tbody.appendChild(tr);
             });
         }
 
-        // Handle Adding New Event
-        function handleAddEvent(e) {
-            e.preventDefault();
-            
-            const newEvent = {
-                id: Date.now(),
-                event_name: document.getElementById('event_name').value,
-                customer_name: document.getElementById('customer_name').value,
-                event_type: document.getElementById('event_type').value,
-                event_date: document.getElementById('event_date').value,
-                start_time: document.getElementById('start_time').value,
-                end_time: document.getElementById('end_time').value,
-                number_of_guests: document.getElementById('number_of_guests').value,
-                venue: document.getElementById('venue').value,
-                catering_package: document.getElementById('catering_package').value,
-                additional_services: document.getElementById('additional_services').value,
-                special_requests: document.getElementById('special_requests').value
-            };
-
-            eventsData.push(newEvent);
-            renderEventsTable();
-            closeModal();
-            document.getElementById('addEventForm').reset();
-        }
-
-        // View Event Details
         function viewDetails(index) {
             const data = eventsData[index];
-            document.getElementById('view_event_title').innerText = data.event_name;
-            document.getElementById('v_customer').innerText = data.customer_name;
-            document.getElementById('v_type').innerText = data.event_type;
+            if (!data) return;
+
+            document.getElementById('view_event_title').innerText = 'Reservation ' + (data.reservation_id || '');
+            document.getElementById('v_id').innerText = data.reservation_id || '—';
+            document.getElementById('v_customer').innerText = data.customer_name || '—';
+            document.getElementById('v_phone').innerText = data.contact_number || 'Not provided';
+            document.getElementById('v_email').innerText = data.email || 'Not provided';
+            document.getElementById('v_type').innerText = data.event_type || 'Not provided';
             document.getElementById('v_date').innerText = formatDate(data.event_date);
-            document.getElementById('v_time').innerText = `${data.start_time} - ${data.end_time}`;
-            document.getElementById('v_guests').innerText = `${data.number_of_guests} Guests`;
-            document.getElementById('v_venue').innerText = data.venue;
-            document.getElementById('v_package').innerText = data.catering_package;
-            document.getElementById('v_services').innerText = data.additional_services || 'None';
-            document.getElementById('v_requests').innerText = data.special_requests || 'None';
-            
+            document.getElementById('v_time').innerText = data.event_time || 'Not provided';
+            document.getElementById('v_guests').innerText = (Number(data.guests) || 0) + ' Guests';
+            document.getElementById('v_status').innerText = data.status || 'Pending';
+            document.getElementById('v_status').className = 'status-badge ' + statusClass(data.status);
+            document.getElementById('v_package').innerText = data.selected_package || 'Not provided';
+            document.getElementById('v_services').innerText = additionalServicesText(data.additional_services);
+            document.getElementById('v_total').innerText = formatCurrency(data.estimated_total);
+
             document.getElementById('viewModal').style.display = 'flex';
         }
 
-        // Delete Event
-        function deleteEvent(index) {
-            if (confirm('Are you sure you want to delete this event?')) {
-                eventsData.splice(index, 1);
-                renderEventsTable();
-            }
+        function closeViewModal() {
+            document.getElementById('viewModal').style.display = 'none';
         }
 
-        // Modal Toggle Handlers
-        function openModal() { document.getElementById('addModal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('addModal').style.display = 'none'; }
-        function closeViewModal() { document.getElementById('viewModal').style.display = 'none'; }
-
-        // Initial Load
         document.addEventListener('DOMContentLoaded', renderEventsTable);
     </script>
 <script src="responsive.js"></script>

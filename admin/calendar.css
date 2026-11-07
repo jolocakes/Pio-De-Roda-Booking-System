@@ -226,6 +226,8 @@ body {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: auto;
+  grid-auto-rows: 104px;
   gap: 8px;
   text-align: center;
 }
@@ -239,6 +241,7 @@ body {
 
 .day-cell {
   min-height: 90px;
+  overflow: hidden;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 6px;
@@ -304,6 +307,36 @@ body {
   color: var(--text-dark);
 }
 
+/* Status legend above the calendar grid */
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 0 12px;
+  padding: 0 2px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legend-dot.confirmed { background-color: var(--sage); }
+.legend-dot.pending { background-color: var(--gold); }
+.legend-dot.cancelled { background-color: #b43232; }
+.legend-dot.completed { background-color: #4682b4; }
+
 /* Event Badges inside Calendar Day */
 .event-chip {
   font-size: 10px;
@@ -314,6 +347,10 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
+}
+
+.chip-customer {
+  font-weight: 700;
 }
 
 .chip-confirmed { 

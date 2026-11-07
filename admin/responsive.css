@@ -391,6 +391,7 @@
 
     .calendar-grid {
         gap: 5px;
+        grid-auto-rows: 82px;
     }
 
     .day-cell {
@@ -646,6 +647,7 @@
 
     .calendar-grid {
         gap: 4px;
+        grid-auto-rows: 72px;
     }
 
     .day-cell {
@@ -758,6 +760,10 @@
         font-size: 11px;
     }
 
+    .calendar-grid {
+        grid-auto-rows: 62px;
+    }
+
     .day-cell {
         min-height: 54px;
         padding: 2px;
@@ -799,6 +805,7 @@
 
     .calendar-grid {
         gap: 3px;
+        grid-auto-rows: 56px;
     }
 
     .day-cell {

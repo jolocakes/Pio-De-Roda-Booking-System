@@ -7,7 +7,7 @@
     <title>Payment Tracking - Pio De Roda Cafe</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-   
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="payment.css" />
     <link rel="stylesheet" href="responsive.css" />
 
@@ -36,7 +36,7 @@
                 </li>
 
                 <li class="nav-item">
-                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> calendar</a>
+                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
                 </li>
 
                 <li class="nav-item">
