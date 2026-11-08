@@ -821,3 +821,36 @@
         padding: 20px 14px;
     }
 }
+
+/* Logout is a POST form (CSRF-protected) but must look like the old link. */
+.nav-item .logout-form {
+    margin: 0;
+}
+
+.nav-item .logout-link {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 12px 25px;
+    border: 0;
+    background: transparent;
+    color: var(--text-light-muted);
+    font: inherit;
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nav-item .logout-link:hover,
+.nav-item .logout-link:focus-visible {
+    background-color: var(--accent-red);
+    color: var(--text-light);
+    outline: none;
+}
+
+.nav-item .logout-link i {
+    margin-right: 15px;
+    width: 18px;
+    text-align: center;
+}

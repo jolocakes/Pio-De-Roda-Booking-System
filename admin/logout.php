@@ -1,10 +1,21 @@
 <?php
 /**
- * Admin Logout
- * Pio De Roda Hospitality Reservation and Event Booking System
+ * Admin Logout — POST + CSRF only.
+ * A state-changing action must never be triggered by a bare GET link.
  */
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+require_once __DIR__ . '/../config/csrf.php';
+
+pdrSessionStart();
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    exit('Method Not Allowed');
+}
+
+if (!pdrCsrfValid(pdrRequestCsrfToken())) {
+    http_response_code(403);
+    exit('Invalid CSRF token');
 }
 
 $_SESSION = [];

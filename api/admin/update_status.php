@@ -4,17 +4,41 @@
  * Pio De Roda Hospitality Reservation and Event Booking System
  */
 header('Content-Type: application/json');
+header('Cache-Control: no-store');
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../admin/auth_check.php';
+require_once __DIR__ . '/../../config/csrf.php';
+
+pdrSessionStart();
+
+if (!isset($_SESSION['admin_id']) || !isset($_SESSION['admin_username'])) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'reason' => 'UNAUTHORIZED']);
+    exit();
+}
+
+$method = $_SERVER['REQUEST_METHOD'] ?? '';
+if (!in_array($method, ['PATCH', 'POST'], true)) {
+    http_response_code(405);
+    header('Allow: PATCH, POST');
+    echo json_encode(['ok' => false, 'reason' => 'METHOD_NOT_ALLOWED']);
+    exit();
+}
+
+pdrRequireCsrfJson();
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
+if (!is_array($data)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'reason' => 'INVALID']);
+    exit();
+}
 
-$reservationId = trim($data['reservationId'] ?? '');
-$newStatus = trim($data['status'] ?? '');
+$reservationId = trim((string) ($data['reservationId'] ?? ''));
+$newStatus = trim((string) ($data['status'] ?? ''));
 
 $allowedStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed'];
-if (empty($reservationId) || !in_array($newStatus, $allowedStatuses)) {
+if ($reservationId === '' || !in_array($newStatus, $allowedStatuses, true)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'reason' => 'INVALID']);
     exit();

@@ -6,6 +6,7 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../lookup_guard.php';
 
 $xenditConfig = __DIR__ . '/../../config/xendit.php';
 if (!is_file($xenditConfig)) {
@@ -18,7 +19,7 @@ $xendit = require $xenditConfig;
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true) ?: [];
 
-$reservationId = trim((string)($data['reservationId'] ?? ''));
+$reservationId = pdrLookupNormalizeId((string)($data['reservationId'] ?? ''));
 $bookingPin    = trim((string)($data['bookingPin'] ?? ''));
 $paymentType   = strtolower(trim((string)($data['paymentType'] ?? 'full')));
 
@@ -38,6 +39,11 @@ if (empty($xendit['secret_key']) || strpos($xendit['secret_key'], 'REPLACE') !==
     exit;
 }
 
+$lock = pdrLookupGuard($pdo, $reservationId);
+if ($lock !== null) {
+    pdrLookupReject($lock);
+}
+
 try {
     try {
         $stmt = $pdo->prepare("SELECT reservation_id, booking_pin_hash, status, email, customer_name, estimated_total, event_date, main_service, payment_status, amount_paid FROM reservations WHERE reservation_id = ?");
@@ -51,10 +57,13 @@ try {
     }
 
     if (!$res || !password_verify($bookingPin, $res['booking_pin_hash'])) {
+        pdrLookupRecord($pdo, $reservationId, false);
         http_response_code(404);
         echo json_encode(['ok' => false, 'reason' => 'NOT_FOUND']);
         exit;
     }
+
+    pdrLookupRecord($pdo, $reservationId, true);
     if (($res['status'] ?? '') !== 'Confirmed') {
         http_response_code(409);
         echo json_encode(['ok' => false, 'reason' => 'NOT_CONFIRMED', 'status' => $res['status']]);

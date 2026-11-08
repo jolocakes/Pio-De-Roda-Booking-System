@@ -2,6 +2,12 @@
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/db.php';
 
+/** Escape every value rendered into HTML. */
+function pdrH($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
+
 $reservations = [];
 try {
     $stmt = $pdo->query("SELECT * FROM reservations ORDER BY id DESC");
@@ -91,7 +97,12 @@ try {
             </ul>
         </div>
         <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;"><a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
+            <li class="nav-item" style="list-style: none;">
+                <form method="POST" action="logout.php" class="logout-form">
+                    <?php echo pdrCsrfField(); ?>
+                    <button type="submit" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                </form>
+            </li>
         </div>
     </aside>
 
@@ -148,42 +159,45 @@ try {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach($reservations as$row): ?>
-                                <tr id="row-<?php echo $row['id']; ?>">
-                                    <td><strong><?php echo $row['id']; ?></strong></td>
-                                    <td><?php echo $row['customer']; ?></td>
-                                    <td><?php echo $row['service']; ?></td>
-                                    <td><?php echo $row['date'] . ' ' .$row['time']; ?></td>
+                            <?php foreach($reservations as $row): ?>
+                                <tr id="row-<?php echo pdrH($row['id']); ?>">
+                                    <td><strong><?php echo pdrH($row['id']); ?></strong></td>
+                                    <td><?php echo pdrH($row['customer']); ?></td>
+                                    <td><?php echo pdrH($row['service']); ?></td>
+                                    <td><?php echo pdrH($row['date'] . ' ' . $row['time']); ?></td>
                                     <td>
-                                        <span class="badge badge-<?php echo strtolower($row['status']); ?>" id="status-badge-<?php echo $row['id']; ?>">
-                                            <?php echo $row['status']; ?>
+                                        <span class="badge badge-<?php echo pdrH(strtolower((string) $row['status'])); ?>" id="status-badge-<?php echo pdrH($row['id']); ?>">
+                                            <?php echo pdrH($row['status']); ?>
                                         </span>
                                     </td>
-                                    <td><?php echo $row['payment']; ?></td>
+                                    <td><?php echo pdrH($row['payment']); ?></td>
                                     <td class="action-cell">
                                         <!-- Approve -->
-                                        <button class="btn btn-approve" title="Approve" onclick="updateStatus('<?php echo $row['id']; ?>', 'Confirmed')">
+                                        <button type="button" class="btn btn-approve" title="Approve"
+                                            data-status-action data-id="<?php echo pdrH($row['id']); ?>" data-status="Confirmed">
                                             <i class="fa-solid fa-check"></i>
                                         </button>
 
                                         <!-- Reject -->
-                                        <button class="btn btn-reject" title="Reject" onclick="updateStatus('<?php echo $row['id']; ?>', 'Cancelled')">
+                                        <button type="button" class="btn btn-reject" title="Reject"
+                                            data-status-action data-id="<?php echo pdrH($row['id']); ?>" data-status="Cancelled">
                                             <i class="fa-solid fa-xmark"></i>
                                         </button>
 
                                         <!-- Reschedule / Edit -->
-                                        <button class="btn btn-edit" title="Edit / Reschedule" data-id="<?php echo htmlspecialchars((string) $row['id'], ENT_QUOTES, 'UTF-8'); ?>"
-                                            data-service="<?php echo htmlspecialchars((string) $row['service'], ENT_QUOTES, 'UTF-8'); ?>"
-                                            data-date="<?php echo htmlspecialchars((string) $row['date'], ENT_QUOTES, 'UTF-8'); ?>"
-                                            data-time="<?php echo htmlspecialchars((string) $row['time'], ENT_QUOTES, 'UTF-8'); ?>"
-                                            data-guests="<?php echo htmlspecialchars((string) $row['guests'], ENT_QUOTES, 'UTF-8'); ?>"
-                                            data-status="<?php echo htmlspecialchars((string) $row['status'], ENT_QUOTES, 'UTF-8'); ?>"
+                                        <button class="btn btn-edit" title="Edit / Reschedule" data-id="<?php echo pdrH((string) $row['id']); ?>"
+                                            data-service="<?php echo pdrH((string) $row['service']); ?>"
+                                            data-date="<?php echo pdrH((string) $row['date']); ?>"
+                                            data-time="<?php echo pdrH((string) $row['time']); ?>"
+                                            data-guests="<?php echo pdrH((string) $row['guests']); ?>"
+                                            data-status="<?php echo pdrH((string) $row['status']); ?>"
                                             onclick="openEditModal(this)">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
 
                                         <!-- Cancel -->
-                                        <button class="btn btn-cancel" title="Cancel Booking" onclick="updateStatus('<?php echo $row['id']; ?>', 'Cancelled')">
+                                        <button type="button" class="btn btn-cancel" title="Cancel Booking"
+                                            data-status-action data-id="<?php echo pdrH($row['id']); ?>" data-status="Cancelled">
                                             <i class="fa-solid fa-ban"></i>
                                         </button>
                                     </td>
@@ -252,6 +266,12 @@ try {
     </div>
 
     <script>
+        // Server-issued CSRF token for every state-changing admin request.
+        const PDR_CSRF_TOKEN = <?php echo json_encode(
+            pdrCsrfToken(),
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        ); ?>;
+
         // Search & Filter Logic
         function filterTable() {
     const searchInput = document.getElementById('searchInput').value.toLowerCase();
@@ -337,20 +357,34 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-        // View Reservation Details Modal
+        // View Reservation Details Modal — build DOM nodes with textContent so
+        // customer-controlled values can never become HTML/script.
         function viewDetails(id, customer, phone, email, service, date, time, guests, amount, notes) {
-            const content = `
-                <p><strong>Reservation ID:</strong> ${id}</p>
-                <p><strong>Customer Name:</strong> ${customer}</p>
-                <p><strong>Phone:</strong> ${phone}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Service:</strong> ${service}</p>
-                <p><strong>Date & Time:</strong> ${date} at ${time}</p>
-                <p><strong>Guests:</strong> ${guests}</p>
-                <p><strong>Total Amount:</strong> ${amount}</p>
-                <p><strong>Notes:</strong> ${notes}</p>
-            `;
-            document.getElementById('viewModalContent').innerHTML = content;
+            const content = document.getElementById('viewModalContent');
+            if (!content) return;
+
+            const fields = [
+                ['Reservation ID', id],
+                ['Customer Name', customer],
+                ['Phone', phone],
+                ['Email', email],
+                ['Service', service],
+                ['Date & Time', date + ' at ' + time],
+                ['Guests', guests],
+                ['Total Amount', amount],
+                ['Notes', notes],
+            ];
+
+            content.replaceChildren();
+            fields.forEach(([label, value]) => {
+                const p = document.createElement('p');
+                const strong = document.createElement('strong');
+                strong.textContent = label + ':';
+                p.appendChild(strong);
+                p.appendChild(document.createTextNode(' ' + (value == null ? '' : String(value))));
+                content.appendChild(p);
+            });
+
             document.getElementById('viewModal').style.display = 'flex';
         }
 
@@ -376,7 +410,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch('../api/admin/update_status.php', {
                     method: 'PATCH',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': PDR_CSRF_TOKEN
                     },
                     body: JSON.stringify({
                         reservationId: id,
@@ -451,7 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch('../api/admin/update_reservation.php', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': PDR_CSRF_TOKEN
                     },
                     body: JSON.stringify({
                         reservationId: id,
@@ -507,6 +543,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+
+        // Status buttons carry the reservation ID/status in data attributes so
+        // no server value is interpolated into JavaScript source.
+        document.querySelectorAll('[data-status-action]').forEach((button) => {
+            button.addEventListener('click', () => {
+                updateStatus(button.dataset.id || '', button.dataset.status || '');
+            });
+        });
 
     </script>
 <script src="responsive.js"></script>

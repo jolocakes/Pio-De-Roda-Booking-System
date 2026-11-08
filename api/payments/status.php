@@ -5,16 +5,22 @@
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../lookup_guard.php';
 
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true) ?: [];
-$reservationId = trim((string)($data['reservationId'] ?? ''));
-$bookingPin    = trim((string)($data['bookingPin'] ?? ''));
+$reservationId = pdrLookupNormalizeId((string) ($data['reservationId'] ?? ''));
+$bookingPin    = trim((string) ($data['bookingPin'] ?? ''));
 
 if ($reservationId === '' || $bookingPin === '') {
     http_response_code(404);
     echo json_encode(['ok' => false, 'reason' => 'NOT_FOUND']);
-    exit;
+    exit();
+}
+
+$lock = pdrLookupGuard($pdo, $reservationId);
+if ($lock !== null) {
+    pdrLookupReject($lock);
 }
 
 try {
@@ -22,10 +28,13 @@ try {
     $stmt->execute([$reservationId]);
     $res = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$res || !password_verify($bookingPin, $res['booking_pin_hash'])) {
+        pdrLookupRecord($pdo, $reservationId, false);
         http_response_code(404);
         echo json_encode(['ok' => false, 'reason' => 'NOT_FOUND']);
-        exit;
+        exit();
     }
+
+    pdrLookupRecord($pdo, $reservationId, true);
 
     $est = (float)($res['estimated_total'] ?? 0);
     $paid = (float)($res['amount_paid'] ?? 0);
@@ -63,8 +72,10 @@ try {
         $stmt->execute([$reservationId]);
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$res || !password_verify($bookingPin, $res['booking_pin_hash'])) {
-            http_response_code(404); echo json_encode(['ok'=>false,'reason'=>'NOT_FOUND']); exit;
+            pdrLookupRecord($pdo, $reservationId, false);
+            http_response_code(404); echo json_encode(['ok'=>false,'reason'=>'NOT_FOUND']); exit();
         }
+        pdrLookupRecord($pdo, $reservationId, true);
         echo json_encode(['ok'=>true,'reservation'=>[
             'reservationId'=>$res['reservation_id'],'status'=>$res['status'],
             'estimatedTotal'=>(float)$res['estimated_total'],'amountPaid'=>0,
@@ -72,6 +83,7 @@ try {
             'paymentMethod'=>$res['payment_method']
         ],'payments'=>[],'warning'=>'MIGRATION_NEEDED']);
     } catch (Throwable $e2) {
+        error_log('payments/status fallback error: ' . $e2->getMessage());
         http_response_code(500); echo json_encode(['ok'=>false,'reason'=>'SERVER_ERROR']);
     }
 }

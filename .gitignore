@@ -1,5 +1,13 @@
 # Local secrets / environment-specific config
+.env
+.env.*
+!.env.example
 config/xendit.php
+
+# Mail outbox contains customer PII and plaintext booking PINs.
+# Keep the directory deny rule, but never track its contents.
+api/mail/outbox/*
+!api/mail/outbox/.htaccess
 
 # OS/editor
 .DS_Store

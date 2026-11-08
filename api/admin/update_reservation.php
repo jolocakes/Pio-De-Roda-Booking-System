@@ -11,10 +11,9 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../config/csrf.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+pdrSessionStart();
 
 // JSON 401 instead of an HTML redirect so the admin page can show a clear message.
 if (!isset($_SESSION['admin_id']) || !isset($_SESSION['admin_username'])) {
@@ -22,6 +21,15 @@ if (!isset($_SESSION['admin_id']) || !isset($_SESSION['admin_username'])) {
     echo json_encode(['ok' => false, 'reason' => 'UNAUTHORIZED']);
     exit();
 }
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    echo json_encode(['ok' => false, 'reason' => 'METHOD_NOT_ALLOWED']);
+    exit();
+}
+
+pdrRequireCsrfJson();
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);

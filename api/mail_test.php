@@ -2,14 +2,22 @@
 /**
  * API: Mail self-test / outbox peek — Pio De Roda
  *
- *   GET mail_test.php          -> configuration status (never prints secrets)
- *   POST {"test": true}        -> sends a sample confirmation email through
- *                                 the same code path reservations use, then
- *                                 reports where it went (smtp | outbox).
+ * CLI ONLY. This endpoint used to be reachable over HTTP and allowed an
+ * arbitrary recipient address. It now refuses web requests and always sends
+ * to the fixed PDR_MAIL_TEST_RECIPIENT from .env.
  *
- * Passwords/credentials are never echoed back — only whether they are set.
+ * Usage (from the project root):
+ *   C:\xampp\php\php.exe api\mail_test.php            -> configuration status
+ *   C:\xampp\php\php.exe api\mail_test.php --send     -> send a sample email
+ *
+ * Passwords/credentials are never printed — only whether they are set.
  */
-header('Content-Type: application/json');
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=UTF-8');
+    exit('CLI only');
+}
+
 require_once __DIR__ . '/mail/mailer.php';
 require_once __DIR__ . '/mail/confirmation_template.php';
 
@@ -28,20 +36,19 @@ try {
         'outbox'    => $cfg['outbox'],
     ];
 
-    $raw = file_get_contents('php://input');
-    $data = json_decode($raw, true);
-    if (empty($data['test'])) {
-        echo json_encode($status);
-        exit();
+    if (!in_array('--send', $argv ?? [], true)) {
+        echo json_encode($status, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+        exit(0);
+    }
+
+    // Fixed recipient only — no caller-supplied address is accepted.
+    $to = trim((string) pdrEnv('PDR_MAIL_TEST_RECIPIENT', $cfg['from_email']));
+    if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        fwrite(STDERR, "PDR_MAIL_TEST_RECIPIENT is not a valid email address.\n");
+        exit(1);
     }
 
     // Sample message built by the SAME template reservations use.
-    // `to` is optional: defaults to test@example.com, but you can pass your
-    // own address to see a real confirmation email land in your inbox.
-    $to = trim($data['to'] ?? '');
-    if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-        $to = 'test@example.com';
-    }
     $sample = pdrConfirmEmail([
         'reservationId' => 'PDR-0000-0000',
         'bookingPin'    => '000000',
@@ -58,9 +65,12 @@ try {
 
     $result = pdrSendMail($to, $sample['subject'], $sample['html'], $sample['text']);
 
-    echo json_encode(array_merge($status, ['sent' => $result]));
-
+    echo json_encode(array_merge($status, [
+        'recipient' => $to,
+        'sent'      => $result,
+    ]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+    exit($result['ok'] ? 0 : 1);
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    fwrite(STDERR, json_encode(['ok' => false, 'error' => $e->getMessage()]) . "\n");
+    exit(1);
 }

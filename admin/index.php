@@ -3,9 +3,9 @@
  * Admin Login
  * Pio De Roda Hospitality Reservation and Event Booking System
  */
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../config/csrf.php';
+
+pdrSessionStart();
 
 if (isset($_SESSION['admin_id'])) {
     header("Location: dashboard.php");
@@ -17,6 +17,9 @@ require_once __DIR__ . '/../config/db.php';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!pdrCsrfValid(pdrRequestCsrfToken())) {
+        $error = 'Your session expired. Please reload the page and try again.';
+    } else {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
@@ -32,6 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['admin_username'] = $admin['username'];
                 $_SESSION['admin_name'] = $admin['full_name'];
                 $_SESSION['admin_role'] = $admin['role'];
+                // Rotate the CSRF token after the privilege level changes.
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
                 header("Location: dashboard.php");
                 exit();
@@ -43,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } else {
         $error = "Please enter both username and password.";
+    }
     }
 }
 ?>
@@ -149,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="POST" action="index.php">
+            <?php echo pdrCsrfField(); ?>
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required autofocus autocomplete="username">

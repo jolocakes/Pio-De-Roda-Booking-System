@@ -66,7 +66,12 @@
 
         </div>
         <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;"><a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
+            <li class="nav-item" style="list-style: none;">
+                <form method="POST" action="logout.php" class="logout-form">
+                    <?php echo pdrCsrfField(); ?>
+                    <button type="submit" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                </form>
+            </li>
         </div>
     </div>
 

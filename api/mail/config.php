@@ -2,39 +2,40 @@
 /**
  * Mail configuration — Pio De Roda booking confirmation emails.
  *
- * HOW TO ACTIVATE REAL SENDING
- * ----------------------------
- * XAMPP has no mail server, so until SMTP credentials are filled in below,
- * every email is written to the OUTBOX folder (api/mail/outbox/) as a .eml
- * file instead of being lost. The moment `host`, `username` and `password`
- * are filled in, emails go out through that SMTP account for real.
+ * Credentials are read from the project-root .env file (git-ignored) or from
+ * real environment variables. This file contains NO secrets and is safe to
+ * commit. Copy .env.example to .env and fill in the SMTP values.
+ *
+ * XAMPP has no mail server. When SMTP credentials are absent (or `enabled` is
+ * false), every email is written to the OUTBOX folder as a .eml file instead
+ * of being lost.
  *
  * Gmail example:
- *   host        = 'smtp.gmail.com'
- *   port        = 587
- *   encryption  = 'tls'
- *   username    = 'your@gmail.com'
- *   password    = 'your Gmail App Password (NOT your login password)
- *                  -> create one at https://myaccount.google.com/apppasswords'
- *
- * Set `enabled` to false to force outbox mode even with credentials filled in
- * (useful for testing without sending anything).
- *
- * SECURITY: this file may contain a password. It returns an array and prints
- * nothing, so requesting it over HTTP yields an empty response — never echo
- * these values anywhere.
+ *   PDR_MAIL_HOST=smtp.gmail.com
+ *   PDR_MAIL_PORT=587
+ *   PDR_MAIL_ENCRYPTION=tls
+ *   PDR_MAIL_USERNAME=your@gmail.com
+ *   PDR_MAIL_PASSWORD=your Gmail App Password (NOT your login password)
+ *     -> create one at https://myaccount.google.com/apppasswords
  */
+
+require_once __DIR__ . '/../../config/env.php';
+
+$host = (string) pdrEnv('PDR_MAIL_HOST', 'smtp.gmail.com');
+$username = (string) pdrEnv('PDR_MAIL_USERNAME', '');
+$fromEmail = (string) pdrEnv('PDR_MAIL_FROM_EMAIL', $username);
+
 return [
-    'enabled'     => true, // false = never hit the network, always use the outbox
-    'host'        => 'smtp.gmail.com',
-    'port'        => 587,  // 587 for TLS, 465 for SSL
-    'encryption'  => 'tls',// 'tls' | 'ssl' | 'none'
-    'username'    => 'pioderoda.booking@gmail.com',
-    'password'    => 'REDACTED-ROTATED-GMAIL-APP-PASSWORD', // Gmail App Password (revocable at myaccount.google.com/apppasswords)
+    'enabled'     => filter_var(pdrEnv('PDR_MAIL_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),
+    'host'        => $host,
+    'port'        => (int) pdrEnv('PDR_MAIL_PORT', '587'),
+    'encryption'  => (string) pdrEnv('PDR_MAIL_ENCRYPTION', 'tls'),
+    'username'    => $username,
+    'password'    => (string) pdrEnv('PDR_MAIL_PASSWORD', ''),
 
     // Who the customer sees as the sender.
-    'from_email'  => 'pioderoda.booking@gmail.com',
-    'from_name'   => 'Pio De Roda Cafe & Restaurant',
+    'from_email'  => $fromEmail,
+    'from_name'   => (string) pdrEnv('PDR_MAIL_FROM_NAME', 'Pio De Roda Cafe & Restaurant'),
 
     // Where un-sent emails are parked as .eml files (viewable/double-clickable).
     'outbox'      => __DIR__ . '/outbox',

@@ -297,8 +297,9 @@ if (strtotime($eventDate) < strtotime(date('Y-m-d'))) {
 }
 
 try {
-    // Ensure the `address` column exists on older databases created before the schema update.
-    $pdo->exec("ALTER TABLE `reservations` ADD COLUMN IF NOT EXISTS `address` VARCHAR(255) DEFAULT NULL AFTER `email`");
+    // Schema changes are intentionally NOT executed here. The `address`
+    // column is provisioned by database/migrate_services.php; running DDL on
+    // every reservation request is slow and fails on MySQL 5.7/8.0.
 
     // RULE 2 — Venue Rentals is exclusive per DATE. One customer per venue-day.
     // RULE 1 — a date holds at most PDR_MAX_SERVICES_PER_DAY active bookings.
@@ -328,20 +329,28 @@ try {
         exit();
     }
 
-    // Generate unique Reservation ID: PDR-{YYYY}-{####}
+    // Generate an unguessable Reservation ID: PDR-{YYYY}-{10 random chars}.
+    // The old sequential PDR-YYYY-NNNN format made every customer ID trivially
+    // enumerable. Existing legacy IDs stay valid; new bookings use this format.
     $year = date('Y', strtotime($eventDate));
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM reservations WHERE reservation_id LIKE ?");
-    $stmt->execute(["PDR-$year-%"]);
-    $count = $stmt->fetchColumn();
-    $reservationId = sprintf("PDR-%s-%04d", $year, $count + 1);
+    $alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // no 0/O/1/I ambiguity
+    $reservationId = '';
+    $check = $pdo->prepare("SELECT id FROM reservations WHERE reservation_id = ?");
 
-    // Ensure uniqueness
-    while (true) {
-        $check = $pdo->prepare("SELECT id FROM reservations WHERE reservation_id = ?");
-        $check->execute([$reservationId]);
-        if (!$check->fetch()) break;
-        $count++;
-        $reservationId = sprintf("PDR-%s-%04d", $year, $count + 1);
+    for ($attempt = 0; $attempt < 10 && $reservationId === ''; $attempt++) {
+        $suffix = '';
+        for ($i = 0; $i < 10; $i++) {
+            $suffix .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+        $candidate = sprintf('PDR-%s-%s', $year, $suffix);
+        $check->execute([$candidate]);
+        if (!$check->fetch()) {
+            $reservationId = $candidate;
+        }
+    }
+
+    if ($reservationId === '') {
+        throw new RuntimeException('Could not allocate a unique reservation ID.');
     }
 
     // Generate random 6-digit PIN
