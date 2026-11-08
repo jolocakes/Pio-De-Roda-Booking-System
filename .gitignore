@@ -9,6 +9,10 @@ config/xendit.php
 api/mail/outbox/*
 !api/mail/outbox/.htaccess
 
+# Root-level database dumps (schema/data exports). Migrations under
+# database/ stay tracked; anything dumped into the web root is ignored.
+/*.sql
+
 # OS/editor
 .DS_Store
 Thumbs.db

@@ -7,3 +7,18 @@
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
 </IfModule>
+
+# Never serve database dumps, secrets, logs or editor/backup artifacts.
+# A .sql dump contains customer PII and admin password hashes; a leaked
+# .env contains live SMTP credentials.
+<IfModule mod_authz_core.c>
+  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml)$|(^|/)\.env$|~$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml)$|(^|/)\.env$|~$">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+</IfModule>

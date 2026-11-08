@@ -9,6 +9,23 @@
  */
 
 header('Content-Type: application/json');
+header('Cache-Control: no-store');
+
+require_once __DIR__ . '/rate_limit.php';
+
+// 5 submissions per 15 minutes per IP. The form is public and each accepted
+// submission sends a real email, so it is a spam/relay amplifier if unthrottled.
+$limit = pdrRateLimit('contact', 5, 900);
+if (!$limit['allowed']) {
+    http_response_code(429);
+    header('Retry-After: ' . (int) $limit['retryAfter']);
+    echo json_encode([
+        'ok' => false,
+        'error' => 'Too many messages. Please wait a few minutes and try again.',
+        'retryAfterSeconds' => (int) $limit['retryAfter'],
+    ]);
+    exit();
+}
 
 try {
     // =========================================================================
@@ -35,15 +52,36 @@ try {
         $message = $_POST['message'] ?? '';
     }
 
+    // Coerce to strings and cap sizes so a huge payload cannot be mailed out.
+    $name = is_string($name) ? trim($name) : '';
+    $email = is_string($email) ? trim($email) : '';
+    $message = is_string($message) ? trim($message) : '';
+
+    if (mb_strlen($name) > 100) {
+        $name = mb_substr($name, 0, 100);
+    }
+    if (mb_strlen($email) > 254) {
+        $email = mb_substr($email, 0, 254);
+    }
+    if (mb_strlen($message) > 2000) {
+        $message = mb_substr($message, 0, 2000);
+    }
+
+    // Strip CR/LF from header-adjacent values (defense in depth).
+    $name = str_replace(["\r", "\n"], ' ', $name);
+    $email = str_replace(["\r", "\n"], '', $email);
+
     // =========================================================================
     // Step 2: Validation
     // =========================================================================
-    if (empty($name) || empty($email) || empty($message)) {
+    if ($name === '' || $email === '' || $message === '') {
+        http_response_code(422);
         echo json_encode(['ok' => false, 'error' => 'All fields are required.']);
         exit();
     }
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(422);
         echo json_encode(['ok' => false, 'error' => 'Please enter a valid email address.']);
         exit();
     }
@@ -67,7 +105,12 @@ try {
     // THE KEY: Always use the restaurant's email as the From address
     // This ensures the email passes spam filters and reaches the inbox
     
-    $to = 'pioderodabooking@gmail.com';
+    // Recipient comes from .env (PDR_CONTACT_RECIPIENT), falling back to the
+    // monitored restaurant inbox. Never caller-controlled.
+    $to = trim((string) pdrEnv('PDR_CONTACT_RECIPIENT', 'pioderodabooking@gmail.com'));
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        $to = 'pioderodabooking@gmail.com';
+    }
     $subject = 'Inquiry from Website Contact Form';
     $fromEmail = 'pioderodabooking@gmail.com'; // Restaurant's email (always)
     $fromName = 'Pio De Roda Cafe & Restaurant';
