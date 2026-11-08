@@ -55,12 +55,29 @@ try {
         exit();
     }
 
-    if ($current['status'] !== $newStatus) {
+    $changed = $current['status'] !== $newStatus;
+    if ($changed) {
         $stmt = $pdo->prepare("UPDATE reservations SET status = ? WHERE reservation_id = ?");
         $stmt->execute([$newStatus, $reservationId]);
     }
 
-    echo json_encode(['ok' => true, 'reservationId' => $reservationId, 'status' => $newStatus]);
+    // T-14: tell the customer when their booking is Confirmed / Cancelled /
+    // Completed. Best effort — pdrDispatchStatusEmail never throws, and the
+    // status change above is already committed.
+    $emailMode = null;
+    if ($changed) {
+        require_once __DIR__ . '/../mail/status_template.php';
+        $emailResult = pdrDispatchStatusEmail($pdo, $reservationId, $newStatus);
+        $emailMode = $emailResult['mode'] ?? 'none';
+    }
+
+    echo json_encode([
+        'ok' => true,
+        'reservationId' => $reservationId,
+        'status' => $newStatus,
+        'changed' => $changed,
+        'email' => $emailMode,
+    ]);
 } catch (Exception $e) {
     error_log("Reservation status update error: " . $e->getMessage());
     http_response_code(500);

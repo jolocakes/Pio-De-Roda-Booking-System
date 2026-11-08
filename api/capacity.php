@@ -34,7 +34,7 @@ function pdrActiveStatuses() {
  * Returns [ 'YYYY-MM-DD' => ['count' => int, 'hasVenue' => bool], ... ]
  * Only dates that actually have at least one active booking are listed.
  */
-function pdrDateLoad($pdo) {
+function pdrDateLoad($pdo, ?string $excludeReservationId = null) {
     $statuses = pdrActiveStatuses();
     $in = implode(',', array_fill(0, count($statuses), '?'));
     $stmt = $pdo->prepare(
@@ -43,9 +43,10 @@ function pdrDateLoad($pdo) {
                 MAX(CASE WHEN main_service = ? THEN 1 ELSE 0 END) AS has_venue
            FROM reservations
           WHERE status IN ($in)
+            AND (? IS NULL OR reservation_id <> ?)
           GROUP BY event_date"
     );
-    $stmt->execute(array_merge([PDR_EXCLUSIVE_SERVICE], $statuses));
+    $stmt->execute(array_merge([PDR_EXCLUSIVE_SERVICE], $statuses, [$excludeReservationId, $excludeReservationId]));
 
     $out = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
@@ -63,8 +64,8 @@ function pdrDateLoad($pdo) {
  * Returns ['taken' => bool, 'count' => int, 'hasVenue' => bool,
  *          'reason' => 'VENUE'|'FULL'|null]
  */
-function pdrDateTaken($pdo, $eventDate) {
-    $load = pdrDateLoad($pdo);
+function pdrDateTaken($pdo, $eventDate, ?string $excludeReservationId = null) {
+    $load = pdrDateLoad($pdo, $excludeReservationId);
     $row  = isset($load[$eventDate]) ? $load[$eventDate] : ['count' => 0, 'hasVenue' => false];
 
     if ($row['hasVenue']) {
@@ -82,15 +83,16 @@ function pdrDateTaken($pdo, $eventDate) {
  * Returns the list of 'HH:MM' strings that service already holds that day.
  * Other services' bookings on the same date/time do NOT appear here.
  */
-function pdrTakenTimes($pdo, $eventDate, $mainService) {
+function pdrTakenTimes($pdo, $eventDate, $mainService, ?string $excludeReservationId = null) {
     $statuses = pdrActiveStatuses();
     $in = implode(',', array_fill(0, count($statuses), '?'));
     $stmt = $pdo->prepare(
         "SELECT DISTINCT event_time
            FROM reservations
-          WHERE event_date = ? AND main_service = ? AND status IN ($in)"
+          WHERE event_date = ? AND main_service = ? AND status IN ($in)
+            AND (? IS NULL OR reservation_id <> ?)"
     );
-    $stmt->execute(array_merge([$eventDate, $mainService], $statuses));
+    $stmt->execute(array_merge([$eventDate, $mainService], $statuses, [$excludeReservationId, $excludeReservationId]));
     return $stmt->fetchAll(PDO::FETCH_COLUMN);
 }
 

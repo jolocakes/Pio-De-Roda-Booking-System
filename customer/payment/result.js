@@ -34,7 +34,7 @@
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error("status");
       const r = data.reservation || {};
-      const paid = (r.balance || 0) <= 0 || (r.paymentStatus || "").toLower().indexOf("paid") !== -1;
+      const paid = (r.balance || 0) <= 0 || (r.paymentStatus || "").toLowerCase().indexOf("paid") !== -1;
       $("title").textContent = paid ? "Payment received" : (result === "success" ? "Payment processing" : "Payment not completed");
       $("msg").className = "notice " + (paid ? "success" : (result === "success" ? "" : "error"));
       $("msg").textContent = paid

@@ -59,8 +59,56 @@ try {
 
     if (in_array($status, $paidStatuses, true)) {
         if (($row['status'] ?? '') !== 'Verified') {
+            // T-15: verify the amount actually paid against the amount this app
+            // asked Xendit to collect (the `payments.amount` we created the
+            // invoice with). A PAID callback whose amount does not line up is
+            // NOT allowed to mark itself Verified — it is flagged for a human.
+            $expectedAmount = (float) ($row['amount'] ?? 0);
+            $amountMismatch = ($paidAmount === null)
+                || ($expectedAmount <= 0)
+                || (abs($paidAmount - $expectedAmount) > 0.01);
+
+            if ($amountMismatch) {
+                error_log(sprintf(
+                    'Xendit webhook amount mismatch: invoice=%s external=%s expected=%.2f paid=%s',
+                    $invoiceId,
+                    $externalId,
+                    $expectedAmount,
+                    $paidAmount === null ? 'null' : number_format($paidAmount, 2, '.', '')
+                ));
+
+                $upd = $pdo->prepare(
+                    "UPDATE payments
+                        SET status = 'For Review', payment_channel = ?, paid_at = NOW(), raw_response = ?
+                      WHERE id = ? AND status <> 'Verified'"
+                );
+                $upd->execute([is_string($channel) ? $channel : json_encode($channel), $raw, $row['id']]);
+
+                // Best effort: record the amount Xendit reported (column added
+                // by database/migrations/003_payment_review.sql; ignored if absent).
+                try {
+                    $p = $pdo->prepare("UPDATE payments SET paid_amount = ? WHERE id = ?");
+                    $p->execute([$paidAmount, $row['id']]);
+                } catch (Throwable $ignoredPaidAmount) {
+                    // Column not migrated yet — raw_response still has the payload.
+                }
+
+                http_response_code(200);
+                echo 'amount-mismatch-flagged';
+                exit;
+            }
+
             $upd = $pdo->prepare("UPDATE payments SET status = 'Verified', payment_channel = ?, paid_at = NOW(), raw_response = ? WHERE id = ? AND status <> 'Verified'");
             $upd->execute([is_string($channel) ? $channel : json_encode($channel), $raw, $row['id']]);
+
+            // Record the verified amount too (best effort; column may not exist
+            // on a database that has not run the migrations yet).
+            try {
+                $p = $pdo->prepare("UPDATE payments SET paid_amount = ? WHERE id = ?");
+                $p->execute([$paidAmount, $row['id']]);
+            } catch (Throwable $ignoredPaidAmount) {
+                // raw_response still holds the gateway payload.
+            }
 
             // Recompute reservation paid totals from verified payments.
             $sum = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE reservation_id = ? AND provider = 'xendit' AND status = 'Verified'");

@@ -31,7 +31,7 @@ $serviceRow = null;
 if ($serviceId !== '') {
     // The service must exist AND be active. Unknown or deactivated services are
     // rejected instead of being silently stored with a NULL service_id.
-    $chkService = $pdo->prepare("SELECT id, name, base_price, per_head, per_head_by_pkg FROM services WHERE id = ? AND is_active = 1");
+    $chkService = $pdo->prepare("SELECT id, name, base_price, per_head, per_head_by_pkg, max_cap FROM services WHERE id = ? AND is_active = 1");
     $chkService->execute([$serviceId]);
     $serviceRow = $chkService->fetch(PDO::FETCH_ASSOC);
     if (!$serviceRow) {
@@ -85,6 +85,7 @@ if ($guests < 1) {
 // ============================================================
 $additionalServices = '[]';
 $mainCourses = null;
+$packageMaxCap = null; // T-09: set when the selected package carries its own cap
 if (isset($data['mainCourses'])) {
     if (!is_array($mainCoursesInput)) {
         http_response_code(400);
@@ -103,7 +104,7 @@ try {
     }
     $selectedPackage = trim($data['selectedPackage']);
 
-    $pkgStmt = $pdo->prepare("SELECT price FROM service_packages WHERE service_id = ? AND package_name = ? AND is_active = 1 ORDER BY sort_order ASC LIMIT 1");
+    $pkgStmt = $pdo->prepare("SELECT price, max_cap FROM service_packages WHERE service_id = ? AND package_name = ? AND is_active = 1 ORDER BY sort_order ASC LIMIT 1");
     $pkgStmt->execute([$serviceId, $selectedPackage]);
     $pkgRow = $pkgStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -111,6 +112,11 @@ try {
         $estimatedTotal = (int)$serviceRow['per_head_by_pkg'] === 1
             ? (float)$pkgRow['price'] * $guests   // "per head" services price the package rate × guests
             : (float)$pkgRow['price'];            // all other services: flat package price
+
+        // T-09: a package may cap guests more tightly than its parent service.
+        if (isset($pkgRow['max_cap']) && $pkgRow['max_cap'] !== null && (int)$pkgRow['max_cap'] > 0) {
+            $packageMaxCap = (int)$pkgRow['max_cap'];
+        }
     } else {
         // Menu-tiered picks (e.g. Dine-In Menu A / Menu B) resolve through service_menus.
         $menuStmt = $pdo->prepare("SELECT menu_code FROM service_menus WHERE service_id = ? AND item_name = ? AND is_active = 1 LIMIT 1");
@@ -277,6 +283,32 @@ try {
     exit();
 }
 
+// T-09: enforce guest capacity server-side.
+// The effective limit is the tighter of the service cap and the selected
+// package cap (either may be NULL = unlimited). The browser-side max is only a
+// convenience — this is the check that actually protects the catalog.
+$serviceMaxCap = (isset($serviceRow['max_cap']) && $serviceRow['max_cap'] !== null && (int)$serviceRow['max_cap'] > 0)
+    ? (int)$serviceRow['max_cap']
+    : null;
+$effectiveCap = null;
+foreach ([$serviceMaxCap, $packageMaxCap] as $cap) {
+    if ($cap !== null) {
+        $effectiveCap = ($effectiveCap === null) ? $cap : min($effectiveCap, $cap);
+    }
+}
+if ($effectiveCap !== null && $guests > $effectiveCap) {
+    http_response_code(422);
+    echo json_encode([
+        'ok'      => false,
+        'reason'  => 'CAPACITY_EXCEEDED',
+        'field'   => 'guests',
+        'guests'  => $guests,
+        'maxCap'  => $effectiveCap,
+        'service' => $mainService,
+    ]);
+    exit();
+}
+
 // Address is REQUIRED for the off-site services (booths, catering, equipment
 // rental) — same list the customer form uses (services.requiresAddress).
 $ADDRESS_REQUIRED_SERVICES = ['coffee', 'noncoffee', 'pizza', 'catering-menu', 'equipment'];
@@ -329,32 +361,17 @@ try {
         exit();
     }
 
-    // Generate an unguessable Reservation ID: PDR-{YYYY}-{10 random chars}.
-    // The old sequential PDR-YYYY-NNNN format made every customer ID trivially
-    // enumerable. Existing legacy IDs stay valid; new bookings use this format.
+    // T-11: collision-safe reservation ID allocation.
+    // We no longer SELECT a candidate first — that check-then-insert left a race
+    // window where two requests could pick the same ID. `reservations.reservation_id`
+    // has a UNIQUE index, so the database is the arbiter. We generate a random
+    // candidate, INSERT, and retry ONLY when MySQL reports a duplicate key
+    // (SQLSTATE 23000 / error 1062).
     $year = date('Y', strtotime($eventDate));
     $alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // no 0/O/1/I ambiguity
-    $reservationId = '';
-    $check = $pdo->prepare("SELECT id FROM reservations WHERE reservation_id = ?");
-
-    for ($attempt = 0; $attempt < 10 && $reservationId === ''; $attempt++) {
-        $suffix = '';
-        for ($i = 0; $i < 10; $i++) {
-            $suffix .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-        }
-        $candidate = sprintf('PDR-%s-%s', $year, $suffix);
-        $check->execute([$candidate]);
-        if (!$check->fetch()) {
-            $reservationId = $candidate;
-        }
-    }
-
-    if ($reservationId === '') {
-        throw new RuntimeException('Could not allocate a unique reservation ID.');
-    }
 
     // Generate random 6-digit PIN
-    $pinNum = mt_rand(100000, 999999);
+    $pinNum = random_int(100000, 999999);
     $bookingPin = strval($pinNum);
     $pinHash = password_hash($bookingPin, PASSWORD_DEFAULT);
 
@@ -366,12 +383,35 @@ try {
         estimated_total, payment_method
     ) VALUES (?, ?, 'Pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $insert->execute([
-        $reservationId, $pinHash, $customerName, $contactPerson,
-        $contactNumber, $email, $address, $serviceId, $mainService, $eventDate, $eventTime,
-        $eventType, $guests, $selectedPackage, $mainCourses, $additionalServices,
-        $estimatedTotal, $paymentMethod
-    ]);
+    $reservationId = '';
+    $maxIdAttempts = 12;
+    for ($attempt = 0; $attempt < $maxIdAttempts && $reservationId === ''; $attempt++) {
+        $suffix = '';
+        for ($i = 0; $i < 10; $i++) {
+            $suffix .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+        $candidate = sprintf('PDR-%s-%s', $year, $suffix);
+
+        try {
+            $insert->execute([
+                $candidate, $pinHash, $customerName, $contactPerson,
+                $contactNumber, $email, $address, $serviceId, $mainService, $eventDate, $eventTime,
+                $eventType, $guests, $selectedPackage, $mainCourses, $additionalServices,
+                $estimatedTotal, $paymentMethod
+            ]);
+            $reservationId = $candidate;
+        } catch (PDOException $dup) {
+            $driverCode = isset($dup->errorInfo[1]) ? (int) $dup->errorInfo[1] : 0;
+            if ($dup->getCode() === '23000' && $driverCode === 1062) {
+                continue; // ID collision — try a fresh random suffix
+            }
+            throw $dup; // any other failure is a real error
+        }
+    }
+
+    if ($reservationId === '') {
+        throw new RuntimeException('Could not allocate a unique reservation ID after ' . $maxIdAttempts . ' attempts.');
+    }
 
     // Send the confirmation email (thank you + pending staff confirmation ->
     // payment + Booking ID and PIN). Best effort: a mail problem must NEVER

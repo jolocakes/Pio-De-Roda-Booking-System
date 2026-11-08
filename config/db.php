@@ -7,6 +7,11 @@
  * and secure local XAMPP settings.
  */
 
+// T-18: one timezone everywhere. Every page and API loads this file, so this
+// is the single place that decides what "today" means for bookings, calendar
+// ranges and the PDR-YYYY booking year.
+date_default_timezone_set('Asia/Manila');
+
 $host = 'localhost';
 $dbname = 'pdrsystem';
 $username = 'root';
@@ -21,6 +26,14 @@ try {
     ];
     
     $pdo = new PDO($dsn, $username, $password, $options);
+
+    // Keep NOW()/CURRENT_TIMESTAMP aligned with the PHP timezone above so
+    // lockout windows and payment timestamps cannot drift by 8 hours.
+    try {
+        $pdo->exec("SET time_zone = '+08:00'");
+    } catch (Throwable $tzError) {
+        error_log('Could not set MySQL session time_zone: ' . $tzError->getMessage());
+    }
 } catch (PDOException $e) {
     // Log error securely internally in production, display generic message to user
     error_log("Database Connection Error: " . $e->getMessage());

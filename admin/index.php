@@ -25,23 +25,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($username) && !empty($password)) {
         try {
-            $stmt = $pdo->prepare("SELECT * FROM admin_users WHERE username = ?");
-            $stmt->execute([$username]);
-            $admin = $stmt->fetch();
+            require_once __DIR__ . '/../api/login_guard.php';
 
-            if ($admin && password_verify($password, $admin['password_hash'])) {
-                session_regenerate_id(true);
-                $_SESSION['admin_id'] = $admin['id'];
-                $_SESSION['admin_username'] = $admin['username'];
-                $_SESSION['admin_name'] = $admin['full_name'];
-                $_SESSION['admin_role'] = $admin['role'];
-                // Rotate the CSRF token after the privilege level changes.
-                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            // T-17: throttle before touching the password hash. The check is
+            // fail-open (see login_guard.php) so a missing table never locks
+            // the real administrator out.
+            $guard = pdrLoginGuardCheck($pdo, $username);
 
-                header("Location: dashboard.php");
-                exit();
+            if (!$guard['allowed']) {
+                $minutes = max(1, (int) ceil($guard['retryAfter'] / 60));
+                $error = sprintf('Too many failed login attempts. Please try again in about %d minute(s).', $minutes);
+                error_log('Admin login temporarily locked for username=' . $username . ' ip=' . pdrLoginIpHash());
             } else {
-                $error = "Invalid username or password.";
+                // Progressive delay on repeated failures.
+                if ($guard['delay'] > 0) {
+                    sleep($guard['delay']);
+                }
+
+                $stmt = $pdo->prepare("SELECT * FROM admin_users WHERE username = ?");
+                $stmt->execute([$username]);
+                $admin = $stmt->fetch();
+
+                if ($admin && password_verify($password, $admin['password_hash'])) {
+                    pdrLoginGuardRecord($pdo, $username, true);
+                    session_regenerate_id(true);
+                    $_SESSION['admin_id'] = $admin['id'];
+                    $_SESSION['admin_username'] = $admin['username'];
+                    $_SESSION['admin_name'] = $admin['full_name'];
+                    $_SESSION['admin_role'] = $admin['role'];
+                    // Rotate the CSRF token after the privilege level changes.
+                    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+
+                    header("Location: dashboard.php");
+                    exit();
+                } else {
+                    pdrLoginGuardRecord($pdo, $username, false);
+                    $error = "Invalid username or password.";
+                }
             }
         } catch (Exception $e) {
             $error = "An error occurred. Please try again later.";
