@@ -138,7 +138,7 @@ try {
         echo json_encode([
             'ok' => true,
             'mode' => $mode,
-            'message' => "✅ Your message has been sent! We'll get back to you soon."
+            'message' => "Your message has been sent! We'll get back to you soon."
         ]);
     } else {
         echo json_encode([

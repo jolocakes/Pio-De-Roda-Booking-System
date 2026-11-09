@@ -678,9 +678,18 @@
         statusDiv.className = `contact-message-status ${type}`;
         statusDiv.textContent = text;
         
-        // Insert after the form
+        // Insert inside the form, after the submit button
+        // This ensures the message stays visually part of the form
+        // and won't appear confusingly outside or under the form.
         const form = document.getElementById("contactForm");
-        form.parentNode.insertBefore(statusDiv, form.nextSibling);
+        if (form) {
+          // Insert after the button (button is the last child, so this appends to form)
+          form.insertBefore(statusDiv, form.lastElementChild.nextSibling);
+        } else {
+          // Fallback: insert at the end of contact-grid
+          const contactGrid = document.querySelector('#contact .contact-grid');
+          contactGrid.appendChild(statusDiv);
+        }
         
         // Auto-remove after 5 seconds
         setTimeout(() => {
