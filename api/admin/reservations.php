@@ -6,9 +6,66 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../admin/auth_check.php';
+require_once __DIR__ . '/../../config/rbac.php';
+
+pdrRequireApiCapability('view');
 
 try {
-    $stmt = $pdo->query("SELECT * FROM reservations ORDER BY id DESC");
+    // T-28: optional filters + pagination. Without ?page= the endpoint keeps
+    // its original shape (a plain array) because the calendar and other pages
+    // already consume it that way.
+    $where = [];
+    $params = [];
+
+    $q = trim((string) ($_GET['q'] ?? ''));
+    if ($q !== '') {
+        $where[] = '(reservation_id LIKE ? OR customer_name LIKE ? OR main_service LIKE ?)';
+        $params[] = '%' . $q . '%';
+        $params[] = '%' . $q . '%';
+        $params[] = '%' . $q . '%';
+    }
+
+    $status = trim((string) ($_GET['status'] ?? ''));
+    if (in_array($status, ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'Rejected'], true)) {
+        $where[] = 'status = ?';
+        $params[] = $status;
+    }
+
+    $from = trim((string) ($_GET['from'] ?? ''));
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
+        $where[] = 'event_date >= ?';
+        $params[] = $from;
+    }
+    $to = trim((string) ($_GET['to'] ?? ''));
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+        $where[] = 'event_date <= ?';
+        $params[] = $to;
+    }
+
+    $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    $paginate = isset($_GET['page']);
+    $page = max(1, (int) ($_GET['page'] ?? 1));
+    $perPage = (int) ($_GET['per_page'] ?? 25);
+    $perPage = max(1, min(200, $perPage));
+
+    if ($paginate) {
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reservations $whereSql");
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $stmt = $pdo->prepare(
+            "SELECT * FROM reservations $whereSql ORDER BY id DESC LIMIT $perPage OFFSET $offset"
+        );
+        $stmt->execute($params);
+    } else {
+        $stmt = $pdo->prepare("SELECT * FROM reservations $whereSql ORDER BY id DESC");
+        $stmt->execute($params);
+    }
+
     $rows = $stmt->fetchAll();
 
     $reservations = [];
@@ -35,8 +92,23 @@ try {
         ];
     }
 
+    if ($paginate) {
+        echo json_encode([
+            'ok' => true,
+            'reservations' => $reservations,
+            'meta' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $total,
+                'totalPages' => $totalPages,
+            ],
+        ]);
+        exit();
+    }
+
     echo json_encode($reservations);
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    error_log('Admin reservations API error: ' . $e->getMessage());
+    echo json_encode(['error' => 'SERVER_ERROR']);
 }

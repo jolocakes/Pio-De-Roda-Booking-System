@@ -1,4 +1,7 @@
-<?php require_once __DIR__ . '/auth_check.php'; ?>
+<?php
+require_once __DIR__ . '/auth_check.php';
+pdrRequirePageCapability('manage_catalog');
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -200,6 +203,9 @@
                 </li>
                 <li class="nav-item">
                     <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
+                    <?php if (pdrCan('manage_staff')): ?>
+                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                    <?php endif; ?>
                 </li>
             </ul>
         </div>
@@ -318,8 +324,9 @@
 
         const REASON_TEXT = {
             UNAUTHORIZED: 'Your session expired. Please log in again.',
-            INVALID_CSRF_TOKEN: 'Your session token expired — reload the page and try again.',
+            INVALID_CSRF_TOKEN: 'Your session token expired â€” reload the page and try again.',
             INVALID_NAME: 'Service name is required (maximum 100 characters).',
+            DUPLICATE_NAME: 'Another service already uses that name.',
             INVALID_DESCRIPTION: 'The description is too long.',
             INVALID_BASE_PRICE: 'Enter a valid base price (0 or higher).',
             INVALID_PER_HEAD: 'Enter a valid per-head rate (0 or higher) or leave it blank.',
@@ -356,8 +363,8 @@
 
         function fmtPeso(value) {
             const n = Number(value);
-            if (!Number.isFinite(n)) return '₱0';
-            return '₱' + n.toLocaleString('en-US');
+            if (!Number.isFinite(n)) return 'â‚±0';
+            return 'â‚±' + n.toLocaleString('en-US');
         }
 
         function splitLines(text) {
@@ -493,7 +500,7 @@
             return `
                 <div class="rate-row">
                     <input type="text" class="rate-label" maxlength="80" placeholder="Label (e.g. Classic Package)" value="${label}">
-                    <input type="text" class="rate-value" maxlength="80" placeholder="Value (e.g. ₱7,250)" value="${value}">
+                    <input type="text" class="rate-value" maxlength="80" placeholder="Value (e.g. â‚±7,250)" value="${value}">
                     <button type="button" class="rate-remove" data-action="remove-rate" aria-label="Remove rate row">&times;</button>
                 </div>`;
         }
@@ -523,17 +530,23 @@
                                 </label>
                             </div>
                             <div class="form-grid">
-                                <label>Base price (₱)
+                                <label>Base price (â‚±)
                                     <input type="number" name="base_price" min="0" step="0.01" value="${svc.base_price === null ? '' : esc(svc.base_price)}">
                                 </label>
                                 <label>Price display
                                     <input type="text" name="price_display" maxlength="50" value="${esc(svc.price_display || '')}">
                                 </label>
-                                <label>Per-head rate (₱)
+                                <label>Per-head rate (â‚±)
                                     <input type="number" name="per_head" min="0" step="0.01" value="${svc.per_head === null ? '' : esc(svc.per_head)}">
                                 </label>
                                 <label>Max capacity
                                     <input type="number" name="max_cap" min="1" step="1" value="${svc.max_cap === null ? '' : esc(svc.max_cap)}">
+                                </label>
+                                <label>Date exclusivity
+                                    <span class="exclusive-toggle" style="display:flex;gap:8px;align-items:center;font-weight:400;">
+                                        <input type="checkbox" name="is_exclusive" ${svc.is_exclusive ? 'checked' : ''}>
+                                        One booking closes the whole date
+                                    </span>
                                 </label>
                             </div>
                             <p class="hint">The price display is the &ldquo;starting price&rdquo; text customers see. It follows the base price unless you type custom text.</p>
@@ -655,7 +668,7 @@
                                 <label>Package code (optional)
                                     <input type="text" name="package_code" maxlength="100" placeholder="auto-generated from name" value="${esc(isNew ? '' : pkg.package_code)}">
                                 </label>
-                                <label>Price (₱)
+                                <label>Price (â‚±)
                                     <input type="number" name="price" min="0" step="0.01" required value="${isNew ? '' : esc(pkg.price)}">
                                 </label>
                                 <label>Max capacity (optional)
@@ -818,7 +831,7 @@
                                 <label class="linked-field" style="${mode === 'linked' ? '' : 'display:none'}">Linked service
                                     <select name="price_from">${serviceOptions}</select>
                                 </label>
-                                <label class="fixed-field" style="${mode === 'fixed' ? '' : 'display:none'}">Fixed price (₱)
+                                <label class="fixed-field" style="${mode === 'fixed' ? '' : 'display:none'}">Fixed price (â‚±)
                                     <input type="number" name="fixed_price" min="0" step="0.01" value="${isNew || addon.fixed_price === null ? '' : esc(addon.fixed_price)}">
                                 </label>
                             </div>
@@ -910,8 +923,8 @@
                 if (raw === '' || !Number.isFinite(Number(raw))) return;
                 const amount = fmtPeso(Number(raw));
                 const current = display.value.trim();
-                display.value = current.indexOf('₱') !== -1
-                    ? current.replace(/₱\s*[\d,]+(?:\.\d+)?/, amount)
+                display.value = current.indexOf('â‚±') !== -1
+                    ? current.replace(/â‚±\s*[\d,]+(?:\.\d+)?/, amount)
                     : amount;
             });
 
@@ -935,6 +948,7 @@
                     price_display: String(formData.get('price_display') || '').trim(),
                     per_head: String(formData.get('per_head') || '').trim() === '' ? null : Number(formData.get('per_head')),
                     max_cap: String(formData.get('max_cap') || '').trim() === '' ? null : parseInt(formData.get('max_cap'), 10),
+                    is_exclusive: form.querySelector('[name="is_exclusive"]').checked ? 1 : 0,
                     customer_display: {
                         rates: rates,
                         notes: splitLines(formData.get('notes')),

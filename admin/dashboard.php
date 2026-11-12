@@ -7,7 +7,7 @@ function h($value) {
 }
 
 function formatPeso($amount) {
-    return '₱' . number_format((float) $amount, 2);
+    return 'â‚±' . number_format((float) $amount, 2);
 }
 
 function formatEventTime($time) {
@@ -51,6 +51,11 @@ $weekSeries = [
 $serviceLabels = [];
 $serviceCounts = [];
 $serviceColors = [];
+
+// T-42: dashboard alerts.
+$stalePendingCount = 0;
+$next7DaysCount = 0;
+$paymentsForReviewCount = 0;
 
 try {
     $statusStmt = $pdo->query("SELECT status, COUNT(*) AS total FROM reservations GROUP BY status");
@@ -110,6 +115,38 @@ try {
     );
     $stmt->execute();
     $recentReservations = $stmt->fetchAll();
+
+    // T-42: actionable notifications. Each query is guarded so an older schema
+    // (e.g. before the payments review status) never breaks the dashboard.
+    try {
+        $staleStmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM reservations
+              WHERE status = 'Pending' AND submitted_at < ?"
+        );
+        $staleStmt->execute([date('Y-m-d H:i:s', time() - 86400)]);
+        $stalePendingCount = (int) $staleStmt->fetchColumn();
+    } catch (Throwable $e) {
+        $stalePendingCount = 0;
+    }
+
+    try {
+        $nextStmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM reservations
+              WHERE status IN ('Pending', 'Confirmed')
+                AND event_date BETWEEN ? AND ?"
+        );
+        $nextStmt->execute([$today, date('Y-m-d', strtotime('+7 days'))]);
+        $next7DaysCount = (int) $nextStmt->fetchColumn();
+    } catch (Throwable $e) {
+        $next7DaysCount = 0;
+    }
+
+    try {
+        $reviewStmt = $pdo->query("SELECT COUNT(*) FROM payments WHERE status = 'For Review'");
+        $paymentsForReviewCount = (int) $reviewStmt->fetchColumn();
+    } catch (Throwable $e) {
+        $paymentsForReviewCount = 0;
+    }
 
     // Reservations overview: current week, Monday through Sunday.
     $weekStart = new DateTimeImmutable('today');
@@ -233,7 +270,7 @@ $metrics = [
     ],
     [
         'title' => 'Most Reserved Service',
-        'value' => $topService !== '' ? $topService : '—',
+        'value' => $topService !== '' ? $topService : 'â€”',
         'sub' => '(' . number_format($topServiceCount) . ' ' . ($topServiceCount === 1 ? 'reservation' : 'reservations') . ')',
         'icon' => 'fa-star',
         'bg' => '#f3e8ff',
@@ -449,6 +486,9 @@ $serviceChart = [
 
                 <li class="nav-item">
                     <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
+                    <?php if (pdrCan('manage_staff')): ?>
+                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                    <?php endif; ?>
                 </li>
             </ul>
         </div>
@@ -480,6 +520,12 @@ $serviceChart = [
         </header>
 
         <div class="content-body">
+            <?php if (isset($_GET['denied'])): ?>
+                <div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #b91c1c;color:#991b1b;border-radius:8px;padding:12px 15px;margin-bottom:16px;font-size:14px;">
+                    <i class="fa-solid fa-lock"></i>
+                    Your role does not have access to that page.
+                </div>
+            <?php endif; ?>
             <div class="welcome-header">
                 <div>
                     <h2>Welcome back, <?php echo h($admin_name); ?>!</h2>
@@ -490,6 +536,56 @@ $serviceChart = [
                      <span><i class="fa-regular fa-clock"></i> <span id="live-time"><?php echo $current_time; ?></span></span>
                 </div>   
             </div>
+
+            <?php
+            // T-42: actionable alerts. Only shown when there is something to do.
+            $alerts = [];
+            if ($stalePendingCount > 0) {
+                $alerts[] = [
+                    'icon' => 'fa-hourglass-half',
+                    'tone' => '#b45309',
+                    'bg' => '#fef3c7',
+                    'text' => $stalePendingCount . ' pending reservation' . ($stalePendingCount === 1 ? ' has' : 's have') . ' been waiting over 24 hours.',
+                    'label' => 'Review pending',
+                    'href' => 'reservation.php?status=Pending',
+                ];
+            }
+            if ($next7DaysCount > 0) {
+                $alerts[] = [
+                    'icon' => 'fa-calendar-day',
+                    'tone' => '#1d4ed8',
+                    'bg' => '#dbeafe',
+                    'text' => $next7DaysCount . ' event' . ($next7DaysCount === 1 ? '' : 's') . ' scheduled in the next 7 days.',
+                    'label' => 'Open calendar',
+                    'href' => 'calendar.php',
+                ];
+            }
+            if ($paymentsForReviewCount > 0) {
+                $alerts[] = [
+                    'icon' => 'fa-receipt',
+                    'tone' => '#9d174d',
+                    'bg' => '#fce7f3',
+                    'text' => $paymentsForReviewCount . ' payment' . ($paymentsForReviewCount === 1 ? '' : 's') . ' waiting for review.',
+                    'label' => 'Review payments',
+                    'href' => 'payment.php',
+                ];
+            }
+            ?>
+            <?php if ($alerts): ?>
+                <div class="alert-stack" style="display:grid;gap:10px;margin:0 0 18px;">
+                    <?php foreach ($alerts as $alert): ?>
+                        <div style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e2e8f0;border-left:4px solid <?php echo h($alert['tone']); ?>;border-radius:8px;padding:12px 14px;">
+                            <span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:<?php echo h($alert['bg']); ?>;color:<?php echo h($alert['tone']); ?>;flex:0 0 auto;">
+                                <i class="fa-solid <?php echo h($alert['icon']); ?>"></i>
+                            </span>
+                            <span style="flex:1;font-size:14px;color:#2d3748;"><?php echo h($alert['text']); ?></span>
+                            <a href="<?php echo h($alert['href']); ?>" style="font-size:13px;font-weight:600;color:<?php echo h($alert['tone']); ?>;text-decoration:none;white-space:nowrap;">
+                                <?php echo h($alert['label']); ?> &rarr;
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
 
             <div class="metrics-grid">
                 <?php foreach($metrics as $item): ?>
@@ -547,8 +643,8 @@ $serviceChart = [
                             <?php foreach ($upcomingEventsList as $event): ?>
                                 <?php
                                     $eventTimestamp = strtotime($event['event_date']);
-                                    $eventDay = $eventTimestamp ? date('j', $eventTimestamp) : '—';
-                                    $eventMonth = $eventTimestamp ? strtoupper(date('M', $eventTimestamp)) : '—';
+                                    $eventDay = $eventTimestamp ? date('j', $eventTimestamp) : 'â€”';
+                                    $eventMonth = $eventTimestamp ? strtoupper(date('M', $eventTimestamp)) : 'â€”';
                                     $eventTitle = $event['event_type'] ?: $event['main_service'];
                                     $eventStatusClass = strtolower((string) $event['status']);
                                 ?>
@@ -606,7 +702,7 @@ $serviceChart = [
                                                 <?php echo h($row['status']); ?>
                                             </span>
                                         </td>
-                                        <td><?php echo h($row['payment_method'] ?: '—'); ?></td>
+                                        <td><?php echo h($row['payment_method'] ?: 'â€”'); ?></td>
                                         <td><?php echo h(formatPeso($row['estimated_total'])); ?></td>
                                     </tr>
                                 <?php endforeach; ?>

@@ -1,3 +1,8 @@
+-- DEPRECATED: kept for older setup instructions. The canonical, idempotent
+-- version is database/migrations/002_xendit_payments.sql, applied by
+-- `php database/migrate.php`. This file is still safe to run because
+-- run_xendit_migration.php skips duplicate columns/keys.
+--
 -- Xendit test-payment support for Pio De Roda booking system
 -- Run once against the `pdrsystem` database (phpMyAdmin / MySQL client).
 -- Back up your database before running (see database/*.sql backups).

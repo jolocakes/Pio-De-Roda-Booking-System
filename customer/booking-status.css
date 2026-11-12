@@ -227,3 +227,76 @@ button.bs-clear {
   cursor: pointer;
 }
 button.bs-clear:hover { border-color: var(--gold-light); color: var(--maroon); }
+/* ===== T-33: post-stay review form ===== */
+.bs-review {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border-soft);
+  display: grid;
+  gap: 0.55rem;
+}
+.bs-review label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--crimson);
+}
+.bs-review select,
+.bs-review textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--maroon);
+  background: #fff;
+  border: 1.5px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+}
+.bs-review textarea { resize: vertical; min-height: 96px; }
+.bs-review select:focus,
+.bs-review textarea:focus { outline: 2px solid var(--gold-light); outline-offset: 1px; }
+.bs-review button.btn { margin-top: 0.3rem; }
+
+/* ===== T-37: customer self-service (cancel / reschedule) ===== */
+.bs-manage {
+  margin-top: 1.15rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border-soft);
+  display: grid;
+  gap: 0.55rem;
+}
+.bs-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.bs-manage form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fffdf8;
+}
+.bs-manage label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--crimson);
+}
+.bs-manage input[type="date"],
+.bs-manage input[type="time"] {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--maroon);
+  background: #fff;
+  border: 1.5px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+.bs-manage input:focus { outline: 2px solid var(--gold-light); outline-offset: 1px; }

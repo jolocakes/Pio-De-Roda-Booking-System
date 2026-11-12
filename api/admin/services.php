@@ -23,6 +23,8 @@
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../config/audit.php';
+require_once __DIR__ . '/../../config/rbac.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -40,6 +42,8 @@ if (empty($_SESSION['csrf_token'])) {
 }
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+pdrRequireApiCapability($method === 'GET' ? 'view' : 'manage_catalog');
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -227,6 +231,7 @@ try {
                 'per_head' => $svc['per_head'] === null ? null : (float)$svc['per_head'],
                 'per_head_by_pkg' => (bool)$svc['per_head_by_pkg'],
                 'max_cap' => $svc['max_cap'] === null ? null : (int)$svc['max_cap'],
+                'is_exclusive' => (bool)($svc['is_exclusive'] ?? false),
                 'description' => $svc['description'],
                 'inclusions' => pdrDecodeJsonArray($svc['inclusions'] ?? null),
                 'guidelines' => pdrDecodeJsonArray($svc['guidelines'] ?? null),
@@ -276,6 +281,13 @@ try {
             $value = is_string($data['name']) ? trim($data['name']) : '';
             if ($value === '' || mb_strlen($value) > 100) {
                 pdrFail('INVALID_NAME');
+            }
+            // Names are used to resolve the service during admin reschedules
+            // (T-13), so they must stay unambiguous.
+            $dupName = $pdo->prepare('SELECT 1 FROM services WHERE name = ? AND id <> ? LIMIT 1');
+            $dupName->execute([$value, $serviceId]);
+            if ($dupName->fetchColumn()) {
+                pdrFail('DUPLICATE_NAME');
             }
             $set[] = 'name = ?';
             $params[] = $value;
@@ -357,6 +369,11 @@ try {
             $params[] = empty($data['is_active']) ? 0 : 1;
         }
 
+        if (array_key_exists('is_exclusive', $data)) {
+            $set[] = 'is_exclusive = ?';
+            $params[] = empty($data['is_exclusive']) ? 0 : 1;
+        }
+
         if (array_key_exists('sort_order', $data)) {
             if (!is_numeric($data['sort_order']) || (int)$data['sort_order'] < 0) {
                 pdrFail('INVALID_SORT_ORDER');
@@ -393,6 +410,10 @@ try {
         $update = $pdo->prepare('UPDATE services SET ' . implode(', ', $set) . ' WHERE id = ?');
         $update->execute($params);
 
+        pdrAudit($pdo, 'service.update', 'service', $serviceId, [
+            'fields' => array_keys($data),
+        ]);
+
         pdrJsonOut(['ok' => true, 'id' => $serviceId]);
     }
 
@@ -414,6 +435,7 @@ try {
             }
             $stmt = $pdo->prepare('UPDATE services SET is_active = ? WHERE id = ?');
             $stmt->execute([$active, $serviceId]);
+            pdrAudit($pdo, 'service.set_active', 'service', $serviceId, ['is_active' => $active]);
             pdrJsonOut(['ok' => true, 'kind' => $kind, 'id' => $serviceId, 'is_active' => $active]);
         }
         if ($kind === 'package' || $kind === 'menu') {
@@ -429,6 +451,7 @@ try {
             }
             $stmt = $pdo->prepare("UPDATE {$table} SET is_active = ? WHERE id = ?");
             $stmt->execute([$active, $numericId]);
+            pdrAudit($pdo, 'catalog.set_active', $kind, (string) $numericId, ['is_active' => $active]);
             pdrJsonOut(['ok' => true, 'kind' => $kind, 'id' => $numericId, 'is_active' => $active]);
         }
         if ($kind === 'addon') {
@@ -440,6 +463,7 @@ try {
             }
             $stmt = $pdo->prepare('UPDATE service_addons SET is_active = ? WHERE id = ?');
             $stmt->execute([$active, $addonId]);
+            pdrAudit($pdo, 'addon.set_active', 'addon', $addonId, ['is_active' => $active]);
             pdrJsonOut(['ok' => true, 'kind' => $kind, 'id' => $addonId, 'is_active' => $active]);
         }
         pdrFail('UNKNOWN_KIND');
@@ -536,6 +560,11 @@ try {
                   WHERE id = ?'
             );
             $stmt->execute([$code, $name, (float)$priceRaw, $maxCap, $isActive, $sortOrder, $packageId]);
+            pdrAudit($pdo, 'package.update', 'service_package', (string) $packageId, [
+                'service_id' => $serviceId,
+                'name' => $name,
+                'is_active' => $isActive,
+            ]);
             pdrJsonOut(['ok' => true, 'id' => $packageId]);
         }
 
@@ -544,7 +573,12 @@ try {
              VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([$serviceId, $code, $name, (float)$priceRaw, $maxCap, $isActive, $sortOrder]);
-        pdrJsonOut(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
+        $newPackageId = (int) $pdo->lastInsertId();
+        pdrAudit($pdo, 'package.create', 'service_package', (string) $newPackageId, [
+            'service_id' => $serviceId,
+            'name' => $name,
+        ]);
+        pdrJsonOut(['ok' => true, 'id' => $newPackageId]);
     }
 
     if ($action === 'menu_save') {
@@ -644,6 +678,11 @@ try {
                   WHERE id = ?'
             );
             $stmt->execute([$code, $categoryName, $itemName, $price, $dishesJson, $isActive, $menuId]);
+            pdrAudit($pdo, 'menu.update', 'service_menu', (string) $menuId, [
+                'service_id' => $serviceId,
+                'item_name' => $itemName,
+                'is_active' => $isActive,
+            ]);
             pdrJsonOut(['ok' => true, 'id' => $menuId]);
         }
 
@@ -652,7 +691,12 @@ try {
              VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([$serviceId, $code, $categoryName, $itemName, $price, $dishesJson, $isActive]);
-        pdrJsonOut(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
+        $newMenuId = (int) $pdo->lastInsertId();
+        pdrAudit($pdo, 'menu.create', 'service_menu', (string) $newMenuId, [
+            'service_id' => $serviceId,
+            'item_name' => $itemName,
+        ]);
+        pdrJsonOut(['ok' => true, 'id' => $newMenuId]);
     }
 
     if ($action === 'addon_save') {
@@ -734,6 +778,11 @@ try {
                   WHERE id = ?'
             );
             $stmt->execute([$name, $descriptionValue, $priceFrom === '' ? null : $priceFrom, $fixedPrice, $allowQty, $isActive, $addonId]);
+            pdrAudit($pdo, 'addon.update', 'addon', $addonId, [
+                'service_id' => $serviceId,
+                'name' => $name,
+                'is_active' => $isActive,
+            ]);
             pdrJsonOut(['ok' => true, 'id' => $addonId]);
         }
 
@@ -742,6 +791,11 @@ try {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([$addonId, $serviceId, $name, $descriptionValue, $priceFrom === '' ? null : $priceFrom, $fixedPrice, $allowQty, $isActive]);
+        pdrAudit($pdo, 'addon.create', 'addon', $addonId, [
+            'service_id' => $serviceId,
+            'name' => $name,
+            'is_active' => $isActive,
+        ]);
         pdrJsonOut(['ok' => true, 'id' => $addonId]);
     }
 

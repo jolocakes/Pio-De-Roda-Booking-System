@@ -4,9 +4,10 @@
  *
  * Policy (rolling 15-minute window, per IP and per username):
  *   - 5 failed attempts from one IP          -> IP temporarily locked.
- *   - 10 failed attempts against one account -> account temporarily locked.
+ *   - 15 failed attempts against one account -> account temporarily locked.
  *   - Progressive delay before password_verify() from the 3rd failure on
- *     (1s, 2s, 4s, then 8s max) so scripted guessing gets expensive.
+ *     (1s, 2s, then 3s max) so scripted guessing gets expensive without
+ *     tying up a web worker for long.
  *
  * A successful login resets the effective counters because only failures that
  * happened AFTER the latest success are counted. The table doubles as an audit
@@ -14,6 +15,10 @@
  *
  * Fail-open: if the table is missing (migration not run), login still works —
  * a logging outage must not lock the administrator out of their own site.
+ *
+ * Residual risk: a global per-account lockout can be abused to deny the real
+ * administrator access for up to 15 minutes. The threshold is deliberately
+ * high (15) and the attempt is recorded in error_log so it is noticeable.
  */
 
 require_once __DIR__ . '/../config/env.php';
@@ -21,7 +26,7 @@ require_once __DIR__ . '/../config/env.php';
 if (!defined('PDR_LOGIN_WINDOW_SECONDS')) {
     define('PDR_LOGIN_WINDOW_SECONDS', 15 * 60);
     define('PDR_LOGIN_IP_MAX_FAILURES', 5);
-    define('PDR_LOGIN_ACCOUNT_MAX_FAILURES', 10);
+    define('PDR_LOGIN_ACCOUNT_MAX_FAILURES', 15);
 }
 
 function pdrLoginIpHash(): string
@@ -87,10 +92,10 @@ function pdrLoginGuardCheck(PDO $pdo, string $username): array
             return $result;
         }
 
-        // Exponential backoff: 0, 0, 0, 1s, 2s, 4s, 8s...
+        // Exponential backoff: 0, 0, 0, 1s, 2s, 3s, 3s...
         $count = max($ipFailures, $accountFailures);
         if ($count >= 3) {
-            $result['delay'] = min(8, 1 << ($count - 3));
+            $result['delay'] = min(3, 1 << ($count - 3));
         }
     } catch (Throwable $e) {
         error_log('Login guard check failed (failing open): ' . $e->getMessage());

@@ -6,6 +6,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/lookup_guard.php';
+require_once __DIR__ . '/capacity.php';
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
@@ -46,6 +47,12 @@ try {
     $at = strpos($email, '@');
     $emailMasked = $at === false ? '••••' : substr($email, 0, 1) . '***' . substr($email, $at);
 
+    // T-37: expose the self-service policy so the page never has to hardcode
+    // the windows. The server re-checks every rule on submit anyway.
+    $daysUntilEvent = pdrDaysUntilDate((string) $res['event_date']);
+    $rescheduleCount = (int) ($res['reschedule_count'] ?? 0);
+    $changeable = in_array((string) $res['status'], ['Pending', 'Confirmed'], true);
+
     $customerView = [
         'reservationId' => $res['reservation_id'],
         'status' => $res['status'],
@@ -63,7 +70,16 @@ try {
         'selectedPackage' => $res['selected_package'],
         'mainCourses' => $res['main_courses'] ? json_decode($res['main_courses'], true) : [],
         'additionalServices' => $res['additional_services'] ? json_decode($res['additional_services'], true) : [],
-        'estimatedTotal' => '₱' . number_format($res['estimated_total'], 2)
+        'estimatedTotal' => '₱' . number_format($res['estimated_total'], 2),
+        'daysUntilEvent' => $daysUntilEvent,
+        'rescheduleCount' => $rescheduleCount,
+        'maxReschedules' => PDR_MAX_RESCHEDULES,
+        'cancelMinDays' => PDR_CANCEL_MIN_DAYS,
+        'rescheduleMinDays' => PDR_RESCHEDULE_MIN_DAYS,
+        'canCancel' => $changeable && $daysUntilEvent >= PDR_CANCEL_MIN_DAYS,
+        'canReschedule' => $changeable
+            && $daysUntilEvent >= PDR_RESCHEDULE_MIN_DAYS
+            && $rescheduleCount < PDR_MAX_RESCHEDULES,
     ];
 
     echo json_encode(['ok' => true, 'reservation' => $customerView]);

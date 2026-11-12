@@ -12,6 +12,24 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
 require_once __DIR__ . '/rate_limit.php';
+require_once __DIR__ . '/../config/captcha.php';
+
+// Read the body once: php://input is a stream and must not be re-read.
+$raw = @file_get_contents('php://input');
+$data = @json_decode($raw, true);
+$isJson = is_array($data);
+
+// T-32 honeypot: the hidden "company" field must stay empty. Report a normal
+// success to the bot, but send no mail and consume no rate-limit budget.
+$honeypot = $isJson ? ($data['company'] ?? '') : ($_POST['company'] ?? '');
+if (is_string($honeypot) && trim($honeypot) !== '') {
+    echo json_encode([
+        'ok' => true,
+        'mode' => 'ignored',
+        'message' => "Your message has been sent! We'll get back to you soon.",
+    ]);
+    exit();
+}
 
 // 5 submissions per 15 minutes per IP. The form is public and each accepted
 // submission sends a real email, so it is a spam/relay amplifier if unthrottled.
@@ -35,11 +53,7 @@ try {
     $email = ''; // Visitor's email
     $message = '';
 
-    // Get data from JSON (fetch AJAX) or POST
-    $raw = @file_get_contents('php://input');
-    $data = @json_decode($raw, true);
-
-    if ($data !== false && is_array($data)) {
+    if ($isJson) {
         $name = $data['name'] ?? '';
         $email = $data['email'] ?? '';
         $message = $data['message'] ?? '';
@@ -50,6 +64,18 @@ try {
         $name = $_POST['name'] ?? '';
         $email = $_POST['email'] ?? '';
         $message = $_POST['message'] ?? '';
+    }
+
+    // Optional Turnstile token (the contact form only sends one when a widget
+    // is present). When configured, a supplied-but-invalid token is rejected.
+    $captchaToken = $isJson ? ($data['turnstileToken'] ?? '') : ($_POST['turnstileToken'] ?? '');
+    if (is_string($captchaToken) && trim($captchaToken) !== '') {
+        $captcha = pdrVerifyCaptcha($captchaToken, pdrCaptchaClientIp(), 'contact');
+        if (!$captcha['ok']) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Please complete the human verification and try again.']);
+            exit();
+        }
     }
 
     // Coerce to strings and cap sizes so a huge payload cannot be mailed out.

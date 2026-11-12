@@ -45,6 +45,20 @@ function pdrStatusEmailFor(string $status, array $r): ?array
             ],
             'note'    => 'If you already made a payment, please contact us so we can advise on the refund process.',
         ],
+        // T-25: a rejection is a venue decision, not a customer cancellation.
+        // The wording is deliberately distinct so the customer is not told they
+        // cancelled something they did not.
+        'Rejected' => [
+            'subject' => 'Reservation NOT APPROVED — Booking ID %s | Pio De Roda',
+            'heading' => 'We could not approve your reservation',
+            'badge'   => 'NOT APPROVED',
+            'lead'    => 'Our staff reviewed your reservation and unfortunately could not approve it. The requested date has been released.',
+            'steps'   => [
+                'Contact us so we can suggest another date or an alternative arrangement.',
+                'You are welcome to submit a new reservation for a different date.',
+            ],
+            'note'    => 'If you already made a payment, please contact us so we can advise on the refund process.',
+        ],
         'Completed' => [
             'subject' => 'Thank you for visiting — Booking ID %s | Pio De Roda',
             'heading' => 'Thank you for visiting Pio De Roda',
@@ -178,7 +192,7 @@ HTML;
 function pdrDispatchStatusEmail(PDO $pdo, string $reservationId, string $status): array
 {
     try {
-        if (!in_array($status, ['Confirmed', 'Cancelled', 'Completed'], true)) {
+        if (!in_array($status, ['Confirmed', 'Cancelled', 'Rejected', 'Completed'], true)) {
             return ['ok' => false, 'mode' => 'none', 'error' => 'no template for status'];
         }
 

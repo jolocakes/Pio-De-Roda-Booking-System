@@ -14,9 +14,6 @@
 
   // sessionStorage key holding {id, pin} of the reservation verified on THIS tab.
   const CTX_KEY = "pdr_verified_booking";
-  // Prototype storage key of the BACKEND AREA in services.js — used only to
-  // know WHEN to re-read the reservation (Admin may have changed the status).
-  const RESERVATIONS_KEY = "pdr_reservations";
 
   // One entry per status. The page uses ONE template and fills it from here,
   // so adding a status later (e.g. "Cancelled") means adding one entry.
@@ -32,7 +29,15 @@
     Cancelled:  { cls:"status-cancelled", label:"CANCELLED", sub:"Reservation Cancelled",
                  heading:"Your reservation was cancelled",
                  message:"This reservation has been cancelled. Please contact Pio De Roda Cafe and Restaurant if you believe this is a mistake.",
-                 full:"Cancelled" }
+                 full:"Cancelled" },
+    Rejected:   { cls:"status-cancelled", label:"NOT APPROVED", sub:"Reservation Not Approved",
+                 heading:"We could not approve your reservation",
+                 message:"Our staff reviewed this reservation and could not approve it. Please contact us to arrange another date.",
+                 full:"Not Approved" },
+    Completed:  { cls:"status-confirmed", label:"COMPLETED", sub:"Event Completed",
+                 heading:"Thank you for visiting!",
+                 message:"This event is complete. We would love to hear about your experience.",
+                 full:"Completed" }
   };
 
   const root = document.getElementById("bookingStatusRoot");
@@ -129,6 +134,52 @@
           ${confirmed
             ? `<a class="btn btn-primary bs-pay-btn" id="proceedToPaymentBtn" href="payment/payment.html?id=${encodeURIComponent(reservation.reservationId)}">Proceed to Payment</a>`
             : `<p class="bs-note" id="paymentNote">Payment becomes available once Pio De Roda staff confirm your reservation. Please check back later.</p>`}
+
+          ${reservation.status === "Completed" ? `
+          <div class="bs-review" id="reviewBox">
+            <p class="bs-kicker">TELL US ABOUT YOUR EXPERIENCE</p>
+            <form id="reviewForm" novalidate>
+              <label for="reviewRating">Rating</label>
+              <select id="reviewRating" required>
+                <option value="5">★★★★★ &nbsp;Excellent</option>
+                <option value="4">★★★★☆ &nbsp;Very good</option>
+                <option value="3">★★★☆☆ &nbsp;Good</option>
+                <option value="2">★★☆☆☆ &nbsp;Fair</option>
+                <option value="1">★☆☆☆☆ &nbsp;Poor</option>
+              </select>
+              <label for="reviewFeedback">Your feedback</label>
+              <textarea id="reviewFeedback" rows="4" maxlength="2000"
+                placeholder="What did you enjoy? What could we improve?" required></textarea>
+              <button type="submit" class="btn btn-primary" id="reviewSubmitBtn">Submit Review</button>
+              <p class="bs-note" id="reviewMessage" role="status" aria-live="polite"></p>
+            </form>
+          </div>` : ""}
+          ${(reservation.canCancel || reservation.canReschedule) ? `
+          <div class="bs-manage" id="manageBooking">
+            <p class="bs-kicker">MANAGE BOOKING</p>
+            <p class="bs-note">
+              Cancel at least ${esc(String(reservation.cancelMinDays))} days before the event, or
+              reschedule at least ${esc(String(reservation.rescheduleMinDays))} days before
+              (${esc(String(reservation.maxReschedules))} reschedule per booking).
+            </p>
+            <div class="bs-manage-actions">
+              ${reservation.canReschedule ? `<button type="button" class="btn btn-primary" id="openRescheduleBtn">Reschedule</button>` : ""}
+              ${reservation.canCancel ? `<button type="button" class="bs-clear" id="cancelBookingBtn">Cancel booking</button>` : ""}
+            </div>
+            ${reservation.canReschedule ? `
+            <form id="rescheduleForm" hidden novalidate>
+              <label for="rescheduleDate">New event date</label>
+              <input type="date" id="rescheduleDate" required>
+              <label for="rescheduleTime">New event time</label>
+              <input type="time" id="rescheduleTime" required value="${esc(String(reservation.eventTime || "").slice(0,5))}">
+              <div class="bs-manage-actions">
+                <button type="submit" class="btn btn-primary" id="rescheduleSubmitBtn">Confirm new date</button>
+                <button type="button" class="bs-clear" id="rescheduleCancelBtn">Keep current date</button>
+              </div>
+            </form>` : ""}
+            <p class="bs-note" id="manageMessage" role="status" aria-live="polite"></p>
+          </div>` : ""}
+
           <p class="bs-note">This page shows the latest status saved for your reservation. Only Pio De Roda staff can confirm a reservation.</p>
           <button type="button" class="bs-clear" id="clearBtn">Clear</button>
         </article>
@@ -178,6 +229,178 @@
       showVerifyForm();
       verifyCard.scrollIntoView({behavior:"smooth", block:"center"});
     };
+
+    // T-33: review form (Completed bookings only). The ID + PIN already
+    // verified for this page are sent along so the server can re-check them.
+    const reviewForm = document.getElementById("reviewForm");
+    if(reviewForm){
+      reviewForm.onsubmit = async (ev)=>{
+        ev.preventDefault();
+        const msg = document.getElementById("reviewMessage");
+        const btn = document.getElementById("reviewSubmitBtn");
+        const rating = parseInt(document.getElementById("reviewRating").value, 10);
+        const feedback = document.getElementById("reviewFeedback").value.trim();
+        const ctx = readCtx();
+
+        if(!ctx){ msg.textContent = "Please verify your booking again."; return; }
+        if(!feedback){ msg.textContent = "Please write a short feedback message."; return; }
+
+        btn.disabled = true;
+        btn.textContent = "Submitting…";
+        try{
+          const res = await fetch(`${API_BASE_URL}/submit_review.php`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              reservationId: ctx.id,
+              bookingPin: ctx.pin,
+              rating: rating,
+              feedback: feedback
+            })
+          });
+          const data = await res.json().catch(()=>({}));
+
+          if(res.ok && data.ok){
+            msg.textContent = "Thank you! Your review was submitted and will appear after staff review.";
+            reviewForm.reset();
+            btn.textContent = "Review submitted";
+            return;
+          }
+
+          const errors = {
+            ALREADY_SUBMITTED: "You have already submitted a review for this booking.",
+            NOT_COMPLETED: "Reviews can be submitted once the event is completed.",
+            TOO_MANY_ATTEMPTS: "Too many attempts. Please wait a few minutes and try again.",
+            NOT_FOUND: "We could not verify this booking. Please check your details."
+          };
+          msg.textContent = errors[data.reason] || "Could not submit your review. Please try again.";
+          btn.disabled = false;
+          btn.textContent = "Submit Review";
+        }catch(err){
+          msg.textContent = "Network error. Please try again.";
+          btn.disabled = false;
+          btn.textContent = "Submit Review";
+        }
+      };
+    }
+
+    // T-37: self-service cancel / reschedule. The ID + PIN stored for this tab
+    // are re-sent, and the server re-checks the policy windows and capacity.
+    const manageMessage = document.getElementById("manageMessage");
+    const cancelBtn = document.getElementById("cancelBookingBtn");
+    const openRescheduleBtn = document.getElementById("openRescheduleBtn");
+    const rescheduleForm = document.getElementById("rescheduleForm");
+    const rescheduleCancelBtn = document.getElementById("rescheduleCancelBtn");
+
+    function manageError(data){
+      const errors = {
+        TOO_LATE_TO_CANCEL: "It is too late to cancel online. Please contact Pio De Roda Cafe directly.",
+        TOO_LATE_TO_RESCHEDULE: "It is too late to reschedule online. Please contact Pio De Roda Cafe directly.",
+        RESCHEDULE_LIMIT: "This booking has already used its one allowed reschedule.",
+        NO_CHANGE: "Please choose a different date or time.",
+        DATE_TAKEN: "That date is no longer available. Please pick another date.",
+        DATE_BLACKOUT: "Pio De Roda is closed on that date. Please pick another date.",
+        TIME_TAKEN: "That time is already taken for this service. Please pick another time.",
+        TOO_SOON: "That date is too soon. Please choose a later date.",
+        TOO_FAR: "That date is too far ahead. Please choose a nearer date.",
+        NOT_CHANGEABLE: "This booking can no longer be changed online.",
+        TOO_MANY_ATTEMPTS: "Too many attempts. Please wait a few minutes and try again.",
+        NOT_FOUND: "We could not verify this booking. Please verify your details again."
+      };
+      return errors[data.reason] || "Could not update the booking. Please try again.";
+    }
+
+    function localDate(d){
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    }
+
+    if(cancelBtn){
+      cancelBtn.onclick = async ()=>{
+        if(!confirm("Cancel this booking? This cannot be undone online.")) return;
+        const ctx = readCtx();
+        if(!ctx){ manageMessage.textContent = "Please verify your booking again."; return; }
+
+        cancelBtn.disabled = true;
+        cancelBtn.textContent = "Cancelling…";
+        try{
+          const res = await fetch(`${API_BASE_URL}/self_service.php`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reservationId: ctx.id, bookingPin: ctx.pin, action: "cancel" })
+          });
+          const data = await res.json().catch(()=>({}));
+          if(res.ok && data.ok){
+            manageMessage.textContent = "Your booking was cancelled. Refreshing…";
+            setTimeout(loadBookingStatus, 900);
+            return;
+          }
+          manageMessage.textContent = manageError(data);
+        }catch(err){
+          manageMessage.textContent = "Network error. Please try again.";
+        }
+        cancelBtn.disabled = false;
+        cancelBtn.textContent = "Cancel booking";
+      };
+    }
+
+    if(openRescheduleBtn && rescheduleForm){
+      const dateInput = document.getElementById("rescheduleDate");
+      const now = new Date();
+      const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + Number(reservation.rescheduleMinDays || 3));
+      const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 365);
+      dateInput.min = localDate(minDate);
+      dateInput.max = localDate(maxDate);
+
+      openRescheduleBtn.onclick = ()=>{
+        rescheduleForm.hidden = false;
+        dateInput.value = dateInput.value || localDate(minDate);
+        dateInput.focus();
+      };
+      if(rescheduleCancelBtn){
+        rescheduleCancelBtn.onclick = ()=>{
+          rescheduleForm.hidden = true;
+          manageMessage.textContent = "";
+        };
+      }
+
+      rescheduleForm.onsubmit = async (ev)=>{
+        ev.preventDefault();
+        const ctx = readCtx();
+        if(!ctx){ manageMessage.textContent = "Please verify your booking again."; return; }
+        if(!dateInput.value){
+          manageMessage.textContent = "Please choose a new date.";
+          return;
+        }
+
+        const submitBtn = document.getElementById("rescheduleSubmitBtn");
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Saving…";
+        try{
+          const res = await fetch(`${API_BASE_URL}/self_service.php`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              reservationId: ctx.id,
+              bookingPin: ctx.pin,
+              action: "reschedule",
+              newDate: dateInput.value,
+              newTime: document.getElementById("rescheduleTime").value
+            })
+          });
+          const data = await res.json().catch(()=>({}));
+          if(res.ok && data.ok){
+            manageMessage.textContent = "Booking moved to " + data.eventDate + " at " + data.eventTime + ". Refreshing…";
+            setTimeout(loadBookingStatus, 1100);
+            return;
+          }
+          manageMessage.textContent = manageError(data);
+        }catch(err){
+          manageMessage.textContent = "Network error. Please try again.";
+        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Confirm new date";
+      };
+    }
   }
 
   /* ---------- loading (always reads the LATEST stored data) ---------- */
@@ -246,10 +469,7 @@
     bindVerify();
     loadBookingStatus();
 
-    // Pick up Admin changes: other tab saves -> "storage" event; returning to this tab/page -> reload.
-    window.addEventListener("storage", ev=>{
-      if(ev.key === null || ev.key === RESERVATIONS_KEY || ev.key === CTX_KEY) loadBookingStatus();
-    });
+    // Pick up Admin changes when the customer returns to this page.
     window.addEventListener("pageshow", loadBookingStatus);
     document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) loadBookingStatus(); });
   }

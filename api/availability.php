@@ -28,6 +28,7 @@ try {
     }
 
     $payload = pdrAvailabilityPayload($pdo, $year, $month);
+    $exclusive = pdrExclusiveServices($pdo);
 
     echo json_encode([
         'ok'    => true,
@@ -36,8 +37,14 @@ try {
         'meta'  => $payload['meta'],
         'rules' => [
             'maxPerDay'         => PDR_MAX_SERVICES_PER_DAY,
-            'exclusiveService'  => PDR_EXCLUSIVE_SERVICE,
+            // T-23: catalog-driven list. `exclusiveService` is kept for older
+            // callers that only expect a single name.
+            'exclusiveServices' => $exclusive['names'],
+            'exclusiveService'  => $exclusive['names'][0] ?? null,
             'activeStatuses'    => pdrActiveStatuses(),
+            // T-40: the customer-facing booking window.
+            'minLeadDays'       => PDR_MIN_LEAD_DAYS,
+            'maxHorizonDays'    => PDR_MAX_HORIZON_DAYS,
         ],
     ]);
 

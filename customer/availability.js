@@ -54,6 +54,15 @@
         cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — past date">${d}</div>`;
         continue;
       }
+      // T-40: dates outside the booking window are shown but not bookable.
+      const windowErr = bookingWindowError(ds);
+      if (windowErr) {
+        const why = windowErr === 'TOO_SOON'
+          ? `requires ${PDR_MIN_LEAD_DAYS} days' notice`
+          : `more than ${PDR_MAX_HORIZON_DAYS} days ahead`;
+        cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — ${why}">${d}</div>`;
+        continue;
+      }
       const unavail = isDateTaken(ds);
       const hint = dayHint(ds).trim(); // "" | "— venue booked..." | "— 1 of 2 slots booked"
       const label = `${ds} — ${unavail ? 'unavailable' : (isToday ? 'today, available' : 'available')}${hint ? ', ' + hint : ''}`;
