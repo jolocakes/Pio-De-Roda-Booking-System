@@ -60,7 +60,7 @@ const SERVICE_IMAGES = {
   coffee: "coffeebooth.jpg",
   pizza: "pizza.jpg",
   intimate: "intimate.jpg",
-  equipment: "equipment.png",
+  equipment: "equipment.jpg",
 };
 
 function _toNullableNumber(v) {
@@ -537,6 +537,37 @@ function isPastDate(dateStr) {
 }
 
 // =====================================================
+// BOOKING WINDOW (T-40) — must match api/capacity.php.
+// The server is the authority; these helpers only stop the customer from
+// picking a date the server would reject.
+// =====================================================
+const PDR_MIN_LEAD_DAYS = 3;
+const PDR_MAX_HORIZON_DAYS = 365;
+
+function shiftLocalDate(dateStr, days) {
+  const parts = String(dateStr || "").split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return "";
+  const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// null when bookable, otherwise "TOO_SOON" | "TOO_FAR" | "INVALID".
+function bookingWindowError(dateStr) {
+  if (typeof dateStr !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return "INVALID";
+  }
+  const today = getTodayLocalDate();
+  if (dateStr < shiftLocalDate(today, PDR_MIN_LEAD_DAYS)) return "TOO_SOON";
+  if (dateStr > shiftLocalDate(today, PDR_MAX_HORIZON_DAYS)) return "TOO_FAR";
+  return null;
+}
+
+function isOutsideBookingWindow(dateStr) {
+  return bookingWindowError(dateStr) !== null;
+}
+
+// =====================================================
 // EVENT TIME SLOTS — PLACEHOLDER, PENDING STAFF CONFIRMATION.
 // The business has not yet published its per-event time slots. These hourly
 // slots are derived ONLY from the opening hours already shown on the homepage
@@ -626,26 +657,11 @@ function getAdditionalServices(currentServiceId) {
 }
 
 /* ############################################################################
-   ############################################################################
+   ##                          API CLIENT AREA                               ##
    ##                                                                        ##
-   ##                     B A C K E N D   A R E A   —   START                ##
-   ##                                                                        ##
-   ##  Everything between this banner and the "BACKEND AREA — END" banner    ##
-   ##  is the ONLY code that talks to where reservations are stored.         ##
-   ##                                                                        ##
-   ##  The rest of the website (booking pages, Booking Status page,          ##
-   ##  homepage calendar, admin page) ONLY calls the async functions in      ##
-   ##  Sections A and B below. It never reads localStorage directly.         ##
-   ##                                                                        ##
-   ##  WHEN THE BACKEND TEAM IS READY:                                       ##
-   ##   1. Keep every function NAME, its PARAMETERS and its RETURN SHAPE.    ##
-   ##   2. Replace the body of each function in Sections A and B with the    ##
-   ##      fetch() call shown in its "REAL BACKEND" comment.                 ##
-   ##   3. Delete Section C (the localStorage prototype) completely.         ##
-   ##   4. Nothing outside this area needs to change.                        ##
-   ##  Full request/response details: BACKEND_CONTRACT.md                    ##
-   ##                                                                        ##
-   ############################################################################
+   ##  Every function here calls the real PHP API. There is no localStorage  ##
+   ##  prototype anymore (T-27): reservations live only in the database, so  ##
+   ##  a booking made on a phone is visible on any other device.             ##
    ############################################################################ */
 
 const API_BASE_URL = window.location.pathname.includes("/customer")
@@ -781,247 +797,4 @@ async function getReservationStatus(reservationId, bookingPin) {
   }
 }
 
-async function adminGetReservations() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/admin/reservations.php`);
-    return await res.json();
-  } catch (e) {
-    return [];
-  }
-}
-
-async function adminUpdateReservationStatus(reservationId, newStatus) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/admin/update_status.php`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reservationId, status: newStatus }),
-    });
-    return await res.json();
-  } catch (e) {
-    return { ok: false, reason: "NETWORK" };
-  }
-}
-
-/* ===========================================================================
-   SECTION C — PROTOTYPE ONLY (browser localStorage pretending to be a server)
-   DELETE THIS WHOLE SECTION when the real backend is connected.
-   localStorage is per-device, so reservations made on a phone are NOT visible on
-   a desktop here — that is exactly the limitation the real backend removes.
-   Everything the real server must do is marked  "SERVER JOB:".
-   =========================================================================== */
-const BASE_UNAVAILABLE_DATES = []; // real backend: dates the restaurant blocked manually (stored server-side)
-
-const _MOCK = {
-  KEY: "pdr_reservations", // the "database table"
-  GUARD_KEY: "pdr_verify_guard", // stand-in for server-side rate limiting
-  MAX_FAILS: 5,
-  LOCK_SECONDS: 120,
-
-  delay(ms = 150) {
-    return new Promise((res) => setTimeout(res, ms));
-  }, // pretend network time
-
-  read() {
-    try {
-      const list = JSON.parse(localStorage.getItem(this.KEY) || "[]");
-      return Array.isArray(list)
-        ? list.filter((r) => r && r.reservationId).map((r) => this.normalize(r))
-        : [];
-    } catch (e) {
-      return [];
-    }
-  },
-  write(list) {
-    try {
-      localStorage.setItem(this.KEY, JSON.stringify(list));
-      return true;
-    } catch (e) {
-      return false;
-    }
-  },
-  normalize(r) {
-    // tolerate older saved records
-    const n = Object.assign({}, r);
-    if (n.guests === undefined) n.guests = n.numberOfGuests;
-    if (n.eventTime === undefined) n.eventTime = ""; // records saved before Event Time existed
-    if (!n.contactPerson) n.contactPerson = n.customerName;
-    if (!n.status) n.status = PDR_STATUS.PENDING;
-    if (!Array.isArray(n.additionalServices)) n.additionalServices = [];
-    return n;
-  },
-  takenDates() {
-    return BASE_UNAVAILABLE_DATES.concat(this.read().map((r) => r.eventDate));
-  },
-
-  // SERVER JOB: unique ID, e.g. PDR-2026-0001 (one higher than the largest existing number this year).
-  nextId(list) {
-    const year = new Date().getFullYear();
-    const re = new RegExp("^PDR-" + year + "-(\\d+)$");
-    let max = 0;
-    list.forEach((r) => {
-      const m = re.exec(r.reservationId);
-      if (m) max = Math.max(max, parseInt(m[1], 10));
-    });
-    return `PDR-${year}-${String(max + 1).padStart(4, "0")}`;
-  },
-  // SERVER JOB: random 6-digit PIN. (Real backend should store only a HASH of the PIN.)
-  newPin() {
-    let n;
-    if (window.crypto && crypto.getRandomValues) {
-      const a = new Uint32Array(1);
-      crypto.getRandomValues(a);
-      n = a[0] % 900000;
-    } else n = Math.floor(Math.random() * 900000);
-    return String(100000 + n);
-  },
-
-  // SERVER JOB: validate input, re-check the date, force status "Pending", add id/PIN/timestamp.
-  // (Real backend should also RECOMPUTE estimatedTotal from its own price list, never trust the browser's.)
-  create(data) {
-    if (
-      !data ||
-      !data.customerName ||
-      !data.eventDate ||
-      !data.eventTime ||
-      !data.mainService ||
-      !data.selectedPackage
-    )
-      return { ok: false, reason: "INVALID" };
-    const list = this.read();
-    if (isPastDate(data.eventDate)) return { ok: false, reason: "INVALID" }; // past dates are never bookable
-    if (!isTimeAvailable(data.eventDate, data.eventTime))
-      return { ok: false, reason: "INVALID" };
-    if (this.takenDates().includes(data.eventDate))
-      return { ok: false, reason: "DATE_TAKEN" };
-    const rec = {
-      reservationId: this.nextId(list),
-      bookingPin: this.newPin(),
-      status: PDR_STATUS.PENDING,
-      customerName: data.customerName,
-      contactPerson: data.contactPerson || data.customerName,
-      contactNumber: data.contactNumber,
-      email: data.email,
-      eventDate: data.eventDate,
-      eventTime: data.eventTime,
-      eventType: data.eventType,
-      guests: data.guests,
-      mainService: data.mainService,
-      selectedPackage: data.selectedPackage,
-      // Catering with Menu: the customer's main-course choices (minimum 2).
-      ...(Array.isArray(data.mainCourses) && data.mainCourses.length
-        ? { mainCourses: data.mainCourses }
-        : {}),
-      additionalServices: Array.isArray(data.additionalServices)
-        ? data.additionalServices
-        : [],
-      estimatedTotal: data.estimatedTotal,
-      submittedAt: new Date().toISOString(),
-    };
-    list.push(rec);
-    if (!this.write(list)) return { ok: false, reason: "NETWORK" };
-    return {
-      ok: true,
-      reservationId: rec.reservationId,
-      bookingPin: rec.bookingPin,
-      status: rec.status,
-    };
-  },
-
-  // SERVER JOB: BOTH values must match; failures look identical; too many failures are throttled.
-  verify(reservationId, bookingPin) {
-    const wait = this.lockedSeconds();
-    if (wait > 0)
-      return {
-        ok: false,
-        reason: "TOO_MANY_ATTEMPTS",
-        retryAfterSeconds: wait,
-      };
-    const want = String(reservationId || "")
-      .trim()
-      .toUpperCase();
-    const rec = this.read().find(
-      (r) => String(r.reservationId).toUpperCase() === want,
-    );
-    if (
-      !rec ||
-      !rec.bookingPin ||
-      rec.bookingPin !== String(bookingPin || "")
-    ) {
-      this.registerFailure();
-      return { ok: false, reason: "NOT_FOUND" };
-    }
-    this.clearFailures();
-    return { ok: true, record: rec };
-  },
-  guard() {
-    try {
-      return JSON.parse(localStorage.getItem(this.GUARD_KEY) || "{}");
-    } catch (e) {
-      return {};
-    }
-  },
-  lockedSeconds() {
-    const g = this.guard();
-    return g.lockedUntil && g.lockedUntil > Date.now()
-      ? Math.ceil((g.lockedUntil - Date.now()) / 1000)
-      : 0;
-  },
-  registerFailure() {
-    const g = this.guard();
-    const count =
-      (g.lockedUntil && g.lockedUntil <= Date.now() ? 0 : g.count || 0) + 1;
-    const next =
-      count >= this.MAX_FAILS
-        ? { count: 0, lockedUntil: Date.now() + this.LOCK_SECONDS * 1000 }
-        : { count };
-    try {
-      localStorage.setItem(this.GUARD_KEY, JSON.stringify(next));
-    } catch (e) {}
-  },
-  clearFailures() {
-    try {
-      localStorage.removeItem(this.GUARD_KEY);
-    } catch (e) {}
-  },
-
-  // SERVER JOB: build what the customer is allowed to see. No PIN; phone/email masked.
-  maskPhone(v) {
-    const s = String(v || "");
-    return s.length < 4
-      ? "••••"
-      : s.slice(0, 2) + "*".repeat(s.length - 3) + s.slice(-1);
-  },
-  maskEmail(v) {
-    const s = String(v || "");
-    const at = s.indexOf("@");
-    return at < 1 ? (s ? "••••" : "") : s[0] + "***" + s.slice(at);
-  },
-  customerView(r) {
-    return {
-      reservationId: r.reservationId,
-      status: r.status,
-      submittedAt: r.submittedAt,
-      customerName: r.customerName,
-      contactPerson: r.contactPerson,
-      contactNumberMasked: this.maskPhone(r.contactNumber),
-      emailMasked: this.maskEmail(r.email),
-      eventDate: r.eventDate,
-      eventTime: r.eventTime || "",
-      eventType: r.eventType,
-      guests: r.guests,
-      mainService: r.mainService,
-      selectedPackage: r.selectedPackage,
-      // Catering with Menu only: the chosen main courses (when the record has them)
-      ...(Array.isArray(r.mainCourses) && r.mainCourses.length
-        ? { mainCourses: r.mainCourses }
-        : {}),
-      additionalServices: r.additionalServices,
-      estimatedTotal: r.estimatedTotal,
-    };
-  },
-};
-
-/* ############################################################################
-   ##                     B A C K E N D   A R E A   —   END                  ##
-   ############################################################################ */
+/* End of services.js */

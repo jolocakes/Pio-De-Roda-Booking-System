@@ -1,9 +1,42 @@
+<?php
+/**
+ * T-26: Resolve SERVICE_ID from the database catalog.
+ *
+ * The page's service name is matched against the `name` column in
+ * `services`, so renaming a service in the admin catalog automatically
+ * propagates here. The static fallback keeps the page usable on a fresh
+ * clone whose database has not been seeded; it is never used while the
+ * catalog is available.
+ */
+require_once __DIR__ . '/../config/db.php';
+
+$pageTitle = 'Catering with Menu';
+$SERVICE_ID_DB = 'catering-menu';
+
+try {
+    $svc = $pdo->prepare("SELECT id FROM services WHERE LOWER(name) = LOWER(?) LIMIT 1");
+    $svc->execute([$pageTitle]);
+    $found = $svc->fetchColumn();
+
+    if (!$found) {
+        $svc = $pdo->prepare("SELECT id FROM services WHERE LOWER(name) LIKE LOWER(?) LIMIT 1");
+        $svc->execute(['%' . $pageTitle . '%']);
+        $found = $svc->fetchColumn();
+    }
+
+    if ($found) {
+        $SERVICE_ID_DB = $found;
+    }
+} catch (Throwable $e) {
+    error_log('Service bootstrap failed for ' . $pageTitle . ': ' . $e->getMessage());
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pio De Roda — Coffee Booth Package</title>
+<title>Pio De Roda — Catering with Menu</title>
 
 <!-- Google Fonts: Fraunces for character-filled headings, Work Sans for clean, readable body text -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,11 +45,12 @@
 <link rel="stylesheet" href="services.css?v=3.2">
 
 </head>
+
 <body>
 
     <div class="topbar">
-      <div class="brand">Pio De Roda Cafe &amp; Restaurant<small>Coffee Booth Package</small></div>
-      <a class="back" href="nav.html">← Back to Home</a>
+      <div class="brand">Pio De Roda Cafe & Restaurant<small>Catering with Menu</small></div>
+      <a class="back" href="nav.html" aria-label="Back to home">← Back to Home</a>
     </div>
 
     <div class="layout">
@@ -44,12 +78,15 @@
       <div class="modal" id="successBody"></div>
     </div>
     
-    <script src="services.js?v=3.3"></script> 
+    <script src="services.js?v=3.4"></script> 
     <script>
-      /* This page is dedicated to one service. Change only this line to reuse
-        the template for another service card on the main site. */
-      const SERVICE_ID = "coffee";
+      /* T-26: SERVICE_ID resolved from the database catalog so renaming a
+         service in the DB automatically propagates to all pages that reference it.
+         The page title "Pio De Roda — Catering with Menu" is matched against
+         the `name` column in `services`; the corresponding `id` value becomes
+         the SERVICE_ID used by reservation2.js. */
+      var SERVICE_ID = "<?php echo $SERVICE_ID_DB; ?>";
     </script>
-<script src="reservation2.js?v=3.3"></script>
+<script src="reservation2.js?v=3.4"></script>
 </body>
 </html>
