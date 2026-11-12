@@ -2,6 +2,9 @@
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/db.php';
 
+// T-36: a Viewer may read reservations but never change them.
+$canManageReservations = pdrCan('manage_reservations');
+
 /** Escape every value rendered into HTML. */
 function pdrH($value): string
 {
@@ -9,8 +12,48 @@ function pdrH($value): string
 }
 
 $reservations = [];
+$totalRows = 0;
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$perPage = 25;
+
+$q = trim((string) ($_GET['q'] ?? ''));
+$statusFilter = trim((string) ($_GET['status'] ?? ''));
+$dateFilter = trim((string) ($_GET['date'] ?? ''));
+
 try {
-    $stmt = $pdo->query("SELECT * FROM reservations ORDER BY id DESC");
+    // T-28: filter + paginate in SQL. Loading every reservation into PHP does
+    // not scale past a few thousand rows and makes the page slow to render.
+    $where = [];
+    $params = [];
+
+    if ($q !== '') {
+        $where[] = '(reservation_id LIKE ? OR customer_name LIKE ?)';
+        $params[] = '%' . $q . '%';
+        $params[] = '%' . $q . '%';
+    }
+    if (in_array($statusFilter, ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'Rejected'], true)) {
+        $where[] = 'status = ?';
+        $params[] = $statusFilter;
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFilter)) {
+        $where[] = 'event_date = ?';
+        $params[] = $dateFilter;
+    }
+    $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reservations $whereSql");
+    $countStmt->execute($params);
+    $totalRows = (int) $countStmt->fetchColumn();
+    $totalPages = max(1, (int) ceil($totalRows / $perPage));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $perPage;
+
+    // LIMIT/OFFSET are integers computed here (never user strings), so they can
+    // be interpolated safely even with emulated prepares disabled.
+    $stmt = $pdo->prepare(
+        "SELECT * FROM reservations $whereSql ORDER BY id DESC LIMIT $perPage OFFSET $offset"
+    );
+    $stmt->execute($params);
     $rows = $stmt->fetchAll();
     foreach ($rows as $r) {
         $reservations[] = [
@@ -23,14 +66,30 @@ try {
             'date' => $r['event_date'],
             'time' => $r['event_time'],
             'guests' => $r['guests'],
+            'package' => $r['selected_package'] ?? '',
             'status' => $r['status'],
             'payment' => $r['payment_method'],
-            'amount' => '₱' . number_format($r['estimated_total'], 2),
+            'amount' => 'â‚±' . number_format($r['estimated_total'], 2),
         ];
     }
 } catch (Exception $e) {
     $reservations = [];
+    $totalRows = 0;
+    $page = 1;
+    $totalPages = 1;
 }
+
+// Keep the current filters when building pagination links.
+$pageQuery = array_filter([
+    'q' => $q,
+    'status' => $statusFilter,
+    'date' => $dateFilter,
+], static fn($v) => $v !== '');
+$pageUrl = static function (int $target) use ($pageQuery): string {
+    return 'reservation.php?' . http_build_query(array_merge($pageQuery, ['page' => $target]));
+};
+$shownFrom = $totalRows === 0 ? 0 : (($page - 1) * $perPage) + 1;
+$shownTo = min($page * $perPage, $totalRows);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -93,6 +152,9 @@ try {
 
                 <li class="nav-item">
                     <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
+                    <?php if (pdrCan('manage_staff')): ?>
+                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                    <?php endif; ?>
                 </li>
             </ul>
         </div>
@@ -124,22 +186,44 @@ try {
         <div class="content-body">
             <div id="pageAlert" class="page-alert" role="status" aria-live="polite"></div>
 
-            <!-- Search & Filter Controls -->
-            <div class="filter-bar">
-                <input type="text" id="searchInput" class="search-input" placeholder="Search by customer name or reservation ID..." onkeyup="filterTable()">
-                
-                <input type="date" id="dateFilter" class="filter-date" onchange="filterTable()">
+            <!-- Search & Filter Controls (T-28: server-side, survives pagination) -->
+            <form method="get" action="reservation.php" class="filter-bar" id="filterForm">
+                <input type="search" id="searchInput" name="q" class="search-input"
+                    placeholder="Search by customer name or reservation ID..."
+                    value="<?php echo pdrH($q); ?>">
 
-                <select id="statusFilter" class="filter-select" onchange="filterTable()">
+                <input type="date" id="dateFilter" name="date" class="filter-date"
+                    value="<?php echo pdrH($dateFilter); ?>">
+
+                <select id="statusFilter" name="status" class="filter-select">
                     <option value="">All Statuses</option>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="Completed">Completed</option>
-
+                    <?php foreach (['Pending', 'Confirmed', 'Cancelled', 'Rejected', 'Completed'] as $opt): ?>
+                        <option value="<?php echo pdrH($opt); ?>" <?php echo $statusFilter === $opt ? 'selected' : ''; ?>>
+                            <?php echo pdrH($opt); ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
-                <button type="button" class="btn-reset" onclick="resetFilters()">Reset</button>
+                <button type="submit" class="btn-reset">Filter</button>
+                <a class="btn-reset" href="reservation.php">Reset</a>
+            </form>
+
+            <!-- T-43: bulk actions (applies to the checkboxes on this page) -->
+            <?php if ($canManageReservations): ?>
+            <div id="bulkBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+                <strong id="bulkCount" style="font-size:13px;color:#4a5568;">0 selected</strong>
+                <button type="button" class="btn btn-approve" data-bulk-status="Confirmed" title="Approve selected">
+                    <i class="fa-solid fa-check"></i> Approve
+                </button>
+                <button type="button" class="btn btn-reject" data-bulk-status="Rejected" title="Reject selected">
+                    <i class="fa-solid fa-xmark"></i> Reject
+                </button>
+                <button type="button" class="btn btn-cancel" data-bulk-status="Cancelled" title="Cancel selected">
+                    <i class="fa-solid fa-ban"></i> Cancel
+                </button>
+                <button type="button" class="btn-reset" id="bulkClear">Clear selection</button>
+                <span id="bulkMessage" role="status" aria-live="polite" style="font-size:13px;color:#718096;"></span>
             </div>
+            <?php endif; ?>
 
             <div class="dashboard-card">
                 <div class="card-header">
@@ -149,6 +233,11 @@ try {
                     <table class="data-table" id="reservationsTable">
                         <thead>
                             <tr>
+                                <th style="width:34px;">
+                                    <?php if ($canManageReservations): ?>
+                                    <input type="checkbox" id="selectAllReservations" aria-label="Select all reservations on this page">
+                                    <?php endif; ?>
+                                </th>
                                 <th>ID</th>
                                 <th>Customer Name</th>
                                 <th>Service</th>
@@ -159,8 +248,22 @@ try {
                             </tr>
                         </thead>
                         <tbody>
+                            <?php if (empty($reservations)): ?>
+                                <tr>
+                                    <td colspan="8" style="text-align:center;color:#718096;padding:24px;">
+                                        No reservations match these filters.
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                             <?php foreach($reservations as $row): ?>
                                 <tr id="row-<?php echo pdrH($row['id']); ?>">
+                                    <td>
+                                        <?php if ($canManageReservations): ?>
+                                        <input type="checkbox" class="reservation-check"
+                                            value="<?php echo pdrH($row['id']); ?>"
+                                            aria-label="Select reservation <?php echo pdrH($row['id']); ?>">
+                                        <?php endif; ?>
+                                    </td>
                                     <td><strong><?php echo pdrH($row['id']); ?></strong></td>
                                     <td><?php echo pdrH($row['customer']); ?></td>
                                     <td><?php echo pdrH($row['service']); ?></td>
@@ -172,7 +275,25 @@ try {
                                     </td>
                                     <td><?php echo pdrH($row['payment']); ?></td>
                                     <td class="action-cell">
+                                        <!-- View details -->
+                                        <button type="button" class="btn btn-view" title="View Details"
+                                            data-view-details
+                                            data-id="<?php echo pdrH($row['id']); ?>"
+                                            data-customer="<?php echo pdrH($row['customer']); ?>"
+                                            data-phone="<?php echo pdrH($row['phone']); ?>"
+                                            data-email="<?php echo pdrH($row['email']); ?>"
+                                            data-service="<?php echo pdrH($row['service']); ?>"
+                                            data-date="<?php echo pdrH($row['date']); ?>"
+                                            data-time="<?php echo pdrH($row['time']); ?>"
+                                            data-guests="<?php echo pdrH((string) $row['guests']); ?>"
+                                            data-amount="<?php echo pdrH($row['amount']); ?>"
+                                            data-package="<?php echo pdrH($row['package']); ?>"
+                                            data-status="<?php echo pdrH($row['status']); ?>">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+
                                         <!-- Approve -->
+                                        <?php if ($canManageReservations): ?>
                                         <button type="button" class="btn btn-approve" title="Approve"
                                             data-status-action data-id="<?php echo pdrH($row['id']); ?>" data-status="Confirmed">
                                             <i class="fa-solid fa-check"></i>
@@ -180,7 +301,7 @@ try {
 
                                         <!-- Reject -->
                                         <button type="button" class="btn btn-reject" title="Reject"
-                                            data-status-action data-id="<?php echo pdrH($row['id']); ?>" data-status="Cancelled">
+                                            data-status-action data-id="<?php echo pdrH($row['id']); ?>" data-status="Rejected">
                                             <i class="fa-solid fa-xmark"></i>
                                         </button>
 
@@ -200,11 +321,50 @@ try {
                                             data-status-action data-id="<?php echo pdrH($row['id']); ?>" data-status="Cancelled">
                                             <i class="fa-solid fa-ban"></i>
                                         </button>
+
+                                        <!-- T-41: resend the confirmation email (issues a new PIN) -->
+                                        <button type="button" class="btn" title="Resend confirmation email"
+                                            style="background:#eef2ff;color:#3730a3;"
+                                            data-resend-confirmation data-id="<?php echo pdrH($row['id']); ?>">
+                                            <i class="fa-solid fa-envelope"></i>
+                                        </button>
+                                        <?php endif; // end manage_reservations-only actions ?>
+
+                                        <!-- T-38: printable receipt -->
+                                        <a class="btn" title="Printable receipt"
+                                            style="background:#f0fdf4;color:#166534;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;"
+                                            href="receipt.php?reservationId=<?php echo urlencode((string) $row['id']); ?>"
+                                            target="_blank" rel="noopener">
+                                            <i class="fa-solid fa-receipt"></i>
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- T-28: pagination (25 rows per page) -->
+                <div class="pagination-bar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:12px 4px 2px;">
+                    <span style="font-size:13px;color:#718096;">
+                        Showing <?php echo (int) $shownFrom; ?>&ndash;<?php echo (int) $shownTo; ?>
+                        of <?php echo (int) $totalRows; ?> reservation<?php echo $totalRows === 1 ? '' : 's'; ?>
+                    </span>
+                    <?php if ($totalPages > 1): ?>
+                        <span style="display:flex;gap:6px;align-items:center;">
+                            <?php if ($page > 1): ?>
+                                <a class="btn-reset" href="<?php echo pdrH($pageUrl(1)); ?>">&laquo; First</a>
+                                <a class="btn-reset" href="<?php echo pdrH($pageUrl($page - 1)); ?>">&lsaquo; Prev</a>
+                            <?php endif; ?>
+                            <span style="font-size:13px;color:#4a5568;padding:0 6px;">
+                                Page <?php echo (int) $page; ?> of <?php echo (int) $totalPages; ?>
+                            </span>
+                            <?php if ($page < $totalPages): ?>
+                                <a class="btn-reset" href="<?php echo pdrH($pageUrl($page + 1)); ?>">Next &rsaquo;</a>
+                                <a class="btn-reset" href="<?php echo pdrH($pageUrl($totalPages)); ?>">Last &raquo;</a>
+                            <?php endif; ?>
+                        </span>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -253,6 +413,7 @@ try {
                     <option value="Pending">Pending</option>
                     <option value="Confirmed">Confirmed</option>
                     <option value="Cancelled">Cancelled</option>
+                    <option value="Rejected">Rejected</option>
                     <option value="Completed">Completed</option>
                 </select>
 
@@ -272,48 +433,11 @@ try {
             JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
         ); ?>;
 
-        // Search & Filter Logic
-        function filterTable() {
-    const searchInput = document.getElementById('searchInput').value.toLowerCase();
-    const dateFilter = document.getElementById('dateFilter').value;
-    const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
-    
-    const rows = document.querySelectorAll('#reservationsTable tbody tr');
+        // T-28: filtering happens server-side (see the filter form above), so
+        // there is no client-side table filter anymore â€” it could only filter
+        // the 25 rows that happen to be on the current page.
 
-    rows.forEach(row => {
-        // Kunin ang text mula sa mga angkop na column (halimbawa: Name/ID, Date, Status)
-        const rowText = row.innerText.toLowerCase();
-        
-        // I-check kung nag-a-match ang search input (pangalan o ID)
-        const matchesSearch = rowText.includes(searchInput);
-        
-        // I-check ang date filter (siguraduhing meron kang data attribute o saktong cell para sa date)
-        // Halimbawa kung ang date ay nasa partikular na cell ng row:
-        const rowDate = row.cells[3] ? row.cells[3].innerText.trim() : ''; 
-        const matchesDate = !dateFilter || rowDate.includes(dateFilter);
-
-        // I-check ang status filter
-        const rowStatus = row.cells[4] ? row.cells[4].innerText.toLowerCase() : '';
-        const matchesStatus = !statusFilter || rowStatus.includes(statusFilter);
-
-        // Pagsabayin silang lahat (lahat ay dapat mag-true)
-        if (matchesSearch && matchesDate && matchesStatus) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    });
-}
-
-// Function para sa pag-reset ng mga filters
-function resetFilters() {
-    document.getElementById('searchInput').value = '';
-    document.getElementById('dateFilter').value = '';
-    document.getElementById('statusFilter').value = '';
-    filterTable(); // I-refresh ang table para lumabas ulit ang lahat
-}
-
-function closeModal(modalId) {
+        function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) modal.style.display = 'none';
 }
@@ -357,9 +481,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-        // View Reservation Details Modal — build DOM nodes with textContent so
+        // View Reservation Details Modal â€” build DOM nodes with textContent so
         // customer-controlled values can never become HTML/script.
-        function viewDetails(id, customer, phone, email, service, date, time, guests, amount, notes) {
+        function viewDetails(id, customer, phone, email, service, date, time, guests, amount, packageName, status) {
             const content = document.getElementById('viewModalContent');
             if (!content) return;
 
@@ -369,10 +493,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Phone', phone],
                 ['Email', email],
                 ['Service', service],
+                ['Package', packageName],
                 ['Date & Time', date + ' at ' + time],
                 ['Guests', guests],
                 ['Total Amount', amount],
-                ['Notes', notes],
+                ['Status', status],
             ];
 
             content.replaceChildren();
@@ -393,13 +518,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update Reservation Status (Approve, Reject, Cancel)
         async function updateStatus(id, newStatus) {
            
-            const validStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed'];
+            const validStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'Rejected'];
             if (!validStatuses.includes(newStatus)) {
                 alert('Invalid status: ' + newStatus);
                 return false;
             }
 
-            if (!confirm(`Are you sure you want to change status to ${newStatus}?`)) {
+            const verb = newStatus === 'Rejected'
+                ? 'reject this reservation? The customer will be told it was not approved.'
+                : `change status to ${newStatus}?`;
+            if (!confirm(`Are you sure you want to ${verb}`)) {
                 return false;
             }
 
@@ -552,7 +680,176 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        // T-25: make the existing details modal reachable. Values travel in
+        // data attributes (escaped server-side) and are rendered with
+        // textContent, so a customer name can never inject markup.
+        document.querySelectorAll('[data-view-details]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const d = button.dataset;
+                viewDetails(
+                    d.id, d.customer, d.phone, d.email, d.service,
+                    d.date, d.time, d.guests, d.amount, d.package, d.status
+                );
+            });
+        });
+
+        // T-41: resend the confirmation email. The server can only store a PIN
+        // hash, so the action issues a NEW PIN â€” warn the admin first.
+        document.querySelectorAll('[data-resend-confirmation]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const id = button.dataset.id || '';
+                if (!id) return;
+                if (!confirm(
+                    'Resend the confirmation email for ' + id + '?\n\n' +
+                    'A NEW Booking PIN will be issued and the old PIN will stop working.'
+                )) {
+                    return;
+                }
+
+                button.disabled = true;
+                try {
+                    const res = await fetch('../api/admin/resend_confirmation.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': PDR_CSRF_TOKEN
+                        },
+                        body: JSON.stringify({ reservationId: id })
+                    });
+                    const data = await res.json().catch(() => ({}));
+
+                    if (!res.ok || !data.ok) {
+                        const messages = {
+                            UNAUTHORIZED: 'Your session expired. Please log in again.',
+                            NOT_FOUND: 'Reservation not found. Refresh and try again.',
+                            NO_EMAIL: 'This reservation has no valid email address.',
+                            SERVER_ERROR: 'Could not resend the email. Please try again.'
+                        };
+                        showPageAlert(messages[data.reason] || 'Could not resend the email.', 'error');
+                        return;
+                    }
+
+                    showPageAlert(
+                        data.emailMode === 'smtp'
+                            ? 'Confirmation email sent. A new Booking PIN was issued.'
+                            : 'Email saved to the outbox (SMTP not configured). A new Booking PIN was issued.',
+                        'success'
+                    );
+                } catch (err) {
+                    showPageAlert('Network error while resending the email.', 'error');
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        });
+
+        // T-43: bulk selection + actions.
+        (function initBulkActions() {
+            const selectAll = document.getElementById('selectAllReservations');
+            const checks = Array.prototype.slice.call(document.querySelectorAll('.reservation-check'));
+            const bar = document.getElementById('bulkBar');
+            const countLabel = document.getElementById('bulkCount');
+            const message = document.getElementById('bulkMessage');
+            const clearBtn = document.getElementById('bulkClear');
+            if (!bar || !checks.length) return;
+
+            function selectedIds() {
+                return checks.filter((c) => c.checked).map((c) => c.value);
+            }
+
+            function refresh() {
+                const ids = selectedIds();
+                countLabel.textContent = ids.length + ' selected';
+                bar.style.display = ids.length ? 'flex' : 'none';
+                if (selectAll) {
+                    selectAll.checked = ids.length > 0 && ids.length === checks.length;
+                    selectAll.indeterminate = ids.length > 0 && ids.length < checks.length;
+                }
+            }
+
+            if (selectAll) {
+                selectAll.addEventListener('change', () => {
+                    checks.forEach((c) => { c.checked = selectAll.checked; });
+                    refresh();
+                });
+            }
+            checks.forEach((c) => c.addEventListener('change', refresh));
+
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    checks.forEach((c) => { c.checked = false; });
+                    if (selectAll) selectAll.checked = false;
+                    refresh();
+                });
+            }
+
+            document.querySelectorAll('[data-bulk-status]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const ids = selectedIds();
+                    if (!ids.length) return;
+                    const status = button.dataset.bulkStatus || '';
+                    const verbs = {
+                        Confirmed: 'approve',
+                        Rejected: 'reject',
+                        Cancelled: 'cancel'
+                    };
+                    if (!confirm('Are you sure you want to ' + (verbs[status] || 'update') +
+                        ' ' + ids.length + ' reservation' + (ids.length === 1 ? '' : 's') + '?')) {
+                        return;
+                    }
+
+                    message.textContent = 'Working...';
+                    button.disabled = true;
+                    try {
+                        const res = await fetch('../api/admin/bulk_status.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': PDR_CSRF_TOKEN
+                            },
+                            body: JSON.stringify({ reservationIds: ids, status: status })
+                        });
+                        const data = await res.json().catch(() => ({}));
+
+                        if (!res.ok || !data.ok) {
+                            message.textContent = 'Bulk update failed.';
+                            return;
+                        }
+
+                        // Reflect what actually changed without a full reload.
+                        const updated = data.updated || [];
+                        updated.forEach((id) => {
+                            const badge = document.getElementById('status-badge-' + id);
+                            if (badge) {
+                                badge.textContent = status;
+                                badge.className = 'badge badge-' + status.toLowerCase();
+                            }
+                            const row = document.getElementById('row-' + id);
+                            if (row) {
+                                const cb = row.querySelector('.reservation-check');
+                                if (cb) cb.checked = false;
+                            }
+                        });
+
+                        const failed = (data.failed || []).length;
+                        const skipped = (data.skipped || []).length;
+                        message.textContent = updated.length + ' updated' +
+                            (skipped ? ', ' + skipped + ' unchanged' : '') +
+                            (failed ? ', ' + failed + ' failed' : '') + '.';
+                        setTimeout(refresh, 0);
+                    } catch (err) {
+                        message.textContent = 'Network error during bulk update.';
+                    } finally {
+                        button.disabled = false;
+                    }
+                });
+            });
+
+            refresh();
+        })();
+
     </script>
 <script src="responsive.js"></script>
+<script src="a11y.js"></script>
 </body>
 </html>

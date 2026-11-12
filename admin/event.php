@@ -3,8 +3,50 @@ require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/db.php';
 
 $reservations = [];
+$totalRows = 0;
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$perPage = 25;
+
+$q = trim((string) ($_GET['q'] ?? ''));
+$statusFilter = trim((string) ($_GET['status'] ?? ''));
+$dateFrom = trim((string) ($_GET['from'] ?? ''));
+$dateTo = trim((string) ($_GET['to'] ?? ''));
+
 try {
-    $stmt = $pdo->query(
+    // T-28: filter + paginate in SQL. The page used to render every event at
+    // once, which does not scale.
+    $where = [];
+    $params = [];
+
+    if ($q !== '') {
+        $where[] = '(reservation_id LIKE ? OR customer_name LIKE ? OR main_service LIKE ?)';
+        $params[] = '%' . $q . '%';
+        $params[] = '%' . $q . '%';
+        $params[] = '%' . $q . '%';
+    }
+    if (in_array($statusFilter, ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'Rejected'], true)) {
+        $where[] = 'status = ?';
+        $params[] = $statusFilter;
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+        $where[] = 'event_date >= ?';
+        $params[] = $dateFrom;
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+        $where[] = 'event_date <= ?';
+        $params[] = $dateTo;
+    }
+    $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reservations $whereSql");
+    $countStmt->execute($params);
+    $totalRows = (int) $countStmt->fetchColumn();
+    $totalPages = max(1, (int) ceil($totalRows / $perPage));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $perPage;
+
+    // LIMIT/OFFSET are integers computed here, never user strings.
+    $stmt = $pdo->prepare(
         "SELECT
             reservation_id,
             customer_name,
@@ -20,11 +62,34 @@ try {
             estimated_total,
             status
          FROM reservations
-         ORDER BY event_date ASC, event_time ASC"
+         $whereSql
+         ORDER BY event_date ASC, event_time ASC
+         LIMIT $perPage OFFSET $offset"
     );
+    $stmt->execute($params);
     $reservations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     $reservations = [];
+    $totalRows = 0;
+    $page = 1;
+    $totalPages = 1;
+}
+
+$eventQuery = array_filter([
+    'q' => $q,
+    'status' => $statusFilter,
+    'from' => $dateFrom,
+    'to' => $dateTo,
+], static fn($v) => $v !== '');
+$eventPageUrl = static function (int $target) use ($eventQuery): string {
+    return 'event.php?' . http_build_query(array_merge($eventQuery, ['page' => $target]));
+};
+$eventShownFrom = $totalRows === 0 ? 0 : (($page - 1) * $perPage) + 1;
+$eventShownTo = min($page * $perPage, $totalRows);
+
+function eventH($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
 ?>
@@ -91,6 +156,9 @@ try {
 
                 <li class="nav-item">
                     <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
+                    <?php if (pdrCan('manage_staff')): ?>
+                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                    <?php endif; ?>
                 </li>
             </ul>
         </div>
@@ -128,6 +196,31 @@ try {
                 </div>
             </div>
 
+            <!-- T-28: server-side search / filters -->
+            <form method="get" action="event.php" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#fff;border:1px solid var(--border-color);border-radius:8px;padding:12px;margin-bottom:14px;">
+                <input type="search" name="q" value="<?php echo eventH($q); ?>"
+                    placeholder="Search ID, customer, or service..."
+                    style="flex:1 1 220px;min-width:180px;padding:9px 11px;border:1px solid #cbd5e1;border-radius:6px;">
+                <select name="status" style="padding:9px 11px;border:1px solid #cbd5e1;border-radius:6px;">
+                    <option value="">All Statuses</option>
+                    <?php foreach (['Pending', 'Confirmed', 'Cancelled', 'Rejected', 'Completed'] as $opt): ?>
+                        <option value="<?php echo eventH($opt); ?>" <?php echo $statusFilter === $opt ? 'selected' : ''; ?>>
+                            <?php echo eventH($opt); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <label style="font-size:12px;color:#718096;">From
+                    <input type="date" name="from" value="<?php echo eventH($dateFrom); ?>"
+                        style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+                </label>
+                <label style="font-size:12px;color:#718096;">To
+                    <input type="date" name="to" value="<?php echo eventH($dateTo); ?>"
+                        style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+                </label>
+                <button type="submit" style="padding:9px 16px;border:0;border-radius:6px;background:var(--primary,#8C1414);color:#fff;cursor:pointer;">Filter</button>
+                <a href="event.php" style="padding:9px 14px;border:1px solid #cbd5e1;border-radius:6px;color:#4a5568;text-decoration:none;">Reset</a>
+            </form>
+
             <!-- Events Table -->
             <div class="table-container">
                 <table>
@@ -148,6 +241,27 @@ try {
                         <!-- Rendered dynamically via JavaScript -->
                     </tbody>
                 </table>
+            </div>
+
+            <!-- T-28: pagination -->
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:12px 4px 2px;">
+                <span style="font-size:13px;color:#718096;">
+                    Showing <?php echo (int) $eventShownFrom; ?>&ndash;<?php echo (int) $eventShownTo; ?>
+                    of <?php echo (int) $totalRows; ?> event<?php echo $totalRows === 1 ? '' : 's'; ?>
+                </span>
+                <?php if ($totalPages > 1): ?>
+                    <span style="display:flex;gap:6px;align-items:center;font-size:13px;">
+                        <?php if ($page > 1): ?>
+                            <a href="<?php echo eventH($eventPageUrl(1)); ?>" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#4a5568;">&laquo; First</a>
+                            <a href="<?php echo eventH($eventPageUrl($page - 1)); ?>" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#4a5568;">&lsaquo; Prev</a>
+                        <?php endif; ?>
+                        <span style="color:#4a5568;padding:0 6px;">Page <?php echo (int) $page; ?> of <?php echo (int) $totalPages; ?></span>
+                        <?php if ($page < $totalPages): ?>
+                            <a href="<?php echo eventH($eventPageUrl($page + 1)); ?>" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#4a5568;">Next &rsaquo;</a>
+                            <a href="<?php echo eventH($eventPageUrl($totalPages)); ?>" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#4a5568;">Last &raquo;</a>
+                        <?php endif; ?>
+                    </span>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -196,7 +310,7 @@ try {
 
         // Format a YYYY-MM-DD date without timezone drift.
         function formatDate(dateStr) {
-            if (!dateStr) return '—';
+            if (!dateStr) return 'â€”';
             const date = new Date(dateStr + 'T00:00:00');
             if (isNaN(date.getTime())) return dateStr;
             return date.toLocaleDateString('en-US', {
@@ -208,7 +322,7 @@ try {
 
         function statusClass(status) {
             const value = String(status || '').toLowerCase();
-            if (['pending', 'confirmed', 'cancelled', 'completed'].indexOf(value) !== -1) {
+            if (['pending', 'confirmed', 'cancelled', 'completed', 'rejected'].indexOf(value) !== -1) {
                 return 'status-' + value;
             }
             return 'status-pending';
@@ -216,8 +330,8 @@ try {
 
         function formatCurrency(value) {
             const amount = Number(value);
-            if (!isFinite(amount)) return '₱0.00';
-            return '₱' + amount.toLocaleString('en-PH', {
+            if (!isFinite(amount)) return 'â‚±0.00';
+            return 'â‚±' + amount.toLocaleString('en-PH', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
@@ -259,15 +373,15 @@ try {
 
                 tr.innerHTML = `
                     <td><strong>${escapeHtml(event.reservation_id)}</strong></td>
-                    <td>${escapeHtml(event.main_service || '—')}</td>
-                    <td>${escapeHtml(event.customer_name || '—')}</td>
-                    <td>${escapeHtml(event.event_type || '—')}</td>
+                    <td>${escapeHtml(event.main_service || 'â€”')}</td>
+                    <td>${escapeHtml(event.customer_name || 'â€”')}</td>
+                    <td>${escapeHtml(event.event_type || 'â€”')}</td>
                     <td>
                         ${escapeHtml(formatDate(event.event_date))}
-                        <br><small style="color:var(--text-muted);">${escapeHtml(event.event_time || '—')}</small>
+                        <br><small style="color:var(--text-muted);">${escapeHtml(event.event_time || 'â€”')}</small>
                     </td>
                     <td>${guests} pax</td>
-                    <td>${escapeHtml(event.selected_package || '—')}</td>
+                    <td>${escapeHtml(event.selected_package || 'â€”')}</td>
                     <td><span class="status-badge ${statusClass(event.status)}">${escapeHtml(event.status || 'Pending')}</span></td>
                     <td style="text-align: right;">
                         <button type="button" class="btn-outline-sm" onclick="viewDetails(${index})">
@@ -285,8 +399,8 @@ try {
             if (!data) return;
 
             document.getElementById('view_event_title').innerText = 'Reservation ' + (data.reservation_id || '');
-            document.getElementById('v_id').innerText = data.reservation_id || '—';
-            document.getElementById('v_customer').innerText = data.customer_name || '—';
+            document.getElementById('v_id').innerText = data.reservation_id || 'â€”';
+            document.getElementById('v_customer').innerText = data.customer_name || 'â€”';
             document.getElementById('v_phone').innerText = data.contact_number || 'Not provided';
             document.getElementById('v_email').innerText = data.email || 'Not provided';
             document.getElementById('v_type').innerText = data.event_type || 'Not provided';
@@ -309,5 +423,6 @@ try {
         document.addEventListener('DOMContentLoaded', renderEventsTable);
     </script>
 <script src="responsive.js"></script>
+<script src="a11y.js"></script>
 </body>
 </html>

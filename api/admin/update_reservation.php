@@ -12,6 +12,8 @@ header('Cache-Control: no-store');
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/csrf.php';
+require_once __DIR__ . '/../../config/audit.php';
+require_once __DIR__ . '/../../config/rbac.php';
 require_once __DIR__ . '/../capacity.php';
 
 pdrSessionStart();
@@ -22,6 +24,8 @@ if (!isset($_SESSION['admin_id']) || !isset($_SESSION['admin_username'])) {
     echo json_encode(['ok' => false, 'reason' => 'UNAUTHORIZED']);
     exit();
 }
+
+pdrRequireApiCapability('manage_reservations');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     http_response_code(405);
@@ -48,7 +52,7 @@ $time          = trim((string) ($data['time'] ?? ''));
 $guestsInput   = $data['guests'] ?? null;
 $status        = trim((string) ($data['status'] ?? ''));
 
-$allowedStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed'];
+$allowedStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'Rejected'];
 
 if ($reservationId === '' || strlen($reservationId) > 30) {
     http_response_code(400);
@@ -106,7 +110,7 @@ try {
     // Does the reservation exist, and what is its current state? We need the
     // current status so the capacity checks can exclude the row itself when it
     // is being rescheduled (otherwise it always conflicts with its own slot).
-    $checkStmt = $pdo->prepare("SELECT id, status FROM reservations WHERE reservation_id = ? LIMIT 1");
+    $checkStmt = $pdo->prepare("SELECT id, status, selected_package FROM reservations WHERE reservation_id = ? LIMIT 1");
     $checkStmt->execute([$reservationId]);
     $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -119,7 +123,7 @@ try {
     // T-13: the service must be a real, active catalog entry — not arbitrary
     // text. Resolving by name keeps the admin UI's service labels working while
     // guaranteeing `services.id`/`max_cap` line up with `main_service`.
-    $svcStmt = $pdo->prepare("SELECT id, name, max_cap FROM services WHERE name = ? AND is_active = 1 LIMIT 1");
+    $svcStmt = $pdo->prepare("SELECT id, name, max_cap FROM services WHERE name = ? AND is_active = 1 ORDER BY id ASC LIMIT 1");
     $svcStmt->execute([$service]);
     $svcRow = $svcStmt->fetch(PDO::FETCH_ASSOC);
     if (!$svcRow) {
@@ -130,8 +134,30 @@ try {
     $serviceName = $svcRow['name'];
     $serviceId   = $svcRow['id'];
 
-    // Guest cap: reject over-capacity edits, same limit the customer form uses.
-    $maxCap = ($svcRow['max_cap'] !== null && (int) $svcRow['max_cap'] > 0) ? (int) $svcRow['max_cap'] : null;
+    // Guest cap: reject over-capacity edits, same rule the customer form uses.
+    // The effective limit is the tighter of the service cap and the selected
+    // package cap (either may be NULL = unlimited), so an admin cannot bypass a
+    // package-level cap that the booking flow already enforces.
+    $serviceCap = ($svcRow['max_cap'] !== null && (int) $svcRow['max_cap'] > 0) ? (int) $svcRow['max_cap'] : null;
+    $packageCap = null;
+    if (!empty($existing['selected_package'])) {
+        $pkgStmt = $pdo->prepare(
+            "SELECT max_cap FROM service_packages
+              WHERE service_id = ? AND package_name = ? AND is_active = 1
+              ORDER BY sort_order ASC LIMIT 1"
+        );
+        $pkgStmt->execute([$serviceId, $existing['selected_package']]);
+        $pkgCapRaw = $pkgStmt->fetchColumn();
+        if ($pkgCapRaw !== false && $pkgCapRaw !== null && (int) $pkgCapRaw > 0) {
+            $packageCap = (int) $pkgCapRaw;
+        }
+    }
+    $maxCap = null;
+    foreach ([$serviceCap, $packageCap] as $cap) {
+        if ($cap !== null) {
+            $maxCap = ($maxCap === null) ? $cap : min($maxCap, $cap);
+        }
+    }
     if ($maxCap !== null && $guests > $maxCap) {
         http_response_code(422);
         echo json_encode([
@@ -189,6 +215,15 @@ try {
         $emailResult = pdrDispatchStatusEmail($pdo, $reservationId, $status);
         $emailMode = $emailResult['mode'] ?? 'none';
     }
+
+    pdrAudit($pdo, 'reservation.update', 'reservation', $reservationId, [
+        'from_status' => $existing['status'],
+        'to_status' => $status,
+        'service' => $serviceName,
+        'date' => $date,
+        'time' => $time,
+        'guests' => $guests,
+    ]);
 
     echo json_encode([
         'ok' => true,

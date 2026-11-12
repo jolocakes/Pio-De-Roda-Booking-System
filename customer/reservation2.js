@@ -28,6 +28,99 @@ function showFieldError(errId, inputId, show) {
   if (inp) inp.classList.toggle("invalid", !!show);
 }
 
+/* ---------------- T-45: CLOUDFLARE TURNSTILE ---------------- */
+// The public config endpoint exposes only the site key (never the secret).
+// When the keys are blank — the default on a fresh clone — captchaEnabled is
+// false and the booking flow behaves exactly as it did before.
+const PDR_PUBLIC_CONFIG = {
+  loaded: false,
+  captchaEnabled: false,
+  turnstileSiteKey: "",
+};
+let pdrTurnstileWidgetId = null;
+let pdrCaptchaToken = "";
+
+async function loadPublicConfig() {
+  try {
+    const res = await fetch("../api/public_config.php", { cache: "no-store" });
+    const cfg = await res.json();
+    if (cfg && cfg.ok) {
+      PDR_PUBLIC_CONFIG.loaded = true;
+      PDR_PUBLIC_CONFIG.captchaEnabled = !!cfg.captchaEnabled;
+      PDR_PUBLIC_CONFIG.turnstileSiteKey = cfg.turnstileSiteKey || "";
+    }
+  } catch (e) {
+    /* fail-open: never block a booking because the config call failed */
+  }
+  if (PDR_PUBLIC_CONFIG.captchaEnabled) loadTurnstileScript();
+}
+
+function loadTurnstileScript() {
+  if (document.getElementById("pdrTurnstileScript")) return;
+  const script = document.createElement("script");
+  script.id = "pdrTurnstileScript";
+  script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+  script.async = true;
+  script.defer = true;
+  script.onload = () => {
+    // The review modal may already be open while the script finishes loading.
+    const modal = document.getElementById("reviewModal");
+    if (modal && modal.classList.contains("open")) {
+      ensureCaptchaWidget();
+      checkChecks();
+    }
+  };
+  document.head.appendChild(script);
+}
+
+function ensureCaptchaWidget() {
+  const modal = document.querySelector("#reviewModal .modal");
+  if (!modal || !PDR_PUBLIC_CONFIG.captchaEnabled) return;
+
+  let host = document.getElementById("pdrCaptcha");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "pdrCaptcha";
+    host.className = "pdr-captcha";
+    host.style.margin = "12px 0";
+    const firstCheckbox = modal.querySelector(".chk");
+    modal.insertBefore(host, firstCheckbox || null);
+  }
+
+  if (window.turnstile && pdrTurnstileWidgetId === null) {
+    pdrCaptchaToken = "";
+    pdrTurnstileWidgetId = window.turnstile.render(host, {
+      sitekey: PDR_PUBLIC_CONFIG.turnstileSiteKey,
+      action: "reservation",
+      theme: "auto",
+      callback: (token) => {
+        pdrCaptchaToken = token || "";
+        checkChecks();
+      },
+      "expired-callback": () => {
+        pdrCaptchaToken = "";
+        checkChecks();
+      },
+      "error-callback": () => {
+        pdrCaptchaToken = "";
+        checkChecks();
+      },
+    });
+  } else if (window.turnstile && pdrTurnstileWidgetId !== null) {
+    pdrCaptchaToken = "";
+    window.turnstile.reset(pdrTurnstileWidgetId);
+  }
+}
+
+function resetCaptcha() {
+  pdrCaptchaToken = "";
+  if (window.turnstile && pdrTurnstileWidgetId !== null) {
+    window.turnstile.reset(pdrTurnstileWidgetId);
+  }
+}
+
+const pdrConfigReady = loadPublicConfig();
+
 /* ---------------- STATE ---------------- */
 // The calendar opens on the CURRENT month (calculated in Asia/Manila), never a
 // hard-coded one, so past months are not the default view.
@@ -73,7 +166,7 @@ function renderDetails() {
   const inclusionsList = Array.isArray(s.inclusions) ? s.inclusions : [];
   el.innerHTML = `
     <h1>${s.name}</h1>
-    <div class="venue-img">${SERVICE_IMAGES[s.id] ? `<img src="${SERVICE_IMAGES[s.id]}" alt="${s.name}">` : "[Pio De Roda Venue Image — placeholder]"}</div>
+    <div class="venue-img">${SERVICE_IMAGES[s.id] ? `<img src="${SERVICE_IMAGES[s.id]}" alt="${s.name}" loading="lazy" decoding="async">` : "[Pio De Roda Venue Image - placeholder]"}</div>
     <div class="section-label">RATES</div>
     <table class="rates">${ratesRows}</table>
     ${hasMenu ? renderMenuTable(s) : ""}
@@ -323,13 +416,24 @@ function renderCalendar() {
       cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — past date">${d}</div>`;
       continue;
     }
+    // T-40: outside the booking window — same visual treatment as a past date.
+    const windowErr = bookingWindowError(ds);
+    if (windowErr) {
+      const why = windowErr === "TOO_SOON"
+        ? `requires at least ${PDR_MIN_LEAD_DAYS} days' notice`
+        : `more than ${PDR_MAX_HORIZON_DAYS} days ahead`;
+      cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — ${why}">${d}</div>`;
+      continue;
+    }
     const unavail = isDateTaken(ds);
     const sel = state.eventDate === ds;
     const meta = AVAIL.meta[ds];
     const hint = unavail
-      ? meta && meta.hasVenue
-        ? "venue booked"
-        : "fully booked"
+      ? meta && meta.blackout
+        ? "closed by staff"
+        : meta && meta.hasVenue
+          ? "exclusive service booked"
+          : "fully booked"
       : meta && meta.count > 0
         ? `${meta.count} of ${(AVAIL.rules && AVAIL.rules.maxPerDay) || 2} slots booked`
         : "";
@@ -1085,15 +1189,21 @@ function handleContinue() {
   // The calendar already blocks those days; this is the SECOND check that runs
   // at submission time (a date can become past/taken after it was selected).
   let dateMsg = "";
+  const windowErr = state.eventDate ? bookingWindowError(state.eventDate) : null;
   if (!state.eventDate) dateMsg = "Please select an event date.";
-  else if (isPastDate(state.eventDate))
-    dateMsg =
-      "That date has already passed. Please select a current or future date.";
+  else if (windowErr === "TOO_SOON")
+    dateMsg = `Bookings require at least ${PDR_MIN_LEAD_DAYS} days' notice. Please choose a later date.`;
+  else if (windowErr === "TOO_FAR")
+    dateMsg = `Bookings open at most ${PDR_MAX_HORIZON_DAYS} days ahead. Please choose an earlier date.`;
+  else if (windowErr === "INVALID")
+    dateMsg = "Please select a valid event date.";
   else if (isDateTaken(state.eventDate))
     dateMsg =
-      AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue
-        ? "The venue is already booked for that date. Please choose another date."
-        : "That date is fully booked. Please choose another date.";
+      AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].blackout
+        ? "That date is closed by our staff. Please choose another date."
+        : AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue
+          ? "The venue is already booked for that date. Please choose another date."
+          : "That date is fully booked. Please choose another date.";
   if (dateMsg) document.getElementById("errDate").textContent = dateMsg;
   setErr("errDate", !!dateMsg);
 
@@ -1184,14 +1294,22 @@ function openReviewModal() {
   document.getElementById("chkGuidelines").checked = false;
   document.getElementById("submitBtn").disabled = true;
   document.getElementById("reviewModal").classList.add("open");
+  // T-45: the widget is injected during the async config load; re-check once
+  // the config and script are ready.
+  pdrConfigReady.then(() => {
+    ensureCaptchaWidget();
+    checkChecks();
+  });
 }
 
 function checkChecks() {
   const c1 = document.getElementById("chkCorrect").checked;
   const c2 = document.getElementById("chkGuidelines").checked;
+  const captchaOk = !PDR_PUBLIC_CONFIG.captchaEnabled || pdrCaptchaToken !== "";
   document.getElementById("submitBtn").disabled = !(
     c1 &&
     c2 &&
+    captchaOk &&
     state.catalogReady &&
     state.service
   );
@@ -1234,9 +1352,14 @@ document.getElementById("submitBtn").onclick = async () => {
   }
   // FINAL re-validation before submission (the calendar may have changed since
   // the customer picked the date — a day can become past or taken meanwhile).
-  if (isPastDate(state.eventDate)) {
+  const finalWindowErr = bookingWindowError(state.eventDate);
+  if (finalWindowErr) {
     alert(
-      "The selected event date has already passed. Please go back and choose a current or future date.",
+      finalWindowErr === "TOO_SOON"
+        ? `Bookings require at least ${PDR_MIN_LEAD_DAYS} days' notice. Please choose a later date.`
+        : finalWindowErr === "TOO_FAR"
+          ? `Bookings open at most ${PDR_MAX_HORIZON_DAYS} days ahead. Please choose an earlier date.`
+          : "Please choose a valid event date.",
     );
     document.getElementById("reviewModal").classList.remove("open");
     state.eventDate = null;
@@ -1275,6 +1398,16 @@ document.getElementById("submitBtn").onclick = async () => {
   btn.disabled = true;
   btn.textContent = "Submitting…";
 
+  // T-45: wait for the public config, then require a Turnstile token when the
+  // keys are configured. pdrVerifyCaptcha() enforces the same rule server-side.
+  await pdrConfigReady;
+  if (PDR_PUBLIC_CONFIG.captchaEnabled && !pdrCaptchaToken) {
+    alert("Please complete the verification challenge before submitting.");
+    btn.disabled = false;
+    btn.textContent = "Submit Reservation";
+    return;
+  }
+
   // Structured additional-services list: name, quantity, unit price, total price.
   const additionalServices = Object.values(state.cart).map((c) => ({
     name: c.item.name,
@@ -1306,6 +1439,8 @@ document.getElementById("submitBtn").onclick = async () => {
       : {}),
     additionalServices,
     estimatedTotal: computeTotal(),
+    // T-45: present only when Turnstile is configured.
+    ...(PDR_PUBLIC_CONFIG.captchaEnabled ? { captchaToken: pdrCaptchaToken } : {}),
   };
 
   let result;
@@ -1319,6 +1454,9 @@ document.getElementById("submitBtn").onclick = async () => {
   btn.textContent = "Submit Reservation";
 
   if (!result.ok) {
+    // Turnstile tokens are single-use, so any failed attempt needs a fresh one.
+    resetCaptcha();
+    checkChecks();
     if (result.reason === "DATE_TAKEN") {
       // cause distinguishes WHY the date closed: VENUE (exclusive per date)
       // or FULL (2 services already booked).
@@ -1340,6 +1478,10 @@ document.getElementById("submitBtn").onclick = async () => {
       state.eventTime = "";
       await refreshAvailability();
       renderPanel();
+    } else if (result.reason === "CAPTCHA_FAILED") {
+      alert(
+        "The verification challenge failed or expired. Please complete it again and submit.",
+      );
     } else if (result.reason === "INVALID") {
       alert(
         "Some reservation details are missing or invalid. Please review the form.",

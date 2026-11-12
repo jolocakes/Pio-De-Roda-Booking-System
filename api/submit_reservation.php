@@ -321,10 +321,35 @@ if ($address === '') {
     $address = null; // services that don't collect it store NULL
 }
 
-// Check if date is in the past
-if (strtotime($eventDate) < strtotime(date('Y-m-d'))) {
+// T-40: enforce the booking window server-side. "Not in the past" is not
+// enough — same-day spam and year-3000 bookings are both rejected here.
+$windowError = pdrBookingWindowError($eventDate);
+if ($windowError !== null) {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'reason' => 'INVALID']);
+    echo json_encode([
+        'ok' => false,
+        'reason' => $windowError, // TOO_SOON | TOO_FAR | INVALID
+        'field' => 'eventDate',
+        'minLeadDays' => PDR_MIN_LEAD_DAYS,
+        'maxHorizonDays' => PDR_MAX_HORIZON_DAYS,
+    ]);
+    exit();
+}
+
+// T-45: CAPTCHA on the booking form. This is fail-open while the Turnstile
+// keys are unset (fresh clone / local XAMPP), and enforced as soon as both
+// keys exist in .env. A Cloudflare outage is logged and allowed through by
+// pdrVerifyCaptcha() so bookings never depend on the gateway being up.
+require_once __DIR__ . '/../config/captcha.php';
+$captcha = pdrVerifyCaptcha($data['captchaToken'] ?? null, pdrCaptchaClientIp(), 'reservation');
+if (!$captcha['ok']) {
+    http_response_code(400);
+    echo json_encode([
+        'ok' => false,
+        'reason' => 'CAPTCHA_FAILED',
+        'field' => 'captchaToken',
+        'mode' => $captcha['mode'],
+    ]);
     exit();
 }
 
@@ -403,6 +428,8 @@ try {
         } catch (PDOException $dup) {
             $driverCode = isset($dup->errorInfo[1]) ? (int) $dup->errorInfo[1] : 0;
             if ($dup->getCode() === '23000' && $driverCode === 1062) {
+                // Clear the failed statement before reusing it with a new ID.
+                try { $insert->closeCursor(); } catch (Throwable $ignored) {}
                 continue; // ID collision — try a fresh random suffix
             }
             throw $dup; // any other failure is a real error

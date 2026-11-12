@@ -1,4 +1,24 @@
-<?php require_once __DIR__ . '/auth_check.php'; ?>
+<?php
+require_once __DIR__ . '/auth_check.php';
+require_once __DIR__ . '/../config/db.php';
+
+// T-15 operational aid: webhook amount mismatches are flagged in the database,
+// but the full payment module (T-19) is still mock data. Surface them here so
+// they cannot be missed while that rebuild is pending.
+$reviewPayments = [];
+try {
+    $reviewStmt = $pdo->query(
+        "SELECT reservation_id, amount, paid_amount, paid_at
+           FROM payments
+          WHERE status = 'For Review'
+          ORDER BY id DESC
+          LIMIT 20"
+    );
+    $reviewPayments = $reviewStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (Throwable $reviewError) {
+    $reviewPayments = [];
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -60,6 +80,9 @@
                 </li>
                 <li class="nav-item">
                     <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
+                    <?php if (pdrCan('manage_staff')): ?>
+                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                    <?php endif; ?>
                 </li>
             </ul>
 
@@ -95,15 +118,34 @@
                 <button class="btn-add-new" onclick="openModal()"><i class="fa-solid fa-plus"></i> Record Payment</button>
             </div>
 
+            <?php if (!empty($reviewPayments)): ?>
+            <div style="margin:0 0 18px;padding:14px 18px;border:1px solid #d93025;border-left:6px solid #d93025;border-radius:8px;background:#fdecea;color:#611a15;">
+                <strong>Payments needing review (<?php echo count($reviewPayments); ?>)</strong>
+                <p style="margin:6px 0 8px;font-size:13px;">These webhook payments did not match the expected amount and were <strong>not</strong> marked paid.</p>
+                <ul style="margin:0;padding-left:18px;font-size:13px;">
+                    <?php foreach ($reviewPayments as $rp): ?>
+                    <li>
+                        <strong><?php echo htmlspecialchars((string) ($rp['reservation_id'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></strong>
+                        &mdash; expected &#8369;<?php echo number_format((float) ($rp['amount'] ?? 0), 2); ?>,
+                        paid <?php echo ($rp['paid_amount'] === null) ? '(unknown)' : '&#8369;' . number_format((float) $rp['paid_amount'], 2); ?>
+                        <?php if (!empty($rp['paid_at'])): ?>
+                            on <?php echo htmlspecialchars((string) $rp['paid_at'], ENT_QUOTES, 'UTF-8'); ?>
+                        <?php endif; ?>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <?php endif; ?>
+
             <!-- Summary Metrics -->
             <div class="metrics-grid">
                 <div class="metric-card">
                     <h4>Total Collected</h4>
-                    <div class="metric-value" id="m_collected">₱00.00</div>
+                    <div class="metric-value" id="m_collected">â‚±00.00</div>
                 </div>
                 <div class="metric-card">
                     <h4>Outstanding Balances</h4>
-                    <div class="metric-value" id="m_outstanding" style="color: #d93025;">₱00.00</div>
+                    <div class="metric-value" id="m_outstanding" style="color: #d93025;">â‚±00.00</div>
                 </div>
                 <div class="metric-card">
                     <h4>Fully Paid Records</h4>
@@ -154,15 +196,15 @@
                         <input type="text" id="p_customer" required placeholder="e.g. Maria Santos">
                     </div>
                     <div class="form-group">
-                        <label>Total Amount (₱)</label>
+                        <label>Total Amount (â‚±)</label>
                         <input type="number" id="p_total" required placeholder="00.00" oninput="calculateBalance()">
                     </div>
                     <div class="form-group">
-                        <label>Deposit Paid (₱)</label>
+                        <label>Deposit Paid (â‚±)</label>
                         <input type="number" id="p_deposit" required placeholder="00.00" oninput="calculateBalance()">
                     </div>
                     <div class="form-group">
-                        <label>Remaining Balance (₱)</label>
+                        <label>Remaining Balance (â‚±)</label>
                         <input type="number" id="p_balance" readonly placeholder="00.00" style="background:#f4efe8;">
                     </div>
                     <div class="form-group">
@@ -245,7 +287,7 @@
         ];
 
         function formatCurrency(amount) {
-            return '₱' + Number(amount).toLocaleString('en-US');
+            return 'â‚±' + Number(amount).toLocaleString('en-US');
         }
 
         function calculateBalance() {
@@ -334,5 +376,6 @@
         document.addEventListener('DOMContentLoaded', renderPaymentsTable);
     </script>
 <script src="responsive.js"></script>
+<script src="a11y.js"></script>
 </body>
 </html>

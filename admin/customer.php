@@ -59,6 +59,9 @@
                 </li>
                 <li class="nav-item">
                     <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
+                    <?php if (pdrCan('manage_staff')): ?>
+                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                    <?php endif; ?>
                 </li>
             </ul>
 
@@ -248,6 +251,7 @@
         document.addEventListener('DOMContentLoaded', renderCustomersTable);
     </script>
 <script src="responsive.js"></script>
+<script src="a11y.js"></script>
 </body>
 </html>
 
