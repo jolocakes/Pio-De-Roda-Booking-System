@@ -12,13 +12,21 @@
 // ranges and the PDR-YYYY booking year.
 date_default_timezone_set('Asia/Manila');
 
-$host = 'localhost';
-$dbname = 'pdrsystem';
-$username = 'root';
-$password = '';
+// T-31: credentials come from the git-ignored .env, with the local XAMPP
+// defaults kept as fallbacks so a fresh clone still runs.
+require_once __DIR__ . '/env.php';
+
+// T-30: one place for the security headers. Safe to include more than once.
+require_once __DIR__ . '/security_headers.php';
+
+$host     = (string) pdrEnv('PDR_DB_HOST', 'localhost');
+$dbname   = (string) pdrEnv('PDR_DB_NAME', 'pdrsystem');
+$username = (string) pdrEnv('PDR_DB_USER', 'root');
+$password = (string) pdrEnv('PDR_DB_PASS', '');
+$port     = (string) pdrEnv('PDR_DB_PORT', '3306');
 
 try {
-    $dsn = "mysql:host=$host;dbname=$dbname;charset=utf8mb4";
+    $dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

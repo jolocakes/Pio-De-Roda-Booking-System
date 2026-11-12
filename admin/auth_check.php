@@ -43,3 +43,7 @@ if (!isset($_SESSION['admin_id']) || !isset($_SESSION['admin_username'])) {
 
 // Pages including this guard can render pdrCsrfField() for POST forms.
 pdrCsrfToken();
+
+// T-36: role helpers (pdrCan / pdrRequirePageCapability) are used by the
+// individual pages to gate privileged areas.
+require_once __DIR__ . '/../config/rbac.php';
