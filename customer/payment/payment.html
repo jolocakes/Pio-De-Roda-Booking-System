@@ -4,20 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Payment | Pio De Roda</title>
+  <!-- Google Fonts: same as every other page (Fraunces + Work Sans) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../nav.css" />
   <link rel="stylesheet" href="payment.css" />
 </head>
 <body>
-  <header id="site-header">
+  <header class="site-header" id="site-header">
     <nav class="navbar">
-      <a href="../nav.html" class="brand">Pio De Roda</a>
-      <div class="nav-links" id="navLinks">
-        <a href="../nav.html">Home</a>
-        <a href="../booking-status.html">Booking Status</a>
-      </div>
-      <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+      <a href="../nav.html" class="brand">
+        <img src="../pioderodalogo.jpg" alt="Pio De Roda Cafe and Restaurant logo" class="brand-mark" decoding="async" />
+        <span class="brand-name">Pio De Roda Cafe<small>Restaurant &amp; Catering Services</small></span>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
         <span></span><span></span><span></span>
       </button>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="../nav.html" class="nav-link">Home</a></li>
+        <li><a href="../booking-status.html" class="nav-link">Booking Status</a></li>
+      </ul>
     </nav>
   </header>
 

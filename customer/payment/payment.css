@@ -1,17 +1,221 @@
-:root{--bg:#f7f4ef;--card:#fff;--text:#2b2b2b;--muted:#6b6b6b;--brand:#7a4a2e;--brand2:#5f3923;--ok:#1f7a4d;--err:#b42318;--line:#e8e1d8}
-*{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
-.pay-wrap{max-width:720px;margin:24px auto;padding:0 16px}
-.pay-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 20px;box-shadow:0 6px 24px rgba(0,0,0,.04)}
-.kicker{margin:0 0 4px;font-size:.78rem;letter-spacing:.06em;color:var(--brand);font-weight:700}
-h1{margin:0 0 6px;font-size:1.55rem} h2{margin:18px 0 8px;font-size:1.05rem}
-.muted{color:var(--muted)} .small{font-size:.9rem}
-.notice{padding:12px 14px;border-radius:10px;background:#f3f0ea;margin:12px 0}
-.notice.error{background:#fdecec;color:var(--err)} .notice.success{background:#eaf6ef;color:var(--ok)}
-.summary{margin:14px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.summary .row{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-top:1px solid var(--line)}
-.summary .row:first-child{border-top:0} .summary span{color:var(--muted)}
-.choice{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin:8px 0;cursor:pointer}
-.choice input{margin-top:4px} .amt{color:var(--brand);font-weight:600;margin-left:6px}
-.btn-primary{width:100%;margin-top:10px;padding:12px 16px;border:0;border-radius:10px;background:var(--brand);color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
-.btn-primary:hover{background:var(--brand2)} .btn-primary:disabled{opacity:.6;cursor:not-allowed}
-.back{margin-top:14px} .back a{color:var(--brand)}
+/* ==========================================================================
+   PAYMENT / RESULT PAGES — themed to match the rest of the site.
+   Design tokens (maroon/cream/gold, Fraunces/Work Sans) come from ../nav.css;
+   this file only styles the payment-specific pieces.
+   ========================================================================== */
+
+:root {
+  --bg: var(--cream-soft, #fbf6ee);
+  --card: #ffffff;
+  --text: var(--text-dark, #2a0e0e);
+  --muted: var(--text-muted, #6b4c4c);
+  --brand: var(--crimson, #8c1414);
+  --brand2: var(--maroon, #5b0808);
+  --ok: #1f7a4d;
+  --err: #b42318;
+  --line: var(--border-soft, rgba(91, 8, 8, 0.14));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Body font/background come from nav.css — only set the page backdrop here. */
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* The header is fixed — keep the card clear of it. */
+.pay-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: calc(var(--nav-height, 76px) + 1.5rem) 16px 3rem;
+}
+
+.pay-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 18px);
+  padding: 26px 24px;
+  box-shadow: var(--shadow-soft, 0 10px 30px rgba(91, 8, 8, 0.14));
+}
+
+.kicker {
+  margin: 0 0 4px;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand);
+  font-weight: 700;
+}
+
+h1 {
+  font-family: var(--font-display);
+  color: var(--text-dark);
+  margin: 0 0 6px;
+  font-size: 1.65rem;
+  font-weight: 600;
+}
+
+h2 {
+  font-family: var(--font-display);
+  color: var(--text-dark);
+  margin: 18px 0 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.9rem;
+}
+
+.notice {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--cream, #f6ecdd);
+  margin: 12px 0;
+  font-family: var(--font-body);
+  color: var(--text);
+}
+
+.notice.error {
+  background: #fdecec;
+  color: var(--err);
+}
+
+.notice.success {
+  background: #eaf6ef;
+  color: var(--ok);
+}
+
+.summary {
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.summary .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+}
+
+.summary .row:first-child {
+  border-top: 0;
+}
+
+.summary span {
+  color: var(--muted);
+}
+
+.summary strong {
+  color: var(--text-dark);
+}
+
+.choice {
+  display: block;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--cream-soft, #fbf6ee);
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.choice input {
+  margin-top: 4px;
+}
+
+.amt {
+  color: var(--brand);
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* Primary action — matches the site's gold pill button (.btn-primary) */
+.btn-primary {
+  display: inline-block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 0.9rem 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gold, #b8862e);
+  color: var(--maroon, #5b0808);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
+}
+
+.btn-primary:hover {
+  background: var(--gold-light, #d9a84e);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift, 0 18px 40px rgba(91, 8, 8, 0.22));
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.back {
+  margin-top: 16px;
+  font-family: var(--font-body);
+}
+
+.back a {
+  color: var(--crimson, #8c1414);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.back a:hover {
+  color: var(--maroon, #5b0808);
+}
+
+/* Inputs (if any on these pages) inherit the site's warm field styling */
+input[type="text"],
+input[type="number"] {
+  font-family: var(--font-body);
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+  outline: 3px solid var(--gold, #b8862e);
+  outline-offset: 2px;
+}
+
+@media (max-width: 680px) {
+  .pay-card {
+    padding: 20px 16px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+  }
+}

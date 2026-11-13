@@ -290,6 +290,13 @@ body {
   background-color: rgba(107, 76, 76, 0.15); 
   color: var(--text-muted); 
 }
+/* reservation.php lets admins set status "Completed" (see update_status.php
+   $allowedStatuses), but this page only styled Pending/Confirmed/Cancelled/
+   Rejected — Completed rendered as an unstyled badge. Matches dashboard.css. */
+.badge-completed {
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
 
 .btn {
   padding: 6px 10px;

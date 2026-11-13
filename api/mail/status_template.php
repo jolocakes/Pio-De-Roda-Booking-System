@@ -28,7 +28,7 @@ function pdrStatusEmailFor(string $status, array $r): ?array
             'badge'   => 'CONFIRMED',
             'lead'    => 'Good news — our staff has approved your reservation.',
             'steps'   => [
-                'You may now proceed to payment. Your estimated total is shown below.',
+                'You may now proceed to payment. Your estimated total is shown above.',
                 'Keep your Reservation ID and Booking PIN — you need both to check your booking status.',
                 'If you need to reschedule or cancel, please contact us as early as possible.',
             ],

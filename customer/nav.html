@@ -435,8 +435,8 @@
               <li><strong>Phone</strong>(046) 415 0390 / (0926) 684 5833</li>
               <li>
                 <strong>Email</strong>
-                <a href="mailto:pioderoda.booking@gmail.com"
-                  >pioderoda.booking@gmail.com</a
+                <a href="mailto:pioderodabooking@gmail.com"
+                  >pioderodabooking@gmail.com</a
                 >
               </li>
               <li><strong>Hours</strong>Open daily, 8:00 AM – 10:00 PM</li>
@@ -445,7 +445,7 @@
           <form
             class="contact-form"
             id="contactForm"
-            action="api/process_contact.php"
+            action="../api/process_contact.php"
             method="POST"
             onsubmit="handleContactFormSubmit(event)"
           >
@@ -602,7 +602,7 @@
         window.addEventListener("resize", runSpy);
         window.addEventListener("hashchange", runSpy);
         runSpy();
-      });
+      })();
 
       // Contact form: send message via PHP backend (no redirect to email client)
       function handleContactFormSubmit(event) {

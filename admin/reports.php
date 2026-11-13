@@ -676,12 +676,20 @@ $printMode = $exportPdf;
             });
         }
 
+        function deleteReview(index) {
+            if(confirm('Manage feedback: Are you sure you want to remove this inappropriate feedback?')) {
+                reviewsData.splice(index, 1);
+                renderReviews();
+            }
+        }
+
         function filterRevenue(type, event) {
             if (event && event.target) setActiveTab(event.target);
 
             const tbody = document.getElementById('revenueReportBody');
             const rows = revenueReports[type] || [];
             tbody.innerHTML = '';
+
             if (!rows.length) {
                 renderEmptyRow(tbody, 4);
                 return;
@@ -700,16 +708,24 @@ $printMode = $exportPdf;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            filterReservation('Daily');
-            filterRevenue('Daily');
+            renderReviews();
+
+            const resSection = document.getElementById('reservationReportBody');
+            const revSection = document.getElementById('revenueReportBody');
+
+            filterReservation(
+                'Daily',
+                {
+                    target: resSection?.closest('.section-container')?.querySelector('.tab-btn') ?? null
+                }
+            );
+
+            filterRevenue(
+                'Daily',
+                {
+                    target: revSection?.closest('.section-container')?.querySelector('.tab-btn') ?? null
+                }
+            );
         });
-    </script>
-    <?php if ($printMode): ?>
-    <script>
-        // T-44: opened via "Print PDF" — send straight to the browser print dialog.
-        window.addEventListener('load', () => window.print());
-    </script>
-    <?php endif; ?>
-    <script src="responsive.js"></script>
 </body>
 </html>

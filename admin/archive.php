@@ -143,7 +143,11 @@
             ],
             reviews: [
                 { id: 401, client: 'Anonymous User', rating: '1.0 Stars', comment: 'Spam comment with invalid contact details.', archived_date: '2026-10-01', reason: 'Inappropriate Content' }
-            ]
+            ],
+            // renderArchiveTable() has a 'services' branch (no tab button exposes
+            // it yet). Without this key that branch would throw
+            // "Cannot read properties of undefined (reading 'filter')".
+            services: []
         };
 
         function renderArchiveTable() {
@@ -170,7 +174,7 @@
                 );
 
                 if(filtered.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding:30px;">No archived reservations found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding:30px;">No archived reservations found.</td></tr>';
                     return;
                 }
 
@@ -204,7 +208,7 @@
                 );
 
                 if(filtered.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding:30px;">No archived customer records found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding:30px;">No archived customer records found.</td></tr>';
                     return;
                 }
 
@@ -238,7 +242,7 @@
                 );
 
                 if(filtered.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding:30px;">No archived services found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding:30px;">No archived services found.</td></tr>';
                     return;
                 }
 
@@ -272,7 +276,7 @@
                 );
 
                 if(filtered.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding:30px;">No archived feedback found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding:30px;">No archived feedback found.</td></tr>';
                     return;
                 }
 

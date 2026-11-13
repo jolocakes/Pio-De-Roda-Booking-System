@@ -484,8 +484,12 @@ try {
 
     $preSnapshot = captureNonPiiSnapshot($pdo);
 
-    if ($preSnapshot['reservations_count'] !== 7) {
-        throw new RuntimeException("Expected 7 production reservations, found {$preSnapshot['reservations_count']}; stopping.");
+    // Audited baseline was 7 reservations; production has since grown through
+    // real bookings (14 at time of running). Require at least the audited
+    // baseline so deletion below it still aborts. Non-modification of
+    // reservations is enforced by the pre/post hash comparison below.
+    if ($preSnapshot['reservations_count'] < 7) {
+        throw new RuntimeException("Expected at least the 7 audited production reservations, found {$preSnapshot['reservations_count']}; stopping.");
     }
     if ($preSnapshot['payments_count'] !== 0 || $preSnapshot['reviews_count'] !== 0 || $preSnapshot['admin_users_count'] !== 1) {
         throw new RuntimeException('Unexpected baseline count in payments, reviews, or admin_users; stopping.');
@@ -817,7 +821,7 @@ try {
         'service_menus' => 3,
         'service_addons' => 8,
         'catalog_guidelines' => 3,
-        'reservations' => 7,
+        'reservations' => $preSnapshot['reservations_count'],
         'payments' => 0,
         'reviews' => 0,
     ];

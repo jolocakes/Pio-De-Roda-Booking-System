@@ -70,7 +70,9 @@ try {
         'selectedPackage' => $res['selected_package'],
         'mainCourses' => $res['main_courses'] ? json_decode($res['main_courses'], true) : [],
         'additionalServices' => $res['additional_services'] ? json_decode($res['additional_services'], true) : [],
-        'estimatedTotal' => '₱' . number_format($res['estimated_total'], 2),
+        // Raw numeric amount — the client formats it (see booking-status.js money()).
+        // Sending a pre-formatted "₱1,234.00" here made Number() return NaN.
+        'estimatedTotal' => round((float) $res['estimated_total'], 2),
         'daysUntilEvent' => $daysUntilEvent,
         'rescheduleCount' => $rescheduleCount,
         'maxReschedules' => PDR_MAX_RESCHEDULES,

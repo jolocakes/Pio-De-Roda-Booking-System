@@ -65,6 +65,15 @@ if (empty($customerName) || empty($eventDate) || empty($eventTime) || empty($mai
     exit();
 }
 
+// Email format — the booking page validates this client-side only. The
+// confirmation email carries the only copy of the booking PIN, so an
+// undeliverable address means a customer who can never check their status.
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'email']);
+    exit();
+}
+
 // Guests: must be at least 1 — it is the basis for every per-head price below.
 if ($guests < 1) {
     http_response_code(400);
@@ -477,6 +486,10 @@ try {
     ]);
 
 } catch (Exception $e) {
+    // Log the detail, never echo it: raw exception text can expose SQL/schema
+    // internals to an anonymous client (every other endpoint logs + returns a
+    // generic reason).
+    error_log('submit_reservation error: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['ok' => false, 'reason' => 'NETWORK', 'error' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'reason' => 'NETWORK']);
 }

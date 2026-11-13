@@ -68,7 +68,14 @@
   }
   // Event Time ("09:00" -> "9:00 AM"); records saved before the field existed show "—".
   function fmtTime(v){ return has(v) ? (esc(fmtEventTime(v)) || "—") : "—"; }
-  const money = n => (n !== null && n !== "" && isFinite(Number(n))) ? "₱" + Number(n).toLocaleString() : "—";
+  // Accepts a raw number (preferred) or a value the server already formatted
+  // as "₱1,234.00". Number("₱1,234.00") is NaN, which used to render "—".
+  const money = n => {
+    if (n === null || n === undefined || n === "") return "—";
+    if (typeof n === "string" && n.indexOf("₱") !== -1) return n.trim();
+    const v = Number(String(n).replace(/,/g, ""));
+    return isFinite(v) ? "₱" + v.toLocaleString() : "—";
+  };
   const row = (label, html) => `<div class="bs-row"><span>${label}</span><span>${html}</span></div>`;
   const optRow = (label, v) => has(v) ? row(label, esc(v)) : ""; // only show optional fields that were collected
 

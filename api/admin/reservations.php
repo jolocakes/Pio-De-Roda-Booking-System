@@ -108,7 +108,13 @@ try {
 
     echo json_encode($reservations);
 } catch (Exception $e) {
+    // Never return raw exception text to the client (see other endpoints).
+    error_log('admin reservations error: ' . $e->getMessage());
     http_response_code(500);
     error_log('Admin reservations API error: ' . $e->getMessage());
-    echo json_encode(['error' => 'SERVER_ERROR']);
+    echo json_encode([
+        'ok' => false,
+        'error' => 'SERVER_ERROR',
+        'reason' => 'SERVER_ERROR'
+    ]);
 }
