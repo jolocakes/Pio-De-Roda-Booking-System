@@ -11,8 +11,8 @@ $canManageBlackouts = pdrCan('manage_blackouts');
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="calendar.css" />
-    <link rel="stylesheet" href="responsive.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('calendar.css'); ?>" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
     
 </head>
@@ -62,11 +62,11 @@ $canManageBlackouts = pdrCan('manage_blackouts');
                 </li>
 
                 <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
-                    <?php if (pdrCan('manage_staff')): ?>
-                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                    <?php endif; ?>
+                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
                 </li>
+                <?php if (pdrCan('manage_staff')): ?>
+                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                <?php endif; ?>
             </ul>
 
         </div>
@@ -134,10 +134,10 @@ $canManageBlackouts = pdrCan('manage_blackouts');
                     <div class="card" id="venueAvailabilityCard" style="margin-bottom: 20px;">
                         <div class="panel-section-title">
                             <span>Availability</span>
-                            <span id="availDateLabel" style="font-size: 11px; color: var(--text-muted);">â€”</span>
+                            <span id="availDateLabel" style="font-size: 11px; color: var(--text-muted);">—</span>
                         </div>
                         <div id="availabilityPanel">
-                            <p style="font-size: 12px; color: #718096; padding: 10px 0;">Loading availabilityâ€¦</p>
+                            <p style="font-size: 12px; color: #718096; padding: 10px 0;">Loading availability…</p>
                         </div>
                     </div>
 
@@ -148,7 +148,7 @@ $canManageBlackouts = pdrCan('manage_blackouts');
                             <span>Schedule Details</span>
                         </div>
                         <div id="scheduleDetailsPanel">
-                            <p style="font-size: 12px; color: #718096; padding: 10px 0;">Loading bookingsâ€¦</p>
+                            <p style="font-size: 12px; color: #718096; padding: 10px 0;">Loading bookings…</p>
                         </div>
                     </div>
                 </div>
@@ -195,7 +195,7 @@ const PDR_CSRF_TOKEN = <?php echo json_encode(pdrCsrfToken(), JSON_HEX_TAG | JSO
 let fetchSequence = 0;
 
 /* ------------------------------------------------------------------
-   AVAILABILITY â€” the SAME endpoint the customer landing page and the
+   AVAILABILITY — the SAME endpoint the customer landing page and the
    booking section use (api/availability.php -> api/capacity.php).
    Reading one shared source is what keeps the admin calendar in sync:
    max 2 services/day, venue exclusive per date, per-service time slots.
@@ -210,10 +210,10 @@ function isAvailTaken(dateStr) {
 function availHint(dateStr) {
     const m = avail.meta[dateStr];
     if (!m) return '';
-    if (m.blackout) return 'Closed by staff' + (m.blackoutReason ? ' â€” ' + m.blackoutReason : '');
-    if (m.hasVenue) return 'Exclusive service booked â€” date closed';
+    if (m.blackout) return 'Closed by staff' + (m.blackoutReason ? ' — ' + m.blackoutReason : '');
+    if (m.hasVenue) return 'Exclusive service booked — date closed';
     const cap = (avail.rules && avail.rules.maxPerDay) || 2;
-    if (m.count >= cap) return `${m.count} of ${cap} slots used â€” date closed`;
+    if (m.count >= cap) return `${m.count} of ${cap} slots used — date closed`;
     if (m.count > 0) return `${m.count} of ${cap} slots used`;
     return '';
 }
@@ -340,7 +340,7 @@ function renderCalendar() {
         const hint = availHint(dateString);
 
         // Dagdag styling kapag napili ang araw.
-        // NOTE: the selected-day background must NEVER touch a closed date â€”
+        // NOTE: the selected-day background must NEVER touch a closed date —
         // an inline style would beat the .day-taken gray and make a closed
         // day look open. The border still marks it as selected.
         if (dateString === selectedDateStr) {
@@ -359,9 +359,9 @@ function renderCalendar() {
             const badge = getBadgeInfo(evt.rawStatus);
             const customer = evt.customer || 'Unknown customer';
             const service = evt.title || 'Reservation';
-            const chipTitle = `${customer} â€” ${service} (${evt.time || 'All Day'}) Â· ${evt.rawStatus || 'Pending'}`;
+            const chipTitle = `${customer} — ${service} (${evt.time || 'All Day'}) · ${evt.rawStatus || 'Pending'}`;
             eventsHTML += `<span class="event-chip ${badge.cls}" title="${escapeHtml(chipTitle)}">` +
-                `<span class="chip-customer">${escapeHtml(customer)}</span> â€” ${escapeHtml(service)}` +
+                `<span class="chip-customer">${escapeHtml(customer)}</span> — ${escapeHtml(service)}` +
                 `</span>`;
         });
 
@@ -411,7 +411,9 @@ function changeMonth(direction) {
 function updateSidePanels(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     const options = { month: 'short', day: 'numeric', year: 'numeric' };
-    const formattedDate = d.toLocaleDateString('en-US', options);
+    const formattedDate = window.PDRFormat
+        ? PDRFormat.format(dateStr)
+        : d.toLocaleDateString('en-US', options);
 
     // 1. Header date on the availability card
     const availDateLabel = document.getElementById('availDateLabel');
@@ -421,7 +423,7 @@ function updateSidePanels(dateStr) {
     //    below still counts only Pending/Confirmed via api/availability.php.
     const dayEvents = eventsData.filter(e => e.date === dateStr);
 
-    // Update Schedule Details Container (by id â€” no fragile card indexing)
+    // Update Schedule Details Container (by id — no fragile card indexing)
     const scheduleCard = document.getElementById('scheduleDetailsCard');
     if (scheduleCard) {
         let detailsHTML = `<div class="panel-section-title"><span>Schedule Details (${formattedDate})</span></div>`;
@@ -438,7 +440,7 @@ function updateSidePanels(dateStr) {
                 detailsHTML += `
                     <div class="event-detail-item">
                         <div class="event-title">${escapeHtml(customer)}</div>
-                        <div class="event-meta"><i class="fa-solid fa-concierge-bell"></i> ${escapeHtml(service)}${evt.eventType ? ' Â· ' + escapeHtml(evt.eventType) : ''}</div>
+                        <div class="event-meta"><i class="fa-solid fa-concierge-bell"></i> ${escapeHtml(service)}${evt.eventType ? ' · ' + escapeHtml(evt.eventType) : ''}</div>
                         <div class="event-meta"><i class="fa-solid fa-calendar"></i> ${formattedDate}</div>
                         <div class="event-meta"><i class="fa-solid fa-clock"></i> ${escapeHtml(evt.time || 'All Day')}</div>
                         <div class="event-meta"><i class="fa-solid fa-users"></i> ${guests} guests</div>
@@ -454,7 +456,7 @@ function updateSidePanels(dateStr) {
         scheduleCard.innerHTML = detailsHTML;
     }
 
-    // 3. Availability panel â€” the SAME three rules the customer side enforces:
+    // 3. Availability panel — the SAME three rules the customer side enforces:
     //    max 2 services/day, venue exclusive per date, per-service time slots.
     const availCard = document.getElementById('venueAvailabilityCard');
     if (availCard) {
@@ -476,14 +478,14 @@ function updateSidePanels(dateStr) {
             html += `
             <div class="availability-card">
                 <div class="venue-name">Date status</div>
-                <div class="venue-status text-booked">Closed â€” exclusive service booked</div>
+                <div class="venue-status text-booked">Closed — exclusive service booked</div>
                 <div class="time-slot">${exclusive} is exclusive: one booking closes the whole date</div>
             </div>`;
         } else if (meta.count >= cap) {
             html += `
             <div class="availability-card">
                 <div class="venue-name">Date status</div>
-                <div class="venue-status text-booked">Closed â€” ${meta.count} of ${cap} slots used</div>
+                <div class="venue-status text-booked">Closed — ${meta.count} of ${cap} slots used</div>
                 <div class="time-slot">No further bookings accepted for this date</div>
             </div>`;
         } else {
@@ -491,7 +493,7 @@ function updateSidePanels(dateStr) {
             <div class="availability-card">
                 <div class="venue-name">Date status</div>
                 <div class="venue-status text-available">Open</div>
-                <div class="time-slot">${meta.count} of ${cap} slots used â€” ${cap - meta.count} remaining</div>
+                <div class="time-slot">${meta.count} of ${cap} slots used — ${cap - meta.count} remaining</div>
             </div>`;
         }
 
@@ -511,7 +513,7 @@ function updateSidePanels(dateStr) {
                 <div class="time-slot">${meta.hasVenue ? 'Closes this date for every service' : 'Date remains open to other services'}</div>
             </div>`;
 
-        // Taken time slots (per-service â€” a slot blocks only its own service)
+        // Taken time slots (per-service — a slot blocks only its own service)
         const slots = avail.times[dateStr];
         const slotKeys = slots ? Object.keys(slots).sort() : [];
         html += `
@@ -523,7 +525,7 @@ function updateSidePanels(dateStr) {
         } else {
             html += `<div class="venue-status text-booked">${slotKeys.length} booked</div>`;
             slotKeys.forEach(t => {
-                html += `<div class="time-slot">${t} â€” ${(slots[t] || []).join(', ')}</div>`;
+                html += `<div class="time-slot">${t} — ${(slots[t] || []).join(', ')}</div>`;
             });
         }
         html += `</div>`;
@@ -533,7 +535,7 @@ function updateSidePanels(dateStr) {
             html += `
             <div class="availability-card">
                 <div class="venue-name">Staff blackout</div>
-                <div class="venue-status text-booked">Closed${meta.blackoutReason ? ' â€” ' + escapeHtml(meta.blackoutReason) : ''}</div>
+                <div class="venue-status text-booked">Closed${meta.blackoutReason ? ' — ' + escapeHtml(meta.blackoutReason) : ''}</div>
                 <?php if ($canManageBlackouts): ?>
                 <button type="button" onclick="toggleBlackout('${dateStr}')"
                     style="margin-top:8px;padding:7px 11px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;">
@@ -596,6 +598,8 @@ async function toggleBlackout(dateStr) {
 document.addEventListener('DOMContentLoaded', renderCalendar);
 </script>
 
-<script src="responsive.js"></script>
+<script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
+<script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
+<script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>
 </html>

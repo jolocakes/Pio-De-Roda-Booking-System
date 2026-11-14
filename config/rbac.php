@@ -58,6 +58,8 @@ if (!function_exists('pdrCan')) {
             'view'               => ['admin', 'staff', 'viewer'],
             'export_reports'     => ['admin', 'staff', 'viewer'],
             'manage_reservations'=> ['admin', 'staff'],
+            'manage_customers'   => ['admin', 'staff'],
+            'manage_archive'     => ['admin', 'staff'],
             'manage_payments'    => ['admin', 'staff'],
             'manage_reviews'     => ['admin', 'staff'],
             'manage_blackouts'   => ['admin', 'staff'],

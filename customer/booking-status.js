@@ -57,14 +57,14 @@
   const has = v => v !== undefined && v !== null && String(v).trim() !== "";
   const val = v => has(v) ? esc(v) : "—";
   function fmtDay(v){
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v || "");
-    if(!m) return val(v);
-    return new Date(+m[1], +m[2]-1, +m[3]).toLocaleDateString("en-US", {month:"long", day:"numeric", year:"numeric"});
+    if(!has(v)) return val(v);
+    const formatted = window.PDRDates ? PDRDates.format(v) : "";
+    return formatted || val(v);
   }
   function fmtSubmitted(v){
-    if(/^\d{4}-\d{2}-\d{2}$/.test(v || "")) return fmtDay(v); // older records stored only a date
-    const d = new Date(v);
-    return isNaN(d) ? "—" : d.toLocaleDateString("en-US", {month:"long", day:"numeric", year:"numeric"});
+    if(!has(v)) return "—";
+    const formatted = window.PDRDates ? PDRDates.format(v) : "";
+    return formatted || "—";
   }
   // Event Time ("09:00" -> "9:00 AM"); records saved before the field existed show "—".
   function fmtTime(v){ return has(v) ? (esc(fmtEventTime(v)) || "—") : "—"; }
@@ -188,7 +188,10 @@
           </div>` : ""}
 
           <p class="bs-note">This page shows the latest status saved for your reservation. Only Pio De Roda staff can confirm a reservation.</p>
-          <button type="button" class="bs-clear" id="clearBtn">Clear</button>
+          <div class="bs-manage-actions">
+            <button type="button" class="bs-clear" id="viewReceiptBtn">View / Print Receipt</button>
+            <button type="button" class="bs-clear" id="clearBtn">Clear</button>
+          </div>
         </article>
 
         <article class="bs-card bs-summary" id="reservationSummary" tabindex="-1">
@@ -236,6 +239,31 @@
       showVerifyForm();
       verifyCard.scrollIntoView({behavior:"smooth", block:"center"});
     };
+
+    // T-38: printable receipt. The verified ID + PIN are re-sent to a POST-only
+    // endpoint, so the receipt can never be opened by guessing a URL.
+    const receiptBtn = document.getElementById("viewReceiptBtn");
+    if(receiptBtn){
+      receiptBtn.onclick = ()=>{
+        const ctx = readCtx();
+        if(!ctx) return;
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "receipt.php";
+        form.target = "_blank";
+        form.style.display = "none";
+        [["reservationId", ctx.id], ["bookingPin", ctx.pin]].forEach(([name, value])=>{
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+      };
+    }
 
     // T-33: review form (Completed bookings only). The ID + PIN already
     // verified for this page are sent along so the server can re-check them.
@@ -318,7 +346,9 @@
     }
 
     function localDate(d){
-      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      return window.PDRDates
+        ? PDRDates.toISODate(d)
+        : d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
     }
 
     if(cancelBtn){

@@ -18,12 +18,20 @@ $perPage = 25;
 
 $q = trim((string) ($_GET['q'] ?? ''));
 $statusFilter = trim((string) ($_GET['status'] ?? ''));
-$dateFilter = trim((string) ($_GET['date'] ?? ''));
+$fromFilter = trim((string) ($_GET['from'] ?? ''));
+$toFilter = trim((string) ($_GET['to'] ?? ''));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromFilter)) {
+    $fromFilter = '';
+}
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $toFilter)) {
+    $toFilter = '';
+}
 
 try {
     // T-28: filter + paginate in SQL. Loading every reservation into PHP does
     // not scale past a few thousand rows and makes the page slow to render.
-    $where = [];
+    // T-22: archived reservations live in the Archive module, not the active list.
+    $where = ['archived_at IS NULL'];
     $params = [];
 
     if ($q !== '') {
@@ -35,9 +43,13 @@ try {
         $where[] = 'status = ?';
         $params[] = $statusFilter;
     }
-    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFilter)) {
-        $where[] = 'event_date = ?';
-        $params[] = $dateFilter;
+    if ($fromFilter !== '') {
+        $where[] = 'event_date >= ?';
+        $params[] = $fromFilter;
+    }
+    if ($toFilter !== '') {
+        $where[] = 'event_date <= ?';
+        $params[] = $toFilter;
     }
     $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
@@ -57,6 +69,7 @@ try {
     $rows = $stmt->fetchAll();
     foreach ($rows as $r) {
         $reservations[] = [
+            'rowId' => $r['id'],
             'id' => $r['reservation_id'],
             'customer' => $r['customer_name'],
             'phone' => $r['contact_number'],
@@ -68,8 +81,7 @@ try {
             'guests' => $r['guests'],
             'package' => $r['selected_package'] ?? '',
             'status' => $r['status'],
-            'payment' => $r['payment_method'],
-            'amount' => 'â‚±' . number_format($r['estimated_total'], 2),
+            'amount' => '₱' . number_format($r['estimated_total'], 2),
         ];
     }
 } catch (Exception $e) {
@@ -83,7 +95,8 @@ try {
 $pageQuery = array_filter([
     'q' => $q,
     'status' => $statusFilter,
-    'date' => $dateFilter,
+    'from' => $fromFilter,
+    'to' => $toFilter,
 ], static fn($v) => $v !== '');
 $pageUrl = static function (int $target) use ($pageQuery): string {
     return 'reservation.php?' . http_build_query(array_merge($pageQuery, ['page' => $target]));
@@ -101,8 +114,9 @@ $shownTo = min($page * $perPage, $totalRows);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="reservation.css" />
-    <link rel="stylesheet" href="responsive.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 </head>
 <body>
@@ -151,11 +165,11 @@ $shownTo = min($page * $perPage, $totalRows);
                 </li>
 
                 <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
-                    <?php if (pdrCan('manage_staff')): ?>
-                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                    <?php endif; ?>
+                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
                 </li>
+                <?php if (pdrCan('manage_staff')): ?>
+                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                <?php endif; ?>
             </ul>
         </div>
         <div class="sidebar-footer">
@@ -171,7 +185,6 @@ $shownTo = min($page * $perPage, $totalRows);
     <main class="main-wrapper">
         <header class="top-navbar">
             <div class="header-title-section">
-                <i class="fa-solid fa-bars" style="color: #718096; cursor: pointer;"></i>
                 <h1>Reservation Management</h1>
             </div>
             <div class="user-profile">
@@ -192,18 +205,28 @@ $shownTo = min($page * $perPage, $totalRows);
                     placeholder="Search by customer name or reservation ID..."
                     value="<?php echo pdrH($q); ?>">
 
-                <input type="date" id="dateFilter" name="date" class="filter-date"
-                    value="<?php echo pdrH($dateFilter); ?>">
+                <label class="filter-field"><span>Status</span>
+                    <select id="statusFilter" name="status" class="filter-select">
+                        <option value="">All Statuses</option>
+                        <?php foreach (['Pending', 'Confirmed', 'Cancelled', 'Rejected', 'Completed'] as $opt): ?>
+                            <option value="<?php echo pdrH($opt); ?>" <?php echo $statusFilter === $opt ? 'selected' : ''; ?>>
+                                <?php echo pdrH($opt); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
 
-                <select id="statusFilter" name="status" class="filter-select">
-                    <option value="">All Statuses</option>
-                    <?php foreach (['Pending', 'Confirmed', 'Cancelled', 'Rejected', 'Completed'] as $opt): ?>
-                        <option value="<?php echo pdrH($opt); ?>" <?php echo $statusFilter === $opt ? 'selected' : ''; ?>>
-                            <?php echo pdrH($opt); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <button type="submit" class="btn-reset">Filter</button>
+                <label class="filter-field"><span>From</span>
+                    <input type="date" id="fromFilter" name="from" class="filter-date"
+                        value="<?php echo pdrH($fromFilter); ?>">
+                </label>
+
+                <label class="filter-field"><span>To</span>
+                    <input type="date" id="toFilter" name="to" class="filter-date"
+                        value="<?php echo pdrH($toFilter); ?>">
+                </label>
+
+                <button type="submit" class="btn-filter">Filter</button>
                 <a class="btn-reset" href="reservation.php">Reset</a>
             </form>
 
@@ -243,14 +266,13 @@ $shownTo = min($page * $perPage, $totalRows);
                                 <th>Service</th>
                                 <th>Date & Time</th>
                                 <th>Status</th>
-                                <th>Payment</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($reservations)): ?>
                                 <tr>
-                                    <td colspan="8" style="text-align:center;color:#718096;padding:24px;">
+                                    <td colspan="7" style="text-align:center;color:#718096;padding:24px;">
                                         No reservations match these filters.
                                     </td>
                                 </tr>
@@ -273,7 +295,6 @@ $shownTo = min($page * $perPage, $totalRows);
                                             <?php echo pdrH($row['status']); ?>
                                         </span>
                                     </td>
-                                    <td><?php echo pdrH($row['payment']); ?></td>
                                     <td class="action-cell">
                                         <!-- View details -->
                                         <button type="button" class="btn btn-view" title="View Details"
@@ -337,6 +358,17 @@ $shownTo = min($page * $perPage, $totalRows);
                                             target="_blank" rel="noopener">
                                             <i class="fa-solid fa-receipt"></i>
                                         </a>
+
+                                        <?php if ($canManageReservations): ?>
+                                        <!-- T-22: soft-delete into the Archive module -->
+                                        <button type="button" class="btn" title="Archive reservation"
+                                            style="background:#f8fafc;color:#475569;"
+                                            data-archive-reservation
+                                            data-row-id="<?php echo (int) $row['rowId']; ?>"
+                                            data-reservation-id="<?php echo pdrH($row['id']); ?>">
+                                            <i class="fa-solid fa-box-archive"></i>
+                                        </button>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -434,7 +466,7 @@ $shownTo = min($page * $perPage, $totalRows);
         ); ?>;
 
         // T-28: filtering happens server-side (see the filter form above), so
-        // there is no client-side table filter anymore â€” it could only filter
+        // there is no client-side table filter anymore — it could only filter
         // the 25 rows that happen to be on the current page.
 
         function closeModal(modalId) {
@@ -481,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-        // View Reservation Details Modal â€” build DOM nodes with textContent so
+        // View Reservation Details Modal — build DOM nodes with textContent so
         // customer-controlled values can never become HTML/script.
         function viewDetails(id, customer, phone, email, service, date, time, guests, amount, packageName, status) {
             const content = document.getElementById('viewModalContent');
@@ -694,7 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // T-41: resend the confirmation email. The server can only store a PIN
-        // hash, so the action issues a NEW PIN â€” warn the admin first.
+        // hash, so the action issues a NEW PIN — warn the admin first.
         document.querySelectorAll('[data-resend-confirmation]').forEach((button) => {
             button.addEventListener('click', async () => {
                 const id = button.dataset.id || '';
@@ -737,6 +769,47 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                 } catch (err) {
                     showPageAlert('Network error while resending the email.', 'error');
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        });
+
+        // T-22: soft-delete a reservation into the Archive module.
+        document.querySelectorAll('[data-archive-reservation]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const rowId = Number(button.dataset.rowId || 0);
+                const reservationId = button.dataset.reservationId || '';
+                if (!rowId) return;
+                if (!confirm('Archive reservation ' + reservationId + '?\n\nYou can restore it from the Archive page.')) {
+                    return;
+                }
+
+                button.disabled = true;
+                try {
+                    const res = await fetch('../api/admin/archive.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': PDR_CSRF_TOKEN
+                        },
+                        body: JSON.stringify({
+                            action: 'archive',
+                            type: 'reservations',
+                            id: rowId,
+                            reason: 'Archived from Reservations list'
+                        })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.ok) {
+                        showPageAlert('Could not archive the reservation.', 'error');
+                        return;
+                    }
+                    const row = document.getElementById('row-' + reservationId);
+                    if (row) row.remove();
+                    showPageAlert('Reservation archived. Restore it from the Archive page.', 'success');
+                } catch (err) {
+                    showPageAlert('Network error while archiving the reservation.', 'error');
                 } finally {
                     button.disabled = false;
                 }
@@ -849,7 +922,8 @@ document.addEventListener('DOMContentLoaded', () => {
         })();
 
     </script>
-<script src="responsive.js"></script>
-<script src="a11y.js"></script>
+<script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
+<script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
+<script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>
 </html>

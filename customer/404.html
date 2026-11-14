@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Page Not Found | Pio De Roda Cafe and Restaurant</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="nav.css" />
+  <style>
+    .notfound-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 120px 20px 70px;
+      text-align: center;
+    }
+    .notfound-card {
+      max-width: 620px;
+      background: #fff;
+      border: 1px solid #eadfd2;
+      border-radius: 18px;
+      padding: 46px 34px;
+      box-shadow: 0 18px 45px rgba(91, 8, 8, 0.09);
+    }
+    .notfound-code {
+      font-family: "Fraunces", serif;
+      font-size: clamp(4rem, 14vw, 7rem);
+      line-height: 1;
+      color: #5B0808;
+      margin: 0;
+    }
+    .notfound-card h1 {
+      font-family: "Fraunces", serif;
+      color: #3f2a1d;
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      margin: 10px 0 10px;
+    }
+    .notfound-card p {
+      color: #5f5a55;
+      line-height: 1.7;
+      margin: 0 auto 24px;
+      max-width: 460px;
+    }
+    .notfound-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .notfound-actions a {
+      display: inline-block;
+      padding: 12px 22px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid #5B0808;
+      color: #5B0808;
+      background: #fff;
+    }
+    .notfound-actions a.primary {
+      background: #5B0808;
+      color: #fff;
+    }
+    .notfound-actions a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main class="notfound-wrap">
+    <section class="notfound-card">
+      <p class="notfound-code">404</p>
+      <h1>We couldn’t find that page</h1>
+      <p>
+        The link may be broken or the page may have moved. Your reservation details
+        are safe — you can still check your booking status or head back home.
+      </p>
+      <div class="notfound-actions">
+        <a class="primary" href="nav.html">Back to Home</a>
+        <a href="booking-status.html">Check Booking Status</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

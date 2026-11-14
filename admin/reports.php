@@ -23,6 +23,25 @@ $exportPdf = $export === 'pdf';
 $canManageReviews = pdrCan('manage_reviews');
 $canExport = pdrCan('export_reports');
 
+// T-21: custom date-range filter. The default is the last 12 months so the
+// page opens with a useful, bounded window instead of scanning all history.
+$defaultFrom = date('Y-m-d', strtotime('-11 months first day of this month'));
+$from = trim((string) ($_GET['from'] ?? $defaultFrom));
+$to = trim((string) ($_GET['to'] ?? date('Y-m-d')));
+$isDate = static fn(string $value): bool => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value);
+if (!$isDate($from)) {
+    $from = $defaultFrom;
+}
+if (!$isDate($to)) {
+    $to = date('Y-m-d');
+}
+if ($from > $to) {
+    [$from, $to] = [$to, $from];
+}
+$rangeSql = "submitted_at >= '" . $from . " 00:00:00' AND submitted_at <= '" . $to . " 23:59:59'";
+$reviewRangeSql = "created_at >= '" . $from . " 00:00:00' AND created_at <= '" . $to . " 23:59:59'";
+$rangeQuery = ['from' => $from, 'to' => $to];
+
 // ---------------------------------------------------------------------------
 // Data. Every number on this page now comes from the database. Each query is
 // wrapped so a missing table (fresh clone, migration not yet run) degrades to
@@ -56,30 +75,37 @@ try {
         "SELECT id, reservation_id, customer_name, rating, feedback_text,
                 status, admin_note, moderated_at, created_at
            FROM reviews
-          WHERE COALESCE(archived, 0) = 0
+          WHERE COALESCE(archived, 0) = 0 AND $reviewRangeSql
           ORDER BY FIELD(status, 'Pending', 'Approved', 'Hidden'), created_at DESC"
     )->fetchAll(PDO::FETCH_ASSOC);
 
     $avg = $pdo->query(
         "SELECT AVG(rating) FROM reviews
-          WHERE COALESCE(archived, 0) = 0 AND status = 'Approved'"
+          WHERE COALESCE(archived, 0) = 0 AND status = 'Approved' AND $reviewRangeSql"
     )->fetchColumn();
     $averageRating = ($avg === null || $avg === false) ? null : (float) $avg;
 
     // ---- Customer metrics -------------------------------------------------
     $metrics['totalCustomers'] = (int) $pdo->query(
-        "SELECT COUNT(DISTINCT email) FROM reservations"
+        "SELECT COUNT(DISTINCT email) FROM reservations WHERE $rangeSql"
     )->fetchColumn();
 
-    $newStmt = $pdo->prepare(
-        "SELECT COUNT(DISTINCT email) FROM reservations WHERE submitted_at >= ?"
-    );
-    $newStmt->execute([date('Y-m-01 00:00:00')]);
-    $metrics['newCustomers'] = (int) $newStmt->fetchColumn();
+    // "New" means their first-ever booking falls inside the selected range.
+    $metrics['newCustomers'] = (int) $pdo->query(
+        "SELECT COUNT(*) FROM (
+             SELECT email, MIN(submitted_at) AS first_at
+               FROM reservations
+              GROUP BY email
+             HAVING first_at >= '" . $from . " 00:00:00'
+                AND first_at <= '" . $to . " 23:59:59'
+         ) AS new_customers"
+    )->fetchColumn();
 
     $metrics['returningCustomers'] = (int) $pdo->query(
         "SELECT COUNT(*) FROM (
-             SELECT email FROM reservations GROUP BY email HAVING COUNT(*) >= 2
+             SELECT email FROM reservations
+              WHERE $rangeSql
+              GROUP BY email HAVING COUNT(*) >= 2
          ) AS repeat_customers"
     )->fetchColumn();
 
@@ -88,7 +114,7 @@ try {
                     COALESCE(estimated_total, 0) - COALESCE(amount_paid, 0), 0
                 )), 0)
            FROM reservations
-          WHERE status NOT IN ('Cancelled', 'Rejected')"
+          WHERE status NOT IN ('Cancelled', 'Rejected') AND $rangeSql"
     )->fetchColumn();
 
     // ---- Reservation report ----------------------------------------------
@@ -112,38 +138,38 @@ try {
     $reservationReports['Daily'] = $reservationGroup(
         "DATE(submitted_at)",
         "DATE_FORMAT(submitted_at, '%b %d, %Y')",
-        "submitted_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)",
-        14
+        $rangeSql,
+        366
     );
     $reservationReports['Weekly'] = $reservationGroup(
         "YEARWEEK(submitted_at, 1)",
         "CONCAT('Week ', WEEK(submitted_at, 1), ', ', YEAR(submitted_at))",
-        "submitted_at >= DATE_SUB(CURDATE(), INTERVAL 12 WEEK)",
-        8
+        $rangeSql,
+        53
     );
     $reservationReports['Monthly'] = $reservationGroup(
         "DATE_FORMAT(submitted_at, '%Y-%m')",
         "DATE_FORMAT(submitted_at, '%M %Y')",
-        "submitted_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)",
-        12
+        $rangeSql,
+        24
     );
     $reservationReports['By Service'] = $reservationGroup(
         "COALESCE(NULLIF(main_service, ''), 'Unassigned')",
         "COALESCE(NULLIF(main_service, ''), 'Unassigned')",
-        "1 = 1",
+        $rangeSql,
         25
     );
     $reservationReports['Cancelled'] = $reservationGroup(
         "DATE(submitted_at)",
         "DATE_FORMAT(submitted_at, '%b %d, %Y')",
-        "status IN ('Cancelled', 'Rejected')",
-        30
+        "status IN ('Cancelled', 'Rejected') AND $rangeSql",
+        366
     );
 
     // ---- Revenue report ---------------------------------------------------
     // "Total payments" is money actually received (amount_paid); the balance is
     // what is still owed. Cancelled/rejected bookings are excluded.
-    $revenueGroup = static function (string $groupExpr, string $labelExpr, int $limit) use ($pdo): array {
+    $revenueGroup = static function (string $groupExpr, string $labelExpr, int $limit) use ($pdo, $rangeSql): array {
         $sql = "SELECT $labelExpr AS period,
                        COALESCE(SUM(amount_paid), 0) AS collected,
                        COALESCE(SUM(GREATEST(
@@ -151,7 +177,7 @@ try {
                        )), 0) AS balance,
                        COUNT(*) AS bookings
                   FROM reservations
-                 WHERE status NOT IN ('Cancelled', 'Rejected')
+                 WHERE status NOT IN ('Cancelled', 'Rejected') AND $rangeSql
                  GROUP BY $groupExpr
                  ORDER BY MIN(submitted_at) DESC
                  LIMIT $limit";
@@ -197,19 +223,20 @@ try {
 // ---------------------------------------------------------------------------
 if ($exportCsv) {
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="pdr-report-' . date('Y-m-d') . '.csv"');
+    header('Content-Disposition: attachment; filename="pdr-report-' . $from . '-to-' . $to . '.csv"');
     header('Cache-Control: max-age=0, no-store');
 
     $output = fopen('php://output', 'w');
     // UTF-8 BOM so Excel opens the file with the correct encoding.
     fwrite($output, "\xEF\xBB\xBF");
+    fputcsv($output, ['Range', $from . ' to ' . $to]);
     fputcsv($output, ['Pio De Roda — Reports Export', date('Y-m-d H:i:s')]);
     fputcsv($output, []);
 
     fputcsv($output, ['Summary']);
     fputcsv($output, ['Metric', 'Value']);
     fputcsv($output, ['Total Customers', $metrics['totalCustomers']]);
-    fputcsv($output, ['New Customers (this month)', $metrics['newCustomers']]);
+    fputcsv($output, ['New Customers (selected range)', $metrics['newCustomers']]);
     fputcsv($output, ['Returning Customers (2+ bookings)', $metrics['returningCustomers']]);
     fputcsv($output, ['Outstanding Balances', number_format($metrics['outstanding'], 2, '.', '')]);
     fputcsv($output, ['Average Rating', $averageRating === null ? '' : number_format($averageRating, 2, '.', '')]);
@@ -263,9 +290,92 @@ if ($exportCsv) {
     exit();
 }
 
-// T-44: PDF export is a print-friendly render of this page; the browser's
-// "Save as PDF" produces the file, so no server-side PDF library is required.
-$printMode = $exportPdf;
+// T-44: true server-side PDF export (no browser print dialog, no Composer).
+if ($exportPdf) {
+    require_once __DIR__ . '/../lib/PdfReport.php';
+
+    $lines = [];
+    $lines[] = 'Pio De Roda Cafe and Restaurant';
+    $lines[] = 'Reports Export';
+    $lines[] = 'Generated: ' . date('Y-m-d H:i:s');
+    $lines[] = 'Range: ' . $from . ' to ' . $to;
+    $lines[] = '';
+    $lines[] = 'SUMMARY';
+    $lines[] = 'Total customers: ' . $metrics['totalCustomers'];
+    $lines[] = 'New customers (first booking in range): ' . $metrics['newCustomers'];
+    $lines[] = 'Returning customers (2+ bookings): ' . $metrics['returningCustomers'];
+    $lines[] = 'Outstanding balances: PHP ' . number_format((float) $metrics['outstanding'], 2);
+    $lines[] = 'Average rating: ' . ($averageRating === null ? 'n/a' : number_format($averageRating, 2));
+    $lines[] = '';
+    $lines[] = 'RESERVATION REPORT';
+
+    foreach ($reservationReports as $category => $rows) {
+        $lines[] = '[' . $category . ']';
+        if (!$rows) {
+            $lines[] = '  No data for this period.';
+            continue;
+        }
+        foreach ($rows as $row) {
+            $lines[] = sprintf(
+                '  %s | bookings %d | completed %d | cancelled %d | %s',
+                (string) $row['period'],
+                (int) $row['total'],
+                (int) $row['completed'],
+                (int) $row['cancelled'],
+                (string) ($row['service'] ?? '')
+            );
+        }
+    }
+
+    $lines[] = '';
+    $lines[] = 'REVENUE REPORT';
+    foreach ($revenueReports as $category => $rows) {
+        $lines[] = '[' . $category . ']';
+        if (!$rows) {
+            $lines[] = '  No data for this period.';
+            continue;
+        }
+        foreach ($rows as $row) {
+            $lines[] = sprintf(
+                '  %s | collected PHP %s | balance PHP %s | %s',
+                (string) $row['period'],
+                number_format((float) $row['collected'], 2),
+                number_format((float) $row['balance'], 2),
+                (string) $row['status']
+            );
+        }
+    }
+
+    $lines[] = '';
+    $lines[] = 'REVIEWS';
+    if (!$reviews) {
+        $lines[] = '  No reviews in this period.';
+    } else {
+        foreach ($reviews as $review) {
+            $feedback = trim((string) preg_replace('/\s+/', ' ', (string) $review['feedback_text']));
+            if (mb_strlen($feedback) > 90) {
+                $feedback = mb_substr($feedback, 0, 87) . '...';
+            }
+            $lines[] = sprintf(
+                '  %s | %d/5 | %s | %s',
+                (string) $review['customer_name'],
+                (int) $review['rating'],
+                (string) $review['status'],
+                $feedback
+            );
+        }
+    }
+
+    $pdf = pdrBuildReportPdf($lines, 'Pio De Roda Report ' . $from . ' to ' . $to);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="pdr-report-' . $from . '-to-' . $to . '.pdf"');
+    header('Content-Length: ' . strlen($pdf));
+    header('Cache-Control: max-age=0, no-store');
+    echo $pdf;
+    exit();
+}
+
+$printMode = false;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -277,8 +387,8 @@ $printMode = $exportPdf;
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="reports.css" />
-    <link rel="stylesheet" href="responsive.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('reports.css'); ?>" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
     <style>
         @media print {
@@ -337,7 +447,7 @@ $printMode = $exportPdf;
                 </li>
 
                 <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
+                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
                 </li>
 
                 <?php if (pdrCan('manage_staff')): ?>
@@ -379,16 +489,32 @@ $printMode = $exportPdf;
                 <?php if (!$printMode): ?>
                 <div class="export-actions">
                     <?php if ($canExport): ?>
-                    <button type="button" class="btn btn-approve" onclick="window.location='reports.php?export=csv'">
+                    <button type="button" class="btn btn-approve" onclick="window.location='reports.php?export=csv&<?php echo reportsH(http_build_query($rangeQuery)); ?>'">
                         <i class="fa-solid fa-download"></i> Export CSV
                     </button>
                     <?php endif; ?>
-                    <button type="button" class="btn btn-reject" onclick="window.open('reports.php?export=pdf','_blank')">
-                        <i class="fa-solid fa-file-pdf"></i> Print PDF
+                    <button type="button" class="btn btn-reject" onclick="window.location='reports.php?export=pdf&<?php echo reportsH(http_build_query($rangeQuery)); ?>'">
+                        <i class="fa-solid fa-file-pdf"></i> Export PDF
                     </button>
                 </div>
                 <?php endif; ?>
             </div>
+
+            <!-- T-21: dynamic date-range filter (applies to every query/export) -->
+            <form method="get" action="reports.php" class="no-print"
+                style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin-bottom:16px;">
+                <label style="font-size:12px;color:#718096;">From
+                    <input type="date" name="from" value="<?php echo reportsH($from); ?>"
+                        style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-left:4px;">
+                </label>
+                <label style="font-size:12px;color:#718096;">To
+                    <input type="date" name="to" value="<?php echo reportsH($to); ?>"
+                        style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin-left:4px;">
+                </label>
+                <button type="submit" class="btn btn-approve" style="padding:9px 16px;">Apply range</button>
+                <a href="reports.php" style="padding:9px 14px;border:1px solid #cbd5e1;border-radius:6px;color:#4a5568;text-decoration:none;">Reset</a>
+                <span style="font-size:12px;color:#718096;margin-left:auto;">Showing <?php echo reportsH($from); ?> to <?php echo reportsH($to); ?></span>
+            </form>
 
             <!-- Customer Report Summary Cards -->
             <div class="metrics-grid">
@@ -400,7 +526,7 @@ $printMode = $exportPdf;
                 <div class="metric-card">
                     <h4>New Customers</h4>
                     <div class="metric-value"><?php echo (int) $metrics['newCustomers']; ?></div>
-                    <div class="metric-sub">First booking this month</div>
+                    <div class="metric-sub">First booking in selected range</div>
                 </div>
                 <div class="metric-card">
                     <h4>Returning Customers</h4>
@@ -727,5 +853,9 @@ $printMode = $exportPdf;
                 }
             );
         });
+    </script>
+<script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
+<script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
+<script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>
 </html>

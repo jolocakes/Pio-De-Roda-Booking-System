@@ -83,6 +83,7 @@ try {
          the SERVICE_ID used by reservation2.js. */
       var SERVICE_ID = "<?php echo $SERVICE_ID_DB; ?>";
     </script>
+<script src="pdr-dates.js?v=1.0"></script>
 <script src="reservation2.js?v=3.4"></script>
 </body>
 </html>

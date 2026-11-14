@@ -8,6 +8,16 @@
       name="description"
       content="Pio De Roda Cafe and Restaurant — dine-in, catering, and event packages. Reserve your table or book your celebration."
     />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <meta property="og:site_name" content="Pio De Roda Cafe and Restaurant" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Pio De Roda Cafe and Restaurant | Reservations &amp; Catering" />
+    <meta
+      property="og:description"
+      content="Dine-in, catering, and event packages in Indang, Cavite. Reserve your table or book your celebration online."
+    />
+    <meta property="og:image" content="pioabout.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
 
     <!-- Google Fonts: Fraunces for character-filled headings, Work Sans for clean, readable body text -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -511,7 +521,7 @@
           <img
             src="pioderodalogo.jpg"
             alt="Pio De Roda Cafe and Restaurant logo"
-            class="brand-mark" decoding="async" />
+            class="brand-mark" loading="lazy" decoding="async" />
           <div>
             <p class="footer-title">Pio De Roda Cafe</p>
             <p class="footer-tagline">
@@ -533,7 +543,8 @@
 
     <!-- services.js MUST load before availability.js (it defines loadAvailability/AVAIL) -->
     <script src="services.js?v=3.4"></script>
-    <script src="availability.js?v=3.2"></script>
+    <script src="pdr-dates.js?v=1.0"></script>
+    <script src="availability.js?v=3.3"></script>
     <!-- Syncs the service cards above with the catalog API: names,
          descriptions and starting prices come from the database, and a
          deactivated service's card disappears on the next reload. The static

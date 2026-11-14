@@ -10,7 +10,7 @@ $xenditConfig = __DIR__ . '/../../config/xendit.php';
 if (!is_file($xenditConfig)) { http_response_code(500); exit; }
 $xendit = require $xenditConfig;
 
-$token = $_SERVER['HTTP_X_CALLBACK_TOKEN'] ?? ($_SERVER['HTTP_X_CALLBACK_TOKEN'] ?? '');
+$token = $_SERVER['HTTP_X_CALLBACK_TOKEN'] ?? '';
 $expected = (string)($xendit['callback_token'] ?? '');
 if ($expected === '' || strpos($expected, 'REPLACE') !== false || $token === '' || !hash_equals($expected, $token)) {
     http_response_code(403);

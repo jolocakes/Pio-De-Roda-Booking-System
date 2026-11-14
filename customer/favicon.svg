@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Pio De Roda Cafe and Restaurant">
+  <rect width="64" height="64" rx="14" fill="#5B0808"/>
+  <path d="M20 15h17.5c6.4 0 10.5 3.9 10.5 9.8 0 6.2-4.3 10.2-11 10.2H28v14h-8V15zm8 6.7v6.6h8.1c2.5 0 4-1.2 4-3.3 0-2.1-1.5-3.3-4-3.3H28z" fill="#E9C46A"/>
+  <circle cx="49" cy="49" r="5" fill="#E9C46A"/>
+</svg>

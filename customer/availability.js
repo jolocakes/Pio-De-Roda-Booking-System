@@ -15,11 +15,13 @@
   let calMonth = new Date().getMonth();
 
   function daysInMonth(y, m) {
-    return new Date(y, m + 1, 0).getDate();
+    return window.PDRDates ? PDRDates.daysInMonth(y, m) : new Date(y, m + 1, 0).getDate();
   }
 
   function fmtDate(y, m, d) {
-    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return window.PDRDates
+      ? PDRDates.toISODate(new Date(y, m, d))
+      : `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
 
   // Human hint for a partially-booked date, e.g. "1 of 2 slots used".
@@ -40,7 +42,9 @@
 
     const first = new Date(calYear, calMonth, 1).getDay();
     const total = daysInMonth(calYear, calMonth);
-    const monthName = new Date(calYear, calMonth, 1).toLocaleString('default', { month: 'long' });
+    const monthName = window.PDRDates
+      ? PDRDates.monthName(calYear, calMonth, false)
+      : new Date(calYear, calMonth, 1).toLocaleString('default', { month: 'long' });
     const today = getTodayLocalDate();
 
     let cells = `<div class="dow">Su</div><div class="dow">Mo</div><div class="dow">Tu</div><div class="dow">We</div><div class="dow">Th</div><div class="dow">Fr</div><div class="dow">Sa</div>`;

@@ -4,4 +4,4 @@
 -- hard limit without a separate history table.
 
 ALTER TABLE `reservations`
-  ADD COLUMN `reschedule_count` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `status`;
+  ADD COLUMN IF NOT EXISTS `reschedule_count` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `status`;

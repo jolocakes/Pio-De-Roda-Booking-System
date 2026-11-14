@@ -28,8 +28,8 @@ try {
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="payment.css" />
-    <link rel="stylesheet" href="responsive.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('payment.css'); ?>" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 
 </head>
@@ -79,11 +79,11 @@ try {
                     <a href="reports.php"><i class="fa-solid fa-chart-column"></i> Reports</a>
                 </li>
                 <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
-                    <?php if (pdrCan('manage_staff')): ?>
-                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                    <?php endif; ?>
+                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
                 </li>
+                <?php if (pdrCan('manage_staff')): ?>
+                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                <?php endif; ?>
             </ul>
 
         </div>
@@ -141,11 +141,11 @@ try {
             <div class="metrics-grid">
                 <div class="metric-card">
                     <h4>Total Collected</h4>
-                    <div class="metric-value" id="m_collected">â‚±00.00</div>
+                    <div class="metric-value" id="m_collected">₱00.00</div>
                 </div>
                 <div class="metric-card">
                     <h4>Outstanding Balances</h4>
-                    <div class="metric-value" id="m_outstanding" style="color: #d93025;">â‚±00.00</div>
+                    <div class="metric-value" id="m_outstanding" style="color: #d93025;">₱00.00</div>
                 </div>
                 <div class="metric-card">
                     <h4>Fully Paid Records</h4>
@@ -196,15 +196,15 @@ try {
                         <input type="text" id="p_customer" required placeholder="e.g. Maria Santos">
                     </div>
                     <div class="form-group">
-                        <label>Total Amount (â‚±)</label>
+                        <label>Total Amount (₱)</label>
                         <input type="number" id="p_total" required placeholder="00.00" oninput="calculateBalance()">
                     </div>
                     <div class="form-group">
-                        <label>Deposit Paid (â‚±)</label>
+                        <label>Deposit Paid (₱)</label>
                         <input type="number" id="p_deposit" required placeholder="00.00" oninput="calculateBalance()">
                     </div>
                     <div class="form-group">
-                        <label>Remaining Balance (â‚±)</label>
+                        <label>Remaining Balance (₱)</label>
                         <input type="number" id="p_balance" readonly placeholder="00.00" style="background:#f4efe8;">
                     </div>
                     <div class="form-group">
@@ -287,7 +287,7 @@ try {
         ];
 
         function formatCurrency(amount) {
-            return 'â‚±' + Number(amount).toLocaleString('en-US');
+            return '₱' + Number(amount).toLocaleString('en-US');
         }
 
         function calculateBalance() {
@@ -375,7 +375,8 @@ try {
 
         document.addEventListener('DOMContentLoaded', renderPaymentsTable);
     </script>
-<script src="responsive.js"></script>
-<script src="a11y.js"></script>
+<script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
+<script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
+<script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>
 </html>

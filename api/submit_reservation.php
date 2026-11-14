@@ -449,6 +449,24 @@ try {
         throw new RuntimeException('Could not allocate a unique reservation ID after ' . $maxIdAttempts . ' attempts.');
     }
 
+    // T-20: keep the customer directory in sync. The directory is derived from
+    // reservations, so the newest booking wins for name/phone/address. A
+    // failure here must never lose the reservation that was just saved.
+    try {
+        $customerStmt = $pdo->prepare(
+            "INSERT INTO customers (email, full_name, phone, address)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                full_name = VALUES(full_name),
+                phone = VALUES(phone),
+                address = VALUES(address),
+                status = 'Active'"
+        );
+        $customerStmt->execute([$email, $customerName, $contactNumber, $address]);
+    } catch (Throwable $customerError) {
+        error_log('Customer directory sync failed for ' . $reservationId . ': ' . $customerError->getMessage());
+    }
+
     // Send the confirmation email (thank you + pending staff confirmation ->
     // payment + Booking ID and PIN). Best effort: a mail problem must NEVER
     // fail or slow down a reservation that is already saved — pdrSendMail

@@ -15,7 +15,8 @@ $dateTo = trim((string) ($_GET['to'] ?? ''));
 try {
     // T-28: filter + paginate in SQL. The page used to render every event at
     // once, which does not scale.
-    $where = [];
+    // T-22: archived reservations are managed from the Archive page.
+    $where = ['archived_at IS NULL'];
     $params = [];
 
     if ($q !== '') {
@@ -48,6 +49,7 @@ try {
     // LIMIT/OFFSET are integers computed here, never user strings.
     $stmt = $pdo->prepare(
         "SELECT
+            id,
             reservation_id,
             customer_name,
             contact_number,
@@ -103,8 +105,9 @@ function eventH($value): string
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="event.css" />
-    <link rel="stylesheet" href="responsive.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('event.css'); ?>" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 
 </head>
@@ -155,11 +158,11 @@ function eventH($value): string
                 </li>
 
                 <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
-                    <?php if (pdrCan('manage_staff')): ?>
-                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                    <?php endif; ?>
+                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
                 </li>
+                <?php if (pdrCan('manage_staff')): ?>
+                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                <?php endif; ?>
             </ul>
         </div>
         <div class="sidebar-footer">
@@ -197,35 +200,55 @@ function eventH($value): string
             </div>
 
             <!-- T-28: server-side search / filters -->
-            <form method="get" action="event.php" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#fff;border:1px solid var(--border-color);border-radius:8px;padding:12px;margin-bottom:14px;">
-                <input type="search" name="q" value="<?php echo eventH($q); ?>"
-                    placeholder="Search ID, customer, or service..."
-                    style="flex:1 1 220px;min-width:180px;padding:9px 11px;border:1px solid #cbd5e1;border-radius:6px;">
-                <select name="status" style="padding:9px 11px;border:1px solid #cbd5e1;border-radius:6px;">
-                    <option value="">All Statuses</option>
-                    <?php foreach (['Pending', 'Confirmed', 'Cancelled', 'Rejected', 'Completed'] as $opt): ?>
-                        <option value="<?php echo eventH($opt); ?>" <?php echo $statusFilter === $opt ? 'selected' : ''; ?>>
-                            <?php echo eventH($opt); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <label style="font-size:12px;color:#718096;">From
-                    <input type="date" name="from" value="<?php echo eventH($dateFrom); ?>"
-                        style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+            <form method="get" action="event.php" class="filter-bar">
+                <input type="search" name="q" class="search-input" value="<?php echo eventH($q); ?>"
+                    placeholder="Search ID, customer, or service...">
+
+                <label class="filter-field"><span>Status</span>
+                    <select name="status" class="filter-select">
+                        <option value="">All Statuses</option>
+                        <?php foreach (['Pending', 'Confirmed', 'Cancelled', 'Rejected', 'Completed'] as $opt): ?>
+                            <option value="<?php echo eventH($opt); ?>" <?php echo $statusFilter === $opt ? 'selected' : ''; ?>>
+                                <?php echo eventH($opt); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </label>
-                <label style="font-size:12px;color:#718096;">To
-                    <input type="date" name="to" value="<?php echo eventH($dateTo); ?>"
-                        style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+
+                <label class="filter-field"><span>From</span>
+                    <input type="date" name="from" class="filter-date" value="<?php echo eventH($dateFrom); ?>">
                 </label>
-                <button type="submit" style="padding:9px 16px;border:0;border-radius:6px;background:var(--primary,#8C1414);color:#fff;cursor:pointer;">Filter</button>
-                <a href="event.php" style="padding:9px 14px;border:1px solid #cbd5e1;border-radius:6px;color:#4a5568;text-decoration:none;">Reset</a>
+
+                <label class="filter-field"><span>To</span>
+                    <input type="date" name="to" class="filter-date" value="<?php echo eventH($dateTo); ?>">
+                </label>
+
+                <button type="submit" class="btn-filter">Filter</button>
+                <a class="btn-reset" href="event.php">Reset</a>
             </form>
+
+            <!-- T-43: bulk actions for the events table -->
+            <div id="eventBulkBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid var(--border-color);border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+                <strong id="eventBulkCount" style="font-size:13px;color:#4a5568;">0 selected</strong>
+                <button type="button" class="btn-outline-sm" data-event-bulk="Confirmed" title="Approve selected">
+                    <i class="fa-solid fa-check"></i> Approve
+                </button>
+                <button type="button" class="btn-outline-sm" data-event-bulk="Rejected" title="Reject selected">
+                    <i class="fa-solid fa-xmark"></i> Reject
+                </button>
+                <button type="button" class="btn-outline-sm" data-event-bulk="Cancelled" title="Cancel selected">
+                    <i class="fa-solid fa-ban"></i> Cancel
+                </button>
+                <button type="button" class="btn-outline-sm" id="eventBulkClear">Clear selection</button>
+                <span id="eventBulkMessage" role="status" aria-live="polite" style="font-size:13px;color:#718096;"></span>
+            </div>
 
             <!-- Events Table -->
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
+                            <th><input type="checkbox" id="selectAllEvents" aria-label="Select all events on this page"></th>
                             <th>Reservation ID</th>
                             <th>Event / Service</th>
                             <th>Customer</th>
@@ -295,6 +318,7 @@ function eventH($value): string
     <script>
         // Reservation data from the PHP query
         const eventsData = <?php echo json_encode($reservations, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE); ?>;
+        const PDR_CSRF_TOKEN = <?php echo json_encode(pdrCsrfToken()); ?>;
 
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>"']/g, function (ch) {
@@ -310,7 +334,10 @@ function eventH($value): string
 
         // Format a YYYY-MM-DD date without timezone drift.
         function formatDate(dateStr) {
-            if (!dateStr) return 'â€”';
+            if (!dateStr) return '—';
+            if (window.PDRFormat) {
+                return PDRFormat.format(dateStr) || dateStr;
+            }
             const date = new Date(dateStr + 'T00:00:00');
             if (isNaN(date.getTime())) return dateStr;
             return date.toLocaleDateString('en-US', {
@@ -330,8 +357,8 @@ function eventH($value): string
 
         function formatCurrency(value) {
             const amount = Number(value);
-            if (!isFinite(amount)) return 'â‚±0.00';
-            return 'â‚±' + amount.toLocaleString('en-PH', {
+            if (!isFinite(amount)) return '₱0.00';
+            return '₱' + amount.toLocaleString('en-PH', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
@@ -363,7 +390,7 @@ function eventH($value): string
             tbody.innerHTML = '';
 
             if (!Array.isArray(eventsData) || eventsData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: var(--text-muted); padding:30px;">No events available.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color: var(--text-muted); padding:30px;">No events available.</td></tr>';
                 return;
             }
 
@@ -372,20 +399,24 @@ function eventH($value): string
                 const guests = Number(event.guests) || 0;
 
                 tr.innerHTML = `
+                    <td><input type="checkbox" class="event-check" value="${escapeHtml(event.reservation_id)}" aria-label="Select reservation ${escapeHtml(event.reservation_id)}"></td>
                     <td><strong>${escapeHtml(event.reservation_id)}</strong></td>
-                    <td>${escapeHtml(event.main_service || 'â€”')}</td>
-                    <td>${escapeHtml(event.customer_name || 'â€”')}</td>
-                    <td>${escapeHtml(event.event_type || 'â€”')}</td>
+                    <td>${escapeHtml(event.main_service || '—')}</td>
+                    <td>${escapeHtml(event.customer_name || '—')}</td>
+                    <td>${escapeHtml(event.event_type || '—')}</td>
                     <td>
                         ${escapeHtml(formatDate(event.event_date))}
-                        <br><small style="color:var(--text-muted);">${escapeHtml(event.event_time || 'â€”')}</small>
+                        <br><small style="color:var(--text-muted);">${escapeHtml(event.event_time || '—')}</small>
                     </td>
                     <td>${guests} pax</td>
-                    <td>${escapeHtml(event.selected_package || 'â€”')}</td>
+                    <td>${escapeHtml(event.selected_package || '—')}</td>
                     <td><span class="status-badge ${statusClass(event.status)}">${escapeHtml(event.status || 'Pending')}</span></td>
                     <td style="text-align: right;">
                         <button type="button" class="btn-outline-sm" onclick="viewDetails(${index})">
                             <i class="fa-solid fa-eye"></i> View
+                        </button>
+                        <button type="button" class="btn-outline-sm" onclick="archiveEvent(${index})" title="Archive event">
+                            <i class="fa-solid fa-box-archive"></i>
                         </button>
                     </td>
                 `;
@@ -399,8 +430,8 @@ function eventH($value): string
             if (!data) return;
 
             document.getElementById('view_event_title').innerText = 'Reservation ' + (data.reservation_id || '');
-            document.getElementById('v_id').innerText = data.reservation_id || 'â€”';
-            document.getElementById('v_customer').innerText = data.customer_name || 'â€”';
+            document.getElementById('v_id').innerText = data.reservation_id || '—';
+            document.getElementById('v_customer').innerText = data.customer_name || '—';
             document.getElementById('v_phone').innerText = data.contact_number || 'Not provided';
             document.getElementById('v_email').innerText = data.email || 'Not provided';
             document.getElementById('v_type').innerText = data.event_type || 'Not provided';
@@ -420,9 +451,121 @@ function eventH($value): string
             document.getElementById('viewModal').style.display = 'none';
         }
 
-        document.addEventListener('DOMContentLoaded', renderEventsTable);
+        // T-22: archive one event.
+        async function archiveEvent(index) {
+            const item = eventsData[index];
+            if (!item || !item.id) return;
+            if (!confirm('Archive reservation ' + item.reservation_id + '?\n\nYou can restore it from the Archive page.')) {
+                return;
+            }
+            try {
+                const res = await fetch('../api/admin/archive.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': PDR_CSRF_TOKEN
+                    },
+                    body: JSON.stringify({
+                        action: 'archive',
+                        type: 'reservations',
+                        id: Number(item.id),
+                        reason: 'Archived from Events list'
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.ok) {
+                    alert('Could not archive this event.');
+                    return;
+                }
+                eventsData.splice(index, 1);
+                renderEventsTable();
+                initEventBulk();
+            } catch (err) {
+                alert('Network error while archiving this event.');
+            }
+        }
+
+        // T-43: bulk approve / reject / cancel for the events table.
+        function initEventBulk() {
+            const bar = document.getElementById('eventBulkBar');
+            const countLabel = document.getElementById('eventBulkCount');
+            const message = document.getElementById('eventBulkMessage');
+            const selectAll = document.getElementById('selectAllEvents');
+            const checks = Array.prototype.slice.call(document.querySelectorAll('.event-check'));
+            if (!bar) return;
+
+            function selected() {
+                return checks.filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+            }
+            function refresh() {
+                const ids = selected();
+                countLabel.textContent = ids.length + ' selected';
+                bar.style.display = ids.length ? 'flex' : 'none';
+                if (selectAll) {
+                    selectAll.checked = ids.length > 0 && ids.length === checks.length;
+                    selectAll.indeterminate = ids.length > 0 && ids.length < checks.length;
+                }
+            }
+
+            if (selectAll) {
+                selectAll.onchange = function () {
+                    checks.forEach(function (c) { c.checked = selectAll.checked; });
+                    refresh();
+                };
+            }
+            checks.forEach(function (c) { c.onchange = refresh; });
+
+            document.querySelectorAll('[data-event-bulk]').forEach(function (button) {
+                button.onclick = async function () {
+                    const ids = selected();
+                    const status = button.dataset.eventBulk || '';
+                    if (!ids.length || !status) return;
+                    if (!confirm('Set ' + ids.length + ' event(s) to ' + status + '?')) return;
+
+                    button.disabled = true;
+                    message.textContent = 'Working...';
+                    try {
+                        const res = await fetch('../api/admin/bulk_status.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': PDR_CSRF_TOKEN
+                            },
+                            body: JSON.stringify({ reservationIds: ids, status: status })
+                        });
+                        const data = await res.json().catch(function () { return {}; });
+                        if (!res.ok || !data.ok) {
+                            message.textContent = 'Bulk update failed.';
+                            return;
+                        }
+                        message.textContent = (data.updated || []).length + ' updated, ' +
+                            (data.failed || []).length + ' failed.';
+                        setTimeout(function () { window.location.reload(); }, 600);
+                    } catch (err) {
+                        message.textContent = 'Network error during bulk update.';
+                    } finally {
+                        button.disabled = false;
+                        refresh();
+                    }
+                };
+            });
+
+            document.getElementById('eventBulkClear').onclick = function () {
+                checks.forEach(function (c) { c.checked = false; });
+                if (selectAll) selectAll.checked = false;
+                refresh();
+            };
+
+            refresh();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            renderEventsTable();
+            initEventBulk();
+        });
     </script>
-<script src="responsive.js"></script>
-<script src="a11y.js"></script>
+<script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
+<script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
+<script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>
 </html>

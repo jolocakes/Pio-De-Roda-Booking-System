@@ -7,7 +7,7 @@ function h($value) {
 }
 
 function formatPeso($amount) {
-    return 'â‚±' . number_format((float) $amount, 2);
+    return '₱' . number_format((float) $amount, 2);
 }
 
 function formatEventTime($time) {
@@ -270,7 +270,7 @@ $metrics = [
     ],
     [
         'title' => 'Most Reserved Service',
-        'value' => $topService !== '' ? $topService : 'â€”',
+        'value' => $topService !== '' ? $topService : '—',
         'sub' => '(' . number_format($topServiceCount) . ' ' . ($topServiceCount === 1 ? 'reservation' : 'reservations') . ')',
         'icon' => 'fa-star',
         'bg' => '#f3e8ff',
@@ -285,138 +285,116 @@ $metrics = [
     ]
 ];
 
-$chartView = $_GET['chartView'] ?? 'week';
+$chartView = (string) ($_GET['chartView'] ?? 'month');
+if (!in_array($chartView, ['week', 'month', 'last_week', 'last_month', 'this_year'], true)) {
+    $chartView = 'month';
+}
 
 // Compute overview chart data based on selected view period
 $overviewChart = ['labels' => [], 'total' => [], 'confirmed' => [], 'pending' => [], 'cancelled' => []];
 
-// Determine date range and SQL condition for the selected view
-$dateStart = null;
-$dateEnd = null;
-$dateCondition = '';
+// Determine the date range for the selected view.
+$today = new DateTimeImmutable('today');
 
 switch ($chartView) {
     case 'week':
         // Current week: Monday through Sunday
-        $w = new DateTimeImmutable('monday this week');
-        $e = clone $w;
-        $e->modify('+6 days');
-        $dateStart = $w->format('Y-m-d');
-        $dateEnd = $e->format('Y-m-d');
-        $dateCondition = "event_date BETWEEN '$dateStart' AND '$dateEnd'";
-        break;
-
-    case 'month':
-        // Current month: 1st to last day
-        $dateStart = date('Y-m-01');
-        $dateEnd = date('Y-m-t');
-        $dateCondition = "event_date BETWEEN '$dateStart' AND '$dateEnd'";
+        $rangeStart = new DateTimeImmutable('monday this week');
+        $rangeEnd = $rangeStart->modify('+6 days');
         break;
 
     case 'last_week':
         // Previous week: Monday-Sunday before current week
-        $w = new DateTimeImmutable('monday last week');
-        $e = clone $w;
-        $e->modify('+6 days');
-        $dateStart = $w->format('Y-m-d');
-        $dateEnd = $e->format('Y-m-d');
-        $dateCondition = "event_date BETWEEN '$dateStart' AND '$dateEnd'";
+        $rangeStart = new DateTimeImmutable('monday last week');
+        $rangeEnd = $rangeStart->modify('+6 days');
         break;
 
     case 'last_month':
-        // Previous month: 1st to last day
-        $dateStart = date('Y-m-01', strtotime('first day of last month'));
-        $dateEnd = date('Y-m-t', strtotime('first day of last month'));
-        $dateCondition = "event_date BETWEEN '$dateStart' AND '$dateEnd'";
+        $rangeStart = $today->modify('first day of last month');
+        $rangeEnd = $rangeStart->modify('last day of this month');
         break;
 
     case 'this_year':
-        // Jan 1 to today
-        $dateStart = date('Y-01-01');
-        $dateEnd = date('Y-m-d');
-        $dateCondition = "event_date BETWEEN '$dateStart' AND '$dateEnd'";
+        $rangeStart = new DateTimeImmutable($today->format('Y') . '-01-01');
+        $rangeEnd = new DateTimeImmutable($today->format('Y') . '-12-31');
+        break;
+
+    case 'month':
+    default:
+        // Current month: 1st to last day
+        $rangeStart = $today->modify('first day of this month');
+        $rangeEnd = $today->modify('last day of this month');
         break;
 }
 
-// Build label display based on view
-$viewLabel = '';
-switch ($chartView) {
-    case 'week': $viewLabel = 'This Week'; break;
-    case 'month': $viewLabel = 'This Month'; break;
-    case 'last_week': $viewLabel = 'Last Week'; break;
-    case 'last_month': $viewLabel = 'Last Month'; break;
-    case 'this_year': $viewLabel = 'This Year'; break;
-}
-
-// Query reservations in the selected period, broken down by status
-$seriesData = ['total' => 0, 'confirmed' => 0, 'pending' => 0, 'cancelled' => 0];
-
-if ($dateCondition) {
-    $stmt = $pdo->prepare(
-        "SELECT status, COUNT(*) AS total
-           FROM reservations
-          WHERE $dateCondition
-       GROUP BY status"
-    );
-    $stmt->execute();
-    foreach ($stmt->fetchAll() as $row) {
-        $s = strtolower((string) $row['status']);
-        if (isset($seriesData[$s])) {
-            $seriesData[$s] = (int) $row['total'];
-        }
+// Build one x-axis bucket per day (or per month for the yearly view) so every
+// range produces a real line graph rather than a single aggregate point.
+$buckets = [];
+if ($chartView === 'this_year') {
+    for ($month = 1; $month <= 12; $month++) {
+        $key = sprintf('%04d-%02d', (int) $rangeStart->format('Y'), $month);
+        $monthDate = new DateTimeImmutable($key . '-01');
+        $buckets[$key] = [
+            'label' => $monthDate->format('M'),
+            'total' => 0,
+            'confirmed' => 0,
+            'pending' => 0,
+            'cancelled' => 0,
+        ];
     }
-    $seriesData['total'] = array_sum($seriesData);
-}
-
-// Set chart labels and data based on view type
-// For week view: show 7 individual days (Mon-Sun)
-// For other views: show the aggregate total
-if ($chartView === 'week') {
-    // Build array of 7 day labels (Mon-Sun) with counts
-    $weekLabels = [];
-    $weekData = ['total' => [], 'confirmed' => [], 'pending' => [], 'cancelled' => []];
-    for ($i = 0; $i < 7; $i++) {
-        $d = $dateStart;
-        // Advance $i days from $dateStart
-        $dayDate = date('Y-m-d', strtotime($dateStart . ' +' . $i . ' days'));
-        $weekLabels[] = date('M j', strtotime($dayDate));
-        
-        // Count reservations on this specific day
-        $stmtDay = $pdo->prepare(
-            "SELECT status, COUNT(*) AS total
-               FROM reservations
-              WHERE event_date = '$dayDate'
-           GROUP BY status"
-        );
-        $stmtDay->execute();
-        $dayCounts = ['total' => 0, 'confirmed' => 0, 'pending' => 0, 'cancelled' => 0];
-        foreach ($stmtDay->fetchAll() as $row) {
-            $s = strtolower((string) $row['status']);
-            if (isset($dayCounts[$s])) {
-                $dayCounts[$s] = (int) $row['total'];
-            }
-        }
-        $weekData['total'][$i] = $dayCounts['total'];
-        $weekData['confirmed'][$i] = $dayCounts['confirmed'];
-        $weekData['pending'][$i] = $dayCounts['pending'];
-        $weekData['cancelled'][$i] = $dayCounts['cancelled'];
-    }
-
-    $overviewChart = [
-        'labels' => $weekLabels,
-        'total' => array_values($weekData['total']),
-        'confirmed' => array_values($weekData['confirmed']),
-        'pending' => array_values($weekData['pending']),
-        'cancelled' => array_values($weekData['cancelled'])
-    ];
+    $groupExpression = "DATE_FORMAT(event_date, '%Y-%m')";
 } else {
-    $overviewChart = [
-        'labels' => [$viewLabel],
-        'total' => [$seriesData['total']],
-        'confirmed' => [$seriesData['confirmed']],
-        'pending' => [$seriesData['pending']],
-        'cancelled' => [$seriesData['cancelled']]
-    ];
+    for ($day = $rangeStart; $day <= $rangeEnd; $day = $day->modify('+1 day')) {
+        $key = $day->format('Y-m-d');
+        $buckets[$key] = [
+            'label' => $day->format('M j'),
+            'total' => 0,
+            'confirmed' => 0,
+            'pending' => 0,
+            'cancelled' => 0,
+        ];
+    }
+    $groupExpression = 'event_date';
+}
+
+// One grouped query fills every bucket: no per-day round trips.
+$stmt = $pdo->prepare(
+    "SELECT $groupExpression AS bucket, status, COUNT(*) AS total
+       FROM reservations
+      WHERE event_date BETWEEN ? AND ?
+   GROUP BY bucket, status"
+);
+$stmt->execute([$rangeStart->format('Y-m-d'), $rangeEnd->format('Y-m-d')]);
+
+foreach ($stmt->fetchAll() as $row) {
+    $bucketKey = (string) $row['bucket'];
+    if (!isset($buckets[$bucketKey])) {
+        continue;
+    }
+    $count = (int) $row['total'];
+    // "Total" includes every status, including Completed and Rejected.
+    $buckets[$bucketKey]['total'] += $count;
+
+    $statusKey = strtolower((string) $row['status']);
+    if (in_array($statusKey, ['confirmed', 'pending', 'cancelled'], true)) {
+        $buckets[$bucketKey][$statusKey] += $count;
+    }
+}
+
+$overviewChart = [
+    'labels' => [],
+    'total' => [],
+    'confirmed' => [],
+    'pending' => [],
+    'cancelled' => [],
+];
+
+foreach ($buckets as $bucket) {
+    $overviewChart['labels'][] = $bucket['label'];
+    $overviewChart['total'][] = $bucket['total'];
+    $overviewChart['confirmed'][] = $bucket['confirmed'];
+    $overviewChart['pending'][] = $bucket['pending'];
+    $overviewChart['cancelled'][] = $bucket['cancelled'];
 }
 
 $serviceChart = [
@@ -436,8 +414,8 @@ $serviceChart = [
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="dashboard.css" />
-    <link rel="stylesheet" href="responsive.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('dashboard.css'); ?>" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 </head>
 <body>
@@ -485,11 +463,11 @@ $serviceChart = [
                 </li>
 
                 <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
-                    <?php if (pdrCan('manage_staff')): ?>
-                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                    <?php endif; ?>
+                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
                 </li>
+                <?php if (pdrCan('manage_staff')): ?>
+                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                <?php endif; ?>
             </ul>
         </div>
         <div class="sidebar-footer">
@@ -506,7 +484,6 @@ $serviceChart = [
     <main class="main-wrapper">
         <header class="top-navbar">
             <div class="header-title-section">
-                <i class="fa-solid fa-bars" style="color: #718096; cursor: pointer;"></i>
                 <h1>Dashboard</h1>
             </div>
             <div class="user-profile">
@@ -619,7 +596,13 @@ $serviceChart = [
                             </select>
                         </form>
                     </div>
-                    <canvas id="reservationsOverviewChart" height="150"></canvas>
+                    <div class="chart-container-line" id="overviewChartWrap">
+                        <canvas id="reservationsOverviewChart" height="150"></canvas>
+                        <div class="chart-empty" id="overviewEmpty">
+                            <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                            <span>No reservations in this period.</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="dashboard-card">
@@ -643,8 +626,8 @@ $serviceChart = [
                             <?php foreach ($upcomingEventsList as $event): ?>
                                 <?php
                                     $eventTimestamp = strtotime($event['event_date']);
-                                    $eventDay = $eventTimestamp ? date('j', $eventTimestamp) : 'â€”';
-                                    $eventMonth = $eventTimestamp ? strtoupper(date('M', $eventTimestamp)) : 'â€”';
+                                    $eventDay = $eventTimestamp ? date('j', $eventTimestamp) : '—';
+                                    $eventMonth = $eventTimestamp ? strtoupper(date('M', $eventTimestamp)) : '—';
                                     $eventTitle = $event['event_type'] ?: $event['main_service'];
                                     $eventStatusClass = strtolower((string) $event['status']);
                                 ?>
@@ -702,7 +685,7 @@ $serviceChart = [
                                                 <?php echo h($row['status']); ?>
                                             </span>
                                         </td>
-                                        <td><?php echo h($row['payment_method'] ?: 'â€”'); ?></td>
+                                        <td><?php echo h($row['payment_method'] ?: '—'); ?></td>
                                         <td><?php echo h(formatPeso($row['estimated_total'])); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -719,49 +702,68 @@ $serviceChart = [
         const overviewChartData = <?php echo json_encode($overviewChart, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
         const serviceChartData = <?php echo json_encode($serviceChart, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
 
+        // A period with no bookings would otherwise draw every line flat on the
+        // axis, which looks like a broken chart. Show an explicit empty state.
+        const overviewHasData = ['total', 'confirmed', 'pending', 'cancelled'].some(function (key) {
+            return (overviewChartData[key] || []).some(function (value) {
+                return Number(value) > 0;
+            });
+        });
+        if (!overviewHasData) {
+            document.getElementById('overviewChartWrap').classList.add('is-empty');
+        }
+
         // Line Chart Config
         const ctxLine = document.getElementById('reservationsOverviewChart').getContext('2d');
+        const lineSeries = [
+            { label: 'Total', key: 'total', color: '#500a18', fill: true },
+            { label: 'Confirmed', key: 'confirmed', color: '#16a34a', fill: false },
+            { label: 'Pending', key: 'pending', color: '#d97706', fill: false },
+            { label: 'Cancelled', key: 'cancelled', color: '#dc2626', fill: false }
+        ];
         new Chart(ctxLine, {
             type: 'line',
             data: {
                 labels: overviewChartData.labels,
-                datasets: [
-                    {
-                        label: 'Total',
-                        data: overviewChartData.total,
-                        borderColor: '#500a18',
-                        backgroundColor: '#500a181a',
+                datasets: lineSeries.map(function (series) {
+                    return {
+                        label: series.label,
+                        data: overviewChartData[series.key],
+                        borderColor: series.color,
+                        backgroundColor: series.color + '1a',
+                        fill: series.fill,
                         tension: 0.3,
-                        fill: true
-                    },
-                    {
-                        label: 'Confirmed',
-                        data: overviewChartData.confirmed,
-                        borderColor: '#16a34a',
-                        tension: 0.3
-                    },
-                    {
-                        label: 'Pending',
-                        data: overviewChartData.pending,
-                        borderColor: '#d97706',
-                        tension: 0.3
-                    },
-                    {
-                        label: 'Cancelled',
-                        data: overviewChartData.cancelled,
-                        borderColor: '#dc2626',
-                        tension: 0.3
-                    }
-                ]
+                        borderWidth: 2.5,
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: series.color,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1
+                    };
+                })
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                resizeDelay: 80,
+                animation: { duration: 500 },
+                interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { position: 'top', labels: { boxWidth: 8, font: { size: 10 } } }
+                    legend: {
+                        position: 'top',
+                        labels: { boxWidth: 8, usePointStyle: true, font: { size: 10 } }
+                    }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
-                    x: { grid: { display: false } }
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 },
+                        grid: { color: '#f0f0f0' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { maxTicksLimit: 12, maxRotation: 0, autoSkip: true }
+                    }
                 }
             }
         });
@@ -805,6 +807,8 @@ updateLiveDateTime();
 setInterval(updateLiveDateTime, 1000);
 
     </script>
-<script src="responsive.js"></script>
+<script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
+<script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
+<script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>
 </html>

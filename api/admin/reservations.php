@@ -42,7 +42,16 @@ try {
         $params[] = $to;
     }
 
+    // T-22 revision: "History" is a read-only view of finished bookings, not a
+    // list of soft-deleted rows. Past events and terminal statuses qualify.
+    $history = ((int) ($_GET['history'] ?? 0)) === 1;
+    if ($history) {
+        $where[] = 'archived_at IS NULL';
+        $where[] = "(event_date < CURDATE() OR status IN ('Completed', 'Cancelled', 'Rejected'))";
+    }
+
     $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+    $orderSql = $history ? 'event_date DESC, id DESC' : 'id DESC';
 
     $paginate = isset($_GET['page']);
     $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -58,11 +67,11 @@ try {
         $offset = ($page - 1) * $perPage;
 
         $stmt = $pdo->prepare(
-            "SELECT * FROM reservations $whereSql ORDER BY id DESC LIMIT $perPage OFFSET $offset"
+            "SELECT * FROM reservations $whereSql ORDER BY $orderSql LIMIT $perPage OFFSET $offset"
         );
         $stmt->execute($params);
     } else {
-        $stmt = $pdo->prepare("SELECT * FROM reservations $whereSql ORDER BY id DESC");
+        $stmt = $pdo->prepare("SELECT * FROM reservations $whereSql ORDER BY $orderSql");
         $stmt->execute($params);
     }
 

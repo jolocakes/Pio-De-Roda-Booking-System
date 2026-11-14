@@ -11,7 +11,7 @@ pdrRequirePageCapability('manage_catalog');
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="service.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('service.css'); ?>" />
     <style>
         /* ---- Additions for the editable catalog (kept scoped to this page) ---- */
         .page-title-group h1 {
@@ -161,7 +161,7 @@ pdrRequirePageCapability('manage_catalog');
         .empty-note { font-size: 13px; color: var(--text-muted); padding: 14px 4px; }
         .dishes-count { display: inline-block; background: rgba(91,8,8,.07); border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
     </style>
-    <link rel="stylesheet" href="responsive.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 </head>
 <body>
 
@@ -202,11 +202,11 @@ pdrRequirePageCapability('manage_catalog');
                     <a href="reports.php"><i class="fa-solid fa-chart-column"></i> Reports</a>
                 </li>
                 <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a>
-                    <?php if (pdrCan('manage_staff')): ?>
-                        <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                    <?php endif; ?>
+                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
                 </li>
+                <?php if (pdrCan('manage_staff')): ?>
+                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
+                <?php endif; ?>
             </ul>
         </div>
 
@@ -324,7 +324,7 @@ pdrRequirePageCapability('manage_catalog');
 
         const REASON_TEXT = {
             UNAUTHORIZED: 'Your session expired. Please log in again.',
-            INVALID_CSRF_TOKEN: 'Your session token expired â€” reload the page and try again.',
+            INVALID_CSRF_TOKEN: 'Your session token expired — reload the page and try again.',
             INVALID_NAME: 'Service name is required (maximum 100 characters).',
             DUPLICATE_NAME: 'Another service already uses that name.',
             INVALID_DESCRIPTION: 'The description is too long.',
@@ -363,8 +363,8 @@ pdrRequirePageCapability('manage_catalog');
 
         function fmtPeso(value) {
             const n = Number(value);
-            if (!Number.isFinite(n)) return 'â‚±0';
-            return 'â‚±' + n.toLocaleString('en-US');
+            if (!Number.isFinite(n)) return '₱0';
+            return '₱' + n.toLocaleString('en-US');
         }
 
         function splitLines(text) {
@@ -471,7 +471,7 @@ pdrRequirePageCapability('manage_catalog');
             return `
                 <article class="service-card${svc.is_active ? '' : ' is-inactive'}" data-service-id="${esc(svc.id)}">
                     <div class="card-image-wrap">
-                        <img src="${esc(SERVICE_IMAGES[svc.id] || 'pio1.jpg')}" alt="${esc(svc.name)}">
+                        <img src="${esc(SERVICE_IMAGES[svc.id] || 'pio1.jpg')}" alt="${esc(svc.name)}" loading="lazy" decoding="async">
                         ${svc.is_active ? '' : '<span class="img-flag">Inactive</span>'}
                     </div>
                     <div class="card-body">
@@ -500,7 +500,7 @@ pdrRequirePageCapability('manage_catalog');
             return `
                 <div class="rate-row">
                     <input type="text" class="rate-label" maxlength="80" placeholder="Label (e.g. Classic Package)" value="${label}">
-                    <input type="text" class="rate-value" maxlength="80" placeholder="Value (e.g. â‚±7,250)" value="${value}">
+                    <input type="text" class="rate-value" maxlength="80" placeholder="Value (e.g. ₱7,250)" value="${value}">
                     <button type="button" class="rate-remove" data-action="remove-rate" aria-label="Remove rate row">&times;</button>
                 </div>`;
         }
@@ -514,7 +514,7 @@ pdrRequirePageCapability('manage_catalog');
             return `
                 <article class="service-card" data-service-id="${esc(svc.id)}">
                     <div class="card-image-wrap">
-                        <img src="${esc(SERVICE_IMAGES[svc.id] || 'pio1.jpg')}" alt="${esc(svc.name)}">
+                        <img src="${esc(SERVICE_IMAGES[svc.id] || 'pio1.jpg')}" alt="${esc(svc.name)}" loading="lazy" decoding="async">
                         <span class="img-flag">Editing</span>
                     </div>
                     <div class="card-body">
@@ -530,13 +530,13 @@ pdrRequirePageCapability('manage_catalog');
                                 </label>
                             </div>
                             <div class="form-grid">
-                                <label>Base price (â‚±)
+                                <label>Base price (₱)
                                     <input type="number" name="base_price" min="0" step="0.01" value="${svc.base_price === null ? '' : esc(svc.base_price)}">
                                 </label>
                                 <label>Price display
                                     <input type="text" name="price_display" maxlength="50" value="${esc(svc.price_display || '')}">
                                 </label>
-                                <label>Per-head rate (â‚±)
+                                <label>Per-head rate (₱)
                                     <input type="number" name="per_head" min="0" step="0.01" value="${svc.per_head === null ? '' : esc(svc.per_head)}">
                                 </label>
                                 <label>Max capacity
@@ -668,7 +668,7 @@ pdrRequirePageCapability('manage_catalog');
                                 <label>Package code (optional)
                                     <input type="text" name="package_code" maxlength="100" placeholder="auto-generated from name" value="${esc(isNew ? '' : pkg.package_code)}">
                                 </label>
-                                <label>Price (â‚±)
+                                <label>Price (₱)
                                     <input type="number" name="price" min="0" step="0.01" required value="${isNew ? '' : esc(pkg.price)}">
                                 </label>
                                 <label>Max capacity (optional)
@@ -831,7 +831,7 @@ pdrRequirePageCapability('manage_catalog');
                                 <label class="linked-field" style="${mode === 'linked' ? '' : 'display:none'}">Linked service
                                     <select name="price_from">${serviceOptions}</select>
                                 </label>
-                                <label class="fixed-field" style="${mode === 'fixed' ? '' : 'display:none'}">Fixed price (â‚±)
+                                <label class="fixed-field" style="${mode === 'fixed' ? '' : 'display:none'}">Fixed price (₱)
                                     <input type="number" name="fixed_price" min="0" step="0.01" value="${isNew || addon.fixed_price === null ? '' : esc(addon.fixed_price)}">
                                 </label>
                             </div>
@@ -923,8 +923,8 @@ pdrRequirePageCapability('manage_catalog');
                 if (raw === '' || !Number.isFinite(Number(raw))) return;
                 const amount = fmtPeso(Number(raw));
                 const current = display.value.trim();
-                display.value = current.indexOf('â‚±') !== -1
-                    ? current.replace(/â‚±\s*[\d,]+(?:\.\d+)?/, amount)
+                display.value = current.indexOf('₱') !== -1
+                    ? current.replace(/₱\s*[\d,]+(?:\.\d+)?/, amount)
                     : amount;
             });
 
@@ -1135,6 +1135,8 @@ pdrRequirePageCapability('manage_catalog');
     })();
     </script>
 
-<script src="responsive.js"></script>
+<script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
+<script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
+<script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>
 </html>

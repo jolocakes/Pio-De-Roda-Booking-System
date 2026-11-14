@@ -4,6 +4,7 @@
  * Pio De Roda Hospitality Reservation and Event Booking System
  */
 require_once __DIR__ . '/../config/csrf.php';
+require_once __DIR__ . '/../config/assets.php';
 
 pdrSessionStart();
 
@@ -79,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login - Pio De Roda Reservation System</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="reservation.css">
+    <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>">
     <style>
         body.login-body {
             display: flex;
@@ -158,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
         }
     </style>
-    <link rel="stylesheet" href="responsive.css" />
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 </head>
 <body class="login-body">
     <div class="login-card">

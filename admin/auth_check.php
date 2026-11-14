@@ -8,6 +8,7 @@
  * fetch() call can react instead of receiving an HTML login page.
  */
 require_once __DIR__ . '/../config/csrf.php';
+require_once __DIR__ . '/../config/assets.php';
 
 pdrSessionStart();
 

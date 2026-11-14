@@ -13,8 +13,8 @@ $adminRole = pdrRoleLabel();
     <title>Staff Accounts - Pio De Roda Cafe</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="reservation.css">
-    <link rel="stylesheet" href="responsive.css">
+    <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>">
 </head>
 <body>
     <aside class="sidebar">
@@ -35,7 +35,7 @@ $adminRole = pdrRoleLabel();
                 <li class="nav-item"><a href="customer.php"><i class="fa-solid fa-users"></i> Customers</a></li>
                 <li class="nav-item"><a href="payment.php"><i class="fa-solid fa-money-bill-wave"></i> Payment</a></li>
                 <li class="nav-item"><a href="reports.php"><i class="fa-solid fa-chart-column"></i> Reports</a></li>
-                <li class="nav-item"><a href="archive.php"><i class="fa-solid fa-box-archive"></i> Archive</a></li>
+                <li class="nav-item"><a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a></li>
                 <li class="nav-item active"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
             </ul>
         </div>
@@ -246,6 +246,8 @@ $adminRole = pdrRoleLabel();
 
         loadStaff();
     </script>
-    <script src="responsive.js"></script>
+    <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
+    <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
+    <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>
 </html>

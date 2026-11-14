@@ -111,10 +111,16 @@ $issuedAt = date('F j, Y g:i A');
         .note { margin-top: 26px; font-size: 12px; color: var(--muted); line-height: 1.6; }
         .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #eef2ff; color: #3730a3; }
         .error { max-width: 780px; margin: 40px auto; background: #fff; border-radius: 10px; padding: 30px; text-align: center; color: #991b1b; }
+        /* Print / Save-as-PDF: the page margin keeps the receipt off the
+           paper edge. Without @page the sheet printed flush to the edge. */
+        @page { size: A4 portrait; margin: 15mm 14mm; }
         @media print {
-            body { background: #fff; padding: 0; }
+            html, body { background: #fff; padding: 0; margin: 0; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .toolbar { display: none; }
-            .sheet { box-shadow: none; border-radius: 0; max-width: none; padding: 0; }
+            .sheet { box-shadow: none; border-radius: 0; max-width: none; margin: 0; padding: 0; }
+            .head, tr, .meta, .totals, .note { break-inside: avoid; page-break-inside: avoid; }
+            h3 { break-after: avoid; page-break-after: avoid; }
             a[href]::after { content: ""; }
         }
     </style>
