@@ -254,7 +254,8 @@ $shownTo = min($page * $perPage, $totalRows);
                                             data-guests="<?php echo pdrH((string) $row['guests']); ?>"
                                             data-amount="<?php echo pdrH($row['amount']); ?>"
                                             data-package="<?php echo pdrH($row['package']); ?>"
-                                            data-status="<?php echo pdrH($row['status']); ?>">
+                                            data-status="<?php echo pdrH($row['status']); ?>"
+                                            data-address="<?php echo pdrH((string) ($row['address'] ?? '')); ?>">
                                             <i class="fa-solid fa-eye"></i>
                                         </button>
 
@@ -460,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // View Reservation Details Modal — build DOM nodes with textContent so
         // customer-controlled values can never become HTML/script.
-        function viewDetails(id, customer, phone, email, service, date, time, guests, amount, packageName, status) {
+        function viewDetails(id, customer, phone, email, service, date, time, guests, amount, packageName, status, address) {
             const content = document.getElementById('viewModalContent');
             if (!content) return;
 
@@ -469,6 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ['Customer Name', customer],
                 ['Phone', phone],
                 ['Email', email],
+                ['Address', (address || '').trim() || '—'],
                 ['Service', service],
                 ['Package', packageName],
                 ['Date & Time', date + ' at ' + time],
@@ -486,6 +488,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 p.appendChild(document.createTextNode(' ' + (value == null ? '' : String(value))));
                 content.appendChild(p);
             });
+
+            // Free Google Maps embed of the booking address (no API key) plus a
+            // link that opens the full map for directions. Built with DOM nodes
+            // so customer-typed text can never inject markup.
+            const addr = (address || '').trim();
+            if (addr) {
+                const query = addr + ', Philippines';
+                const box = document.createElement('div');
+                box.className = 'view-map';
+
+                const frame = document.createElement('iframe');
+                frame.src = 'https://www.google.com/maps?q=' + encodeURIComponent(query) + '&z=15&output=embed';
+                frame.title = 'Map of the address for this reservation';
+                frame.loading = 'lazy';
+                frame.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
+                box.appendChild(frame);
+
+                const link = document.createElement('a');
+                link.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.textContent = 'Open in Google Maps';
+                box.appendChild(link);
+
+                content.appendChild(box);
+            }
 
             document.getElementById('viewModal').style.display = 'flex';
         }
@@ -665,7 +693,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const d = button.dataset;
                 viewDetails(
                     d.id, d.customer, d.phone, d.email, d.service,
-                    d.date, d.time, d.guests, d.amount, d.package, d.status
+                    d.date, d.time, d.guests, d.amount, d.package, d.status,
+                    d.address || ''
                 );
             });
         });

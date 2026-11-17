@@ -376,6 +376,37 @@ body {
   color: var(--text-muted); 
 }
 
+/* View Details: live map of the booking address + directions link */
+.view-map {
+  margin-top: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--cream-soft);
+}
+
+.view-map iframe {
+  display: block;
+  width: 100%;
+  height: 180px;
+  border: 0;
+}
+
+.view-map a {
+  display: block;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--crimson);
+  text-decoration: none;
+  border-top: 1px solid var(--border-color);
+}
+
+.view-map a:hover {
+  text-decoration: underline;
+}
+
 .modal-body label {
   display: block;
   font-size: 12px;

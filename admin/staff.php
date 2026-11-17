@@ -69,7 +69,7 @@ $adminRole = pdrAdminDisplayRole();
                 <div class="card-header">
                     <h3>All accounts</h3>
                     <span style="font-size:12.5px;color:#718096;">
-                        Admin: full access Â· Staff: daily operations Â· Viewer: read-only
+                        Admin: full access · Staff: daily operations · Viewer: read-only
                     </span>
                 </div>
                 <div class="table-responsive">
@@ -84,7 +84,7 @@ $adminRole = pdrAdminDisplayRole();
                             </tr>
                         </thead>
                         <tbody id="staffTableBody">
-                            <tr><td colspan="5" style="text-align:center;padding:24px;color:#718096;">Loadingâ€¦</td></tr>
+                            <tr><td colspan="5" style="text-align:center;padding:24px;color:#718096;">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>

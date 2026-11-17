@@ -517,6 +517,10 @@ function renderPanel() {
       <input type="text" id="fAddress" autocomplete="street-address" placeholder="Enter Address" value="${state.address}">
       <div class="cap">Complete address where the service will be set up or delivered (street, barangay, municipality)</div>
       <div class="err" id="errAddress">Please enter the address for setup or delivery.</div>
+      <div class="addr-map" id="addrMap" hidden>
+        <span class="addr-map-cap">Location preview</span>
+        <iframe id="addrMapFrame" title="Location preview of the address you entered" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
     </div>`
         : ""
     }
@@ -1027,6 +1031,20 @@ function renderSummary() {
 }
 
 /* ---------------- EVENTS ---------------- */
+// Last address query sent to the map preview — module scope so re-rendering
+// the panel (stepping between form pages) never reloads the same map twice.
+let addrMapQuery = "";
+let addrMapTimer = null;
+
+// Google Maps embed URL for a typed address — plain iframe, no API key.
+function addrMapSrc(addr) {
+  return (
+    "https://www.google.com/maps?q=" +
+    encodeURIComponent(addr.trim() + ", Philippines") +
+    "&z=16&output=embed"
+  );
+}
+
 function attachPanelEvents() {
   document.getElementById("fName").oninput = (e) => {
     state.customerName = e.target.value;
@@ -1052,12 +1070,34 @@ function attachPanelEvents() {
   // equipment rental) — guard so pages without the field never throw.
   const addrInput = document.getElementById("fAddress");
   if (addrInput) {
+    const addrMap = document.getElementById("addrMap");
+    const addrFrame = document.getElementById("addrMapFrame");
+
+    // Show a Google Maps preview once the address is complete enough to geocode.
+    const updateAddrMap = () => {
+      const q = state.address.trim();
+      if (!addrMap || !addrFrame || q.length < 8) {
+        if (addrMap) addrMap.hidden = true;
+        addrMapQuery = "";
+        return;
+      }
+      if (q === addrMapQuery) return; // same address — don't reload the map
+      addrMapQuery = q;
+      addrFrame.src = addrMapSrc(q);
+      addrMap.hidden = false;
+    };
+
     addrInput.oninput = (e) => {
       state.address = e.target.value;
       if (state.address.trim()) showFieldError("errAddress", "fAddress", false);
+      // refresh the preview a moment after typing pauses
+      clearTimeout(addrMapTimer);
+      addrMapTimer = setTimeout(updateAddrMap, 700);
     };
     addrInput.onblur = (e) =>
       showFieldError("errAddress", "fAddress", !e.target.value.trim());
+    // restore the preview when returning to this step with a saved address
+    updateAddrMap();
   }
 
   const dateInput = document.getElementById("fDate");
@@ -1284,6 +1324,11 @@ function openReviewModal() {
     <div class="confirm-row"><span>Contact Number</span><span>${state.contactNumber}</span></div>
     <div class="confirm-row"><span>Email</span><span>${state.email}</span></div>
     ${state.service.requiresAddress ? `<div class="confirm-row"><span>Address</span><span>${pdrEscape(state.address)}</span></div>` : ""}
+    ${state.service.requiresAddress && state.address.trim() ? `
+    <div class="addr-map">
+      <span class="addr-map-cap">Location preview</span>
+      <iframe src="${addrMapSrc(state.address)}" title="Location preview of the address you entered" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>` : ""}
     <div class="confirm-row"><span>Event Date</span><span>${state.eventDate}</span></div>
     <div class="confirm-row"><span>Event Time</span><span>${fmtEventTime(state.eventTime)}</span></div>
     <div class="confirm-row"><span>Event Type</span><span>${state.eventType === "Other" ? state.eventTypeOther : state.eventType}</span></div>

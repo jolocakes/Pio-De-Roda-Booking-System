@@ -156,7 +156,7 @@ $adminName = pdrAdminDisplayName();
         }
         function money(value) {
             const n = Number(value);
-            return isFinite(n) ? 'â‚±' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'â‚±0.00';
+            return isFinite(n) ? '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '₱0.00';
         }
         function showAlert(message, type) {
             const box = document.getElementById('pageAlert');
@@ -205,8 +205,8 @@ $adminName = pdrAdminDisplayName();
                 tr.innerHTML =
                     '<td><strong>' + esc(cust.full_name) + '</strong></td>' +
                     '<td>' + esc(cust.email) + '</td>' +
-                    '<td>' + esc(cust.phone || 'â€”') + '</td>' +
-                    '<td>' + esc(cust.address || 'â€”') + '</td>' +
+                    '<td>' + esc(cust.phone || '—') + '</td>' +
+                    '<td>' + esc(cust.address || '—') + '</td>' +
                     '<td>' + Number(cust.bookings || 0) + '</td>' +
                     '<td><span class="status-badge ' + (cust.status === 'Active' ? 'status-active' : 'status-inactive') + '">' + esc(cust.status) + '</span></td>' +
                     '<td style="white-space:nowrap;">' +
@@ -231,7 +231,7 @@ $adminName = pdrAdminDisplayName();
         function renderPagination() {
             const from = state.total === 0 ? 0 : ((state.page - 1) * state.perPage) + 1;
             const to = Math.min(state.page * state.perPage, state.total);
-            document.getElementById('customerRange').textContent = 'Showing ' + from + 'â€“' + to + ' of ' + state.total + ' customer' + (state.total === 1 ? '' : 's');
+            document.getElementById('customerRange').textContent = 'Showing ' + from + '–' + to + ' of ' + state.total + ' customer' + (state.total === 1 ? '' : 's');
             document.getElementById('customerPage').textContent = 'Page ' + state.page + ' of ' + state.totalPages;
             document.getElementById('customerPrev').disabled = state.page <= 1;
             document.getElementById('customerNext').disabled = state.page >= state.totalPages;
@@ -239,7 +239,7 @@ $adminName = pdrAdminDisplayName();
 
         async function openDetail(id) {
             const box = document.getElementById('detailBody');
-            box.innerHTML = '<p style="color:#718096;">Loadingâ€¦</p>';
+            box.innerHTML = '<p style="color:#718096;">Loading…</p>';
             document.getElementById('detailModal').style.display = 'flex';
 
             try {
@@ -254,8 +254,8 @@ $adminName = pdrAdminDisplayName();
                 let html =
                     '<div class="detail-row"><strong>Name:</strong> <span>' + esc(c.full_name) + '</span></div>' +
                     '<div class="detail-row"><strong>Email:</strong> <span>' + esc(c.email) + '</span></div>' +
-                    '<div class="detail-row"><strong>Phone:</strong> <span>' + esc(c.phone || 'â€”') + '</span></div>' +
-                    '<div class="detail-row"><strong>Address:</strong> <span>' + esc(c.address || 'â€”') + '</span></div>' +
+                    '<div class="detail-row"><strong>Phone:</strong> <span>' + esc(c.phone || '—') + '</span></div>' +
+                    '<div class="detail-row"><strong>Address:</strong> <span>' + esc(c.address || '—') + '</span></div>' +
                     '<div class="detail-row"><strong>Status:</strong> <span>' + esc(c.status) + '</span></div>' +
                     '<div class="detail-row"><strong>Bookings:</strong> <span>' + Number(c.bookings || 0) + '</span></div>' +
                     '<div class="detail-row"><strong>Lifetime value:</strong> <span>' + money(c.lifetime_value) + '</span></div>' +

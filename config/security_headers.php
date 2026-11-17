@@ -42,7 +42,7 @@ header(
     "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; " .
     "img-src 'self' data: blob: https:; " .
     "connect-src 'self' https://challenges.cloudflare.com; " .
-    "frame-src 'self' https://challenges.cloudflare.com; " .
+    "frame-src 'self' https://challenges.cloudflare.com https://www.google.com https://maps.google.com; " .
     "media-src 'self'; " .
     "worker-src 'self' blob:"
 );

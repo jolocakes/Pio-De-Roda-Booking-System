@@ -198,11 +198,11 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             });
         }
         function fmtDate(value) {
-            if (!value) return 'â€”';
+            if (!value) return '—';
             return window.PDRFormat ? (PDRFormat.format(value) || String(value)) : String(value);
         }
         function fmtDateTime(value) {
-            if (!value) return 'â€”';
+            if (!value) return '—';
             return window.PDRFormat ? (PDRFormat.formatDateTime(value) || String(value)) : String(value);
         }
         function showAlert(message, type) {
@@ -272,7 +272,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
                     '<td><strong>' + esc(r.id) + '</strong></td>' +
                     '<td>' + esc(r.customerName) + '</td>' +
                     '<td>' + esc(r.service) + '</td>' +
-                    '<td>' + fmtDate(r.eventDate) + '<br><small style="color:#718096;">' + esc(r.eventTime || 'â€”') + '</small></td>' +
+                    '<td>' + fmtDate(r.eventDate) + '<br><small style="color:#718096;">' + esc(r.eventTime || '—') + '</small></td>' +
                     '<td>' + esc(r.guests) + '</td>' +
                     '<td>' + esc(r.estimatedTotal) + '</td>' +
                     '<td><span class="history-status status-' + esc(String(r.status || '').toLowerCase()) + '">' + esc(r.status) + '</span></td>' +
@@ -289,7 +289,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             const from = historyState.total === 0 ? 0 : ((historyState.page - 1) * historyState.perPage) + 1;
             const to = Math.min(historyState.page * historyState.perPage, historyState.total);
             document.getElementById('historyRange').textContent =
-                'Showing ' + from + 'â€“' + to + ' of ' + historyState.total + ' booking' + (historyState.total === 1 ? '' : 's');
+                'Showing ' + from + '–' + to + ' of ' + historyState.total + ' booking' + (historyState.total === 1 ? '' : 's');
             document.getElementById('historyPage').textContent = 'Page ' + historyState.page + ' of ' + historyState.totalPages;
             document.getElementById('historyPrev').disabled = historyState.page <= 1;
             document.getElementById('historyNext').disabled = historyState.page >= historyState.totalPages;
@@ -299,20 +299,20 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             const record = historyState.records.find(function (r) { return String(r.id) === String(reservationId); });
             if (!record) return;
             const body = document.getElementById('historyModalBody');
-            const packages = record.selectedPackage || 'â€”';
-            const address = record.address || 'â€”';
+            const packages = record.selectedPackage || '—';
+            const address = record.address || '—';
 
             body.innerHTML =
                 '<dl class="detail-list">' +
                     '<div><dt>Reservation ID</dt><dd><strong>' + esc(record.id) + '</strong></dd></div>' +
                     '<div><dt>Status</dt><dd><span class="history-status status-' + esc(String(record.status || '').toLowerCase()) + '">' + esc(record.status) + '</span></dd></div>' +
                     '<div><dt>Customer</dt><dd>' + esc(record.customerName) + '</dd></div>' +
-                    '<div><dt>Contact</dt><dd>' + esc(record.contactNumber || 'â€”') + '</dd></div>' +
-                    '<div><dt>Email</dt><dd>' + esc(record.email || 'â€”') + '</dd></div>' +
+                    '<div><dt>Contact</dt><dd>' + esc(record.contactNumber || '—') + '</dd></div>' +
+                    '<div><dt>Email</dt><dd>' + esc(record.email || '—') + '</dd></div>' +
                     '<div><dt>Address</dt><dd>' + esc(address) + '</dd></div>' +
                     '<div><dt>Service</dt><dd>' + esc(record.service) + '</dd></div>' +
                     '<div><dt>Package</dt><dd>' + esc(packages) + '</dd></div>' +
-                    '<div><dt>Event date</dt><dd>' + fmtDate(record.eventDate) + ' at ' + esc(record.eventTime || 'â€”') + '</dd></div>' +
+                    '<div><dt>Event date</dt><dd>' + fmtDate(record.eventDate) + ' at ' + esc(record.eventTime || '—') + '</dd></div>' +
                     '<div><dt>Guests</dt><dd>' + esc(record.guests) + ' pax</dd></div>' +
                     '<div><dt>Estimated total</dt><dd><strong>' + esc(record.estimatedTotal) + '</strong></dd></div>' +
                     '<div><dt>Submitted</dt><dd>' + fmtDateTime(record.submittedAt) + '</dd></div>' +
@@ -379,7 +379,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
                         '<td>' + fmtDate(r.event_date) + '</td>' +
                         '<td>' + esc(r.status) + '</td>' +
                         '<td>' + fmtDateTime(r.archived_at) + '</td>' +
-                        '<td><span class="category-badge">' + esc(r.archive_reason || 'â€”') + '</span></td>' +
+                        '<td><span class="category-badge">' + esc(r.archive_reason || '—') + '</span></td>' +
                         archiveActionCell(r.id) + '</tr>');
                 });
             } else if (archiveState.type === 'customers') {
@@ -388,10 +388,10 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
                     tbody.insertAdjacentHTML('beforeend',
                         '<tr><td><strong>' + esc(r.full_name) + '</strong></td>' +
                         '<td>' + esc(r.email) + '</td>' +
-                        '<td>' + esc(r.phone || 'â€”') + '</td>' +
+                        '<td>' + esc(r.phone || '—') + '</td>' +
                         '<td>' + esc(r.status) + '</td>' +
                         '<td>' + fmtDateTime(r.archived_at) + '</td>' +
-                        '<td><span class="category-badge">' + esc(r.archive_reason || 'â€”') + '</span></td>' +
+                        '<td><span class="category-badge">' + esc(r.archive_reason || '—') + '</span></td>' +
                         archiveActionCell(r.id) + '</tr>');
                 });
             } else {
@@ -425,7 +425,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
         function renderArchivePagination() {
             const from = archiveState.total === 0 ? 0 : ((archiveState.page - 1) * 50) + 1;
             const to = Math.min(archiveState.page * 50, archiveState.total);
-            document.getElementById('archiveRange').textContent = 'Showing ' + from + 'â€“' + to + ' of ' + archiveState.total + ' record' + (archiveState.total === 1 ? '' : 's');
+            document.getElementById('archiveRange').textContent = 'Showing ' + from + '–' + to + ' of ' + archiveState.total + ' record' + (archiveState.total === 1 ? '' : 's');
             document.getElementById('archivePage').textContent = 'Page ' + archiveState.page + ' of ' + archiveState.totalPages;
             document.getElementById('archivePrev').disabled = archiveState.page <= 1;
             document.getElementById('archiveNext').disabled = archiveState.page >= archiveState.totalPages;

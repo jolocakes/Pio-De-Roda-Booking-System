@@ -11,7 +11,7 @@ function h($value) {
 }
 
 function formatPeso($amount) {
-    return 'â‚±' . number_format((float) $amount, 2);
+    return '₱' . number_format((float) $amount, 2);
 }
 
 function formatEventTime($time) {
@@ -274,7 +274,7 @@ $metrics = [
     ],
     [
         'title' => 'Most Reserved Service',
-        'value' => $topService !== '' ? $topService : 'â€”',
+        'value' => $topService !== '' ? $topService : '—',
         'sub' => '(' . number_format($topServiceCount) . ' ' . ($topServiceCount === 1 ? 'reservation' : 'reservations') . ')',
         'icon' => 'fa-star',
         'bg' => '#f3e8ff',
@@ -573,8 +573,8 @@ $serviceChart = [
                             <?php foreach ($upcomingEventsList as $event): ?>
                                 <?php
                                     $eventTimestamp = strtotime($event['event_date']);
-                                    $eventDay = $eventTimestamp ? date('j', $eventTimestamp) : 'â€”';
-                                    $eventMonth = $eventTimestamp ? strtoupper(date('M', $eventTimestamp)) : 'â€”';
+                                    $eventDay = $eventTimestamp ? date('j', $eventTimestamp) : '—';
+                                    $eventMonth = $eventTimestamp ? strtoupper(date('M', $eventTimestamp)) : '—';
                                     $eventTitle = $event['event_type'] ?: $event['main_service'];
                                     $eventStatusClass = strtolower((string) $event['status']);
                                 ?>
@@ -632,7 +632,7 @@ $serviceChart = [
                                                 <?php echo h($row['status']); ?>
                                             </span>
                                         </td>
-                                        <td><?php echo h($row['payment_method'] ?: 'â€”'); ?></td>
+                                        <td><?php echo h($row['payment_method'] ?: '—'); ?></td>
                                         <td><?php echo h(formatPeso($row['estimated_total'])); ?></td>
                                     </tr>
                                 <?php endforeach; ?>

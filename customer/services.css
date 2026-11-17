@@ -434,6 +434,35 @@ ul.plain.dot li:before {
   margin-top:4px;
 }
 
+/* live Google Maps preview of the typed address */
+.addr-map {
+  margin-top:8px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow:hidden;
+  background:var(--cream-soft);
+}
+
+.addr-map[hidden] {
+  display:none;
+}
+
+.addr-map-cap {
+  display:block;
+  font-family:var(--font-accent);
+  font-size:.74rem;
+  color:var(--text-muted);
+  padding:6px 10px;
+  border-bottom:1px solid var(--line);
+}
+
+.addr-map iframe {
+  display:block;
+  width:100%;
+  height:200px;
+  border:0;
+}
+
 /* calendar */
 .date-input {
   cursor:pointer;
