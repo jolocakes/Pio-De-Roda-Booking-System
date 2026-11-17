@@ -165,12 +165,12 @@ $catalog = [
 $addons = [
     ['id' => 'catering-menu-addon', 'service_id' => 'catering-menu', 'name' => 'Catering with Menu', 'description' => 'Add catering', 'price_from' => 'catering-menu', 'fixed_price' => null, 'allow_qty' => 0],
     ['id' => 'venue-addon', 'service_id' => 'venue', 'name' => 'Venue Rentals', 'description' => 'Add venue', 'price_from' => 'venue', 'fixed_price' => null, 'allow_qty' => 0],
-    ['id' => 'dinein-addon', 'service_id' => 'dinein', 'name' => 'Dine-In Menu', 'description' => 'Add dine-in', 'price_from' => null, 'fixed_price' => null, 'allow_qty' => 0],
+    ['id' => 'dinein', 'service_id' => 'dinein', 'name' => 'Dine-In Menu', 'description' => 'Add dine-in', 'price_from' => 'dinein', 'fixed_price' => null, 'allow_qty' => 0],
     ['id' => 'noncoffee-booth-addon', 'service_id' => 'noncoffee', 'name' => 'Non-Coffee Booth Package', 'description' => 'Add non-coffee booth', 'price_from' => 'noncoffee', 'fixed_price' => null, 'allow_qty' => 0],
     ['id' => 'coffee-booth-addon', 'service_id' => 'coffee', 'name' => 'Coffee Booth Package', 'description' => 'Add coffee booth', 'price_from' => 'coffee', 'fixed_price' => null, 'allow_qty' => 0],
     ['id' => 'pizza-booth-addon', 'service_id' => 'pizza', 'name' => 'Pizza Booth', 'description' => 'Add pizza booth', 'price_from' => 'pizza', 'fixed_price' => null, 'allow_qty' => 0],
     ['id' => 'intimate-addon', 'service_id' => 'intimate', 'name' => 'Intimate Celebration Package', 'description' => 'Add intimate package', 'price_from' => 'intimate', 'fixed_price' => null, 'allow_qty' => 0],
-    ['id' => 'equipment-addon', 'service_id' => 'equipment', 'name' => 'Equipment Rental', 'description' => 'Add equipment', 'price_from' => null, 'fixed_price' => null, 'allow_qty' => 0],
+    ['id' => 'equipment', 'service_id' => 'equipment', 'name' => 'Equipment Rental', 'description' => 'Add equipment', 'price_from' => 'equipment', 'fixed_price' => null, 'allow_qty' => 1],
 ];
 
 try {

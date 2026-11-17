@@ -1,3 +1,7 @@
+// T-61: the service page declares its catalog id on <body data-service-id="…">
+// instead of an inline script, so the page can run without 'unsafe-inline'.
+var SERVICE_ID = (document.body && document.body.getAttribute("data-service-id")) || "";
+
 // Availability comes from AVAIL (services.js) — one shared object holding the
 // current month's taken dates, per-date booking counts and the time slots each
 // service already holds. It backs BOTH this booking calendar and the homepage

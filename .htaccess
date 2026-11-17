@@ -1,3 +1,8 @@
+# T-56: never expose a directory listing. Apache's default for htdocs enables
+# Indexes, and this project has folders without an index file (config/, lib/,
+# api/, database/), so a bare request would otherwise print the file tree.
+Options -Indexes
+
 <IfModule mod_headers.c>
   # T-30: security headers for static files too (PHP responses get the same
   # set from config/security_headers.php).

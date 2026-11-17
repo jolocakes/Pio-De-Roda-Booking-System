@@ -42,7 +42,7 @@ try {
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="services.css?v=3.2">
 </head>
-<body>
+<body data-service-id="<?php echo htmlspecialchars($SERVICE_ID_DB, ENT_QUOTES, 'UTF-8'); ?>">
 
     <div class="topbar">
       <div class="brand">Pio De Roda Cafe & Restaurant<small>Venue Rentals</small></div>
@@ -75,14 +75,6 @@ try {
     </div>
     
     <script src="services.js?v=3.4"></script> 
-    <script>
-      /* T-26: SERVICE_ID resolved from the database catalog so renaming a
-         service in the DB automatically propagates to all pages that reference it.
-         The page title "Pio De Roda — Venue Rentals" is matched against
-         the `name` column in `services`; the corresponding `id` value becomes
-         the SERVICE_ID used by reservation2.js. */
-      var SERVICE_ID = "<?php echo $SERVICE_ID_DB; ?>";
-    </script>
 <script src="pdr-dates.js?v=1.0"></script>
 <script src="reservation2.js?v=3.4"></script>
 </body>

@@ -12,6 +12,9 @@
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/db.php';
 
+// Receipts expose amounts and verified payments, so they follow payments access.
+pdrRequirePageCapability('manage_payments');
+
 function rH($value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');

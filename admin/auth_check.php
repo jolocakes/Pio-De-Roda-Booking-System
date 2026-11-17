@@ -48,3 +48,20 @@ pdrCsrfToken();
 // T-36: role helpers (pdrCan / pdrRequirePageCapability) are used by the
 // individual pages to gate privileged areas.
 require_once __DIR__ . '/../config/rbac.php';
+
+// T-60: one place to render the signed-in account. Pages that used to hardcode
+// "Admin User / Administrator" echo these instead.
+if (!function_exists('pdrAdminDisplayName')) {
+    function pdrAdminDisplayName(): string
+    {
+        $name = trim((string) ($_SESSION['admin_name'] ?? $_SESSION['admin_username'] ?? ''));
+        return htmlspecialchars($name !== '' ? $name : 'Administrator', ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('pdrAdminDisplayRole')) {
+    function pdrAdminDisplayRole(): string
+    {
+        return htmlspecialchars(pdrRoleLabel(), ENT_QUOTES, 'UTF-8');
+    }
+}

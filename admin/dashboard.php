@@ -2,12 +2,16 @@
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/db.php';
 
+// T-36: every admin page states the capability it needs, so a role that is not
+// allowed cannot reach a page just by typing its URL.
+pdrRequirePageCapability('view');
+
 function h($value) {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
 function formatPeso($amount) {
-    return '₱' . number_format((float) $amount, 2);
+    return 'â‚±' . number_format((float) $amount, 2);
 }
 
 function formatEventTime($time) {
@@ -24,8 +28,8 @@ function formatEventDateTime($date, $time) {
     return trim($dateLabel . ' ' . formatEventTime($time));
 }
 
-$admin_name = $_SESSION['admin_name'] ?? $_SESSION['admin_username'] ?? 'Admin User';
-$admin_role = $_SESSION['admin_role'] ?? "Administrator";
+$admin_name = pdrAdminDisplayName();
+$admin_role = pdrAdminDisplayRole();
 $current_date = date('F j, Y');
 $current_time = date('h:i:s A');
 $today = date('Y-m-d');
@@ -270,7 +274,7 @@ $metrics = [
     ],
     [
         'title' => 'Most Reserved Service',
-        'value' => $topService !== '' ? $topService : '—',
+        'value' => $topService !== '' ? $topService : 'â€”',
         'sub' => '(' . number_format($topServiceCount) . ' ' . ($topServiceCount === 1 ? 'reservation' : 'reservations') . ')',
         'icon' => 'fa-star',
         'bg' => '#f3e8ff',
@@ -421,66 +425,9 @@ $serviceChart = [
 <body>
 
     <!-- Left Navigation Bar -->
-    <aside class="sidebar">
-        <div>
-            <div class="brand-header">
-                <div class="brand-logo-container">
-                    <img src="pioderoda.jpg" alt="Pio De Roda Logo" class="brand-logo-img">
-                </div>
-                <h2>PIO DE RODA</h2>
-                <p>RESERVATION SYSTEM</p>
-            </div>
-            <ul class="nav-menu">
-                <li class="nav-item active">
-                    <a href="dashboard.php"><i class="fa-solid fa-house"></i> Dashboard</a>
-                </li>
+    <!-- Shared sidebar: admin/_sidebar.php (T-60) -->
+    <?php $activeNav = 'dashboard'; require __DIR__ . '/_sidebar.php'; ?>
 
-                <li class="nav-item">
-                    <a href="reservation.php"><i class="fa-solid fa-calendar-check"></i> Reservations</a>
-                </li>
-                
-                <li class="nav-item">
-                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="service.php"><i class="fa-solid fa-concierge-bell"></i> Services</a>
-                </li>
-                <li class="nav-item">
-                    <a href="event.php"><i class="fa-solid fa-calendar-check"></i> Events</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="customer.php"><i class="fa-solid fa-users"></i> Customers</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="payment.php"><i class="fa-solid fa-money-bill-wave"></i> Payment</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="reports.php"><i class="fa-solid fa-chart-column"></i> Reports</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
-                </li>
-                <?php if (pdrCan('manage_staff')): ?>
-                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                <?php endif; ?>
-            </ul>
-        </div>
-        <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;">
-                <form method="POST" action="logout.php" class="logout-form">
-                    <?php echo pdrCsrfField(); ?>
-                    <button type="submit" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-                </form>
-            </li>
-        </div>
-    </aside>
-
-    <!-- Main Content Area -->
     <main class="main-wrapper">
         <header class="top-navbar">
             <div class="header-title-section">
@@ -489,8 +436,8 @@ $serviceChart = [
             <div class="user-profile">
                 <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="user-info">
-                    <p><?php echo h($admin_name); ?></p>
-                    <span><?php echo h($admin_role); ?></span>
+                    <p><?php echo $admin_name; ?></p>
+                    <span><?php echo $admin_role; ?></span>
                 </div>
                 <i class="fa-solid fa-chevron-down" style="font-size: 10px; color: #718096; margin-left: 5px;"></i>
             </div>
@@ -505,7 +452,7 @@ $serviceChart = [
             <?php endif; ?>
             <div class="welcome-header">
                 <div>
-                    <h2>Welcome back, <?php echo h($admin_name); ?>!</h2>
+                    <h2>Welcome back, <?php echo $admin_name; ?>!</h2>
                     <p>Here's what's happening with your reservation system today.</p>
                 </div>
                     <div class="time-display">
@@ -626,8 +573,8 @@ $serviceChart = [
                             <?php foreach ($upcomingEventsList as $event): ?>
                                 <?php
                                     $eventTimestamp = strtotime($event['event_date']);
-                                    $eventDay = $eventTimestamp ? date('j', $eventTimestamp) : '—';
-                                    $eventMonth = $eventTimestamp ? strtoupper(date('M', $eventTimestamp)) : '—';
+                                    $eventDay = $eventTimestamp ? date('j', $eventTimestamp) : 'â€”';
+                                    $eventMonth = $eventTimestamp ? strtoupper(date('M', $eventTimestamp)) : 'â€”';
                                     $eventTitle = $event['event_type'] ?: $event['main_service'];
                                     $eventStatusClass = strtolower((string) $event['status']);
                                 ?>
@@ -685,7 +632,7 @@ $serviceChart = [
                                                 <?php echo h($row['status']); ?>
                                             </span>
                                         </td>
-                                        <td><?php echo h($row['payment_method'] ?: '—'); ?></td>
+                                        <td><?php echo h($row['payment_method'] ?: 'â€”'); ?></td>
                                         <td><?php echo h(formatPeso($row['estimated_total'])); ?></td>
                                     </tr>
                                 <?php endforeach; ?>

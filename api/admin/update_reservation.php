@@ -110,7 +110,7 @@ try {
     // Does the reservation exist, and what is its current state? We need the
     // current status so the capacity checks can exclude the row itself when it
     // is being rescheduled (otherwise it always conflicts with its own slot).
-    $checkStmt = $pdo->prepare("SELECT id, status, selected_package FROM reservations WHERE reservation_id = ? LIMIT 1");
+    $checkStmt = $pdo->prepare("SELECT id, status, selected_package, additional_services, service_id, guests FROM reservations WHERE reservation_id = ? LIMIT 1");
     $checkStmt->execute([$reservationId]);
     $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -123,7 +123,7 @@ try {
     // T-13: the service must be a real, active catalog entry — not arbitrary
     // text. Resolving by name keeps the admin UI's service labels working while
     // guaranteeing `services.id`/`max_cap` line up with `main_service`.
-    $svcStmt = $pdo->prepare("SELECT id, name, max_cap FROM services WHERE name = ? AND is_active = 1 ORDER BY id ASC LIMIT 1");
+    $svcStmt = $pdo->prepare("SELECT id, name, per_head, per_head_by_pkg, max_cap FROM services WHERE name = ? AND is_active = 1 ORDER BY id ASC LIMIT 1");
     $svcStmt->execute([$service]);
     $svcRow = $svcStmt->fetch(PDO::FETCH_ASSOC);
     if (!$svcRow) {
@@ -200,12 +200,80 @@ try {
         }
     }
 
-    $stmt = $pdo->prepare(
-        "UPDATE reservations
-            SET service_id = ?, main_service = ?, event_date = ?, event_time = ?, guests = ?, status = ?
-          WHERE reservation_id = ?"
-    );
-    $stmt->execute([$serviceId, $serviceName, $date, $time, $guests, $status, $reservationId]);
+    // Re-price when the price inputs actually change. A scheduling-only edit
+    // (date/time/status) must not rewrite a historical total, but changing the
+    // service or the guest count invalidates it. We reuse the exact pricing
+    // rules the public booking endpoint uses (config/pricing.php).
+    $newTotal = null;
+    $newAddonsJson = null;
+    $serviceChanged = (string) ($existing['service_id'] ?? '') !== (string) $serviceId;
+    $guestsChanged  = (int) ($existing['guests'] ?? 0) !== (int) $guests;
+
+    if ($serviceChanged || $guestsChanged) {
+        require_once __DIR__ . '/../../config/pricing.php';
+
+        // Re-derive the add-on input shape from the stored JSON. Only name,
+        // packageName and quantity are inputs; prices are always recomputed.
+        $storedAddons = [];
+        $decodedAddons = json_decode((string) ($existing['additional_services'] ?? '[]'), true);
+        if (is_array($decodedAddons)) {
+            foreach ($decodedAddons as $line) {
+                if (!is_array($line)) {
+                    continue;
+                }
+                $storedAddons[] = [
+                    'name'        => (string) ($line['name'] ?? ''),
+                    'packageName' => (string) ($line['packageName'] ?? ''),
+                    'quantity'    => (int) ($line['quantity'] ?? 1),
+                ];
+            }
+        }
+
+        $priced = pdrPriceReservation(
+            $pdo,
+            $svcRow,
+            (string) ($existing['selected_package'] ?? ''),
+            (int) $guests,
+            $storedAddons
+        );
+
+        if (!$priced['ok']) {
+            // The booking's package/tier does not exist on the new service (or an
+            // add-on is no longer priceable). Refuse rather than store a wrong
+            // total or silently zero it.
+            http_response_code(422);
+            echo json_encode([
+                'ok'      => false,
+                'reason'  => 'PACKAGE_INCOMPATIBLE',
+                'field'   => $priced['field'] ?? 'selected_package',
+                'message' => 'This reservation\'s package/tier (or an add-on) is not valid for the new service. Keep the current service, or recreate the booking with a valid package.',
+            ]);
+            exit();
+        }
+
+        $newTotal = $priced['total'];
+        $newAddonsJson = json_encode($priced['addons'], JSON_UNESCAPED_UNICODE);
+    }
+
+    if ($newTotal !== null) {
+        $stmt = $pdo->prepare(
+            "UPDATE reservations
+                SET service_id = ?, main_service = ?, event_date = ?, event_time = ?, guests = ?, status = ?,
+                    estimated_total = ?, additional_services = ?
+              WHERE reservation_id = ?"
+        );
+        $stmt->execute([
+            $serviceId, $serviceName, $date, $time, $guests, $status,
+            $newTotal, $newAddonsJson, $reservationId,
+        ]);
+    } else {
+        $stmt = $pdo->prepare(
+            "UPDATE reservations
+                SET service_id = ?, main_service = ?, event_date = ?, event_time = ?, guests = ?, status = ?
+              WHERE reservation_id = ?"
+        );
+        $stmt->execute([$serviceId, $serviceName, $date, $time, $guests, $status, $reservationId]);
+    }
 
     // T-14: email the customer when this edit changes the status into one of the
     // customer-facing states. Field-only edits stay silent.
@@ -223,6 +291,8 @@ try {
         'date' => $date,
         'time' => $time,
         'guests' => $guests,
+        'repriced' => $newTotal !== null,
+        'estimated_total' => $newTotal,
     ]);
 
     echo json_encode([
@@ -234,6 +304,8 @@ try {
         'guests' => $guests,
         'status' => $status,
         'changed' => $status !== $existing['status'],
+        'repriced' => $newTotal !== null,
+        'estimatedTotal' => $newTotal,
         'email' => $emailMode,
     ]);
 } catch (Throwable $e) {

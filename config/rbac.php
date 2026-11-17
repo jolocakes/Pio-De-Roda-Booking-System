@@ -32,7 +32,11 @@ if (!function_exists('pdrCurrentRole')) {
     function pdrCurrentRole(): string
     {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            if (function_exists('pdrSessionStart')) {
+                pdrSessionStart();
+            } else {
+                session_start();
+            }
         }
         return pdrRoleNormalize($_SESSION['admin_role'] ?? null);
     }

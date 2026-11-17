@@ -6,6 +6,22 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/capacity.php';
+require_once __DIR__ . '/rate_limit.php';
+
+// T-57: the booking endpoint writes to the database, upserts a customer and
+// sends an email, so it needs the same per-IP ceiling the other public
+// endpoints have. 10 attempts per 15 minutes is well above real use.
+$reservationLimit = pdrRateLimit('reservation', 10, 900);
+if (!$reservationLimit['allowed']) {
+    http_response_code(429);
+    header('Retry-After: ' . $reservationLimit['retryAfter']);
+    echo json_encode([
+        'ok' => false,
+        'reason' => 'RATE_LIMITED',
+        'retryAfter' => $reservationLimit['retryAfter'],
+    ]);
+    exit();
+}
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
@@ -65,6 +81,24 @@ if (empty($customerName) || empty($eventDate) || empty($eventTime) || empty($mai
     exit();
 }
 
+// T-59: bound every free-text field. Without these, a scripted client can store
+// arbitrarily large values. Reject (rather than truncate) so the customer knows
+// which field is too long.
+$lengthRules = [
+    ['customerName',  $customerName,  120],
+    ['contactPerson', $contactPerson, 120],
+    ['contactNumber', $contactNumber, 30],
+    ['address',       $address,       255],
+    ['eventType',     $eventType,     60],
+];
+foreach ($lengthRules as [$lengthField, $lengthValue, $lengthMax]) {
+    if (mb_strlen((string) $lengthValue) > $lengthMax) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => $lengthField]);
+        exit();
+    }
+}
+
 // Email format — the booking page validates this client-side only. The
 // confirmation email carries the only copy of the booking PIN, so an
 // undeliverable address means a customer who can never check their status.
@@ -113,178 +147,43 @@ try {
     }
     $selectedPackage = trim($data['selectedPackage']);
 
-    $pkgStmt = $pdo->prepare("SELECT price, max_cap FROM service_packages WHERE service_id = ? AND package_name = ? AND is_active = 1 ORDER BY sort_order ASC LIMIT 1");
-    $pkgStmt->execute([$serviceId, $selectedPackage]);
-    $pkgRow = $pkgStmt->fetch(PDO::FETCH_ASSOC);
+    // All catalog pricing lives in config/pricing.php so the admin edit endpoint
+    // applies exactly the same rules when it has to re-price a booking.
+    require_once __DIR__ . '/../config/pricing.php';
 
-    if ($pkgRow) {
-        $estimatedTotal = (int)$serviceRow['per_head_by_pkg'] === 1
-            ? (float)$pkgRow['price'] * $guests   // "per head" services price the package rate × guests
-            : (float)$pkgRow['price'];            // all other services: flat package price
-
-        // T-09: a package may cap guests more tightly than its parent service.
-        if (isset($pkgRow['max_cap']) && $pkgRow['max_cap'] !== null && (int)$pkgRow['max_cap'] > 0) {
-            $packageMaxCap = (int)$pkgRow['max_cap'];
-        }
-    } else {
-        // Menu-tiered picks (e.g. Dine-In Menu A / Menu B) resolve through service_menus.
-        $menuStmt = $pdo->prepare("SELECT menu_code FROM service_menus WHERE service_id = ? AND item_name = ? AND is_active = 1 LIMIT 1");
-        $menuStmt->execute([$serviceId, $selectedPackage]);
-        $menuRow = $menuStmt->fetch(PDO::FETCH_ASSOC);
-        if (!$menuRow) {
-            // Not an active package or menu tier of this service.
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'selectedPackage']);
-            exit();
-        }
-        if ($serviceRow['per_head'] !== null) {
-            $estimatedTotal = (float)$serviceRow['per_head'] * $guests;
-        } else {
-            // Menu rate is unset and the service has no per-head rate — refusing
-            // to store a reservation whose price cannot be resolved safely.
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'selectedPackage']);
-            exit();
-        }
-    }
-
-    // --- Additional Services: validate and re-price every line from the database ---
-    $addonLines = [];
+    $addonInput = [];
     if (isset($data['additionalServices']) && $data['additionalServices'] !== null) {
         if (!is_array($additionalServicesInput)) {
             http_response_code(400);
             echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
             exit();
         }
-        if (count($additionalServicesInput) > 0) {
-            $lookupAddon = $pdo->prepare(
-                "SELECT sa.name, sa.service_id, sa.price_from, sa.fixed_price, sa.allow_qty
-                   FROM service_addons sa
-                   JOIN services svc ON svc.id = sa.service_id
-                  WHERE sa.name = ? AND sa.is_active = 1 AND svc.is_active = 1
-                  ORDER BY sa.id ASC LIMIT 1"
-            );
-            $lookupLinked = $pdo->prepare("SELECT id, per_head, per_head_by_pkg FROM services WHERE id = ? AND is_active = 1 LIMIT 1");
-            $lookupLinkedPkg = $pdo->prepare("SELECT price FROM service_packages WHERE service_id = ? AND package_name = ? AND is_active = 1 ORDER BY sort_order ASC LIMIT 1");
-            $checkAddonName = $pdo->prepare(
-                "SELECT (SELECT COUNT(*) FROM service_packages WHERE service_id = ? AND package_name = ? AND is_active = 1)
-                       + (SELECT COUNT(*) FROM service_menus    WHERE service_id = ? AND item_name    = ? AND is_active = 1) AS hits"
-            );
-
-            $seenAddonNames = [];
-            foreach ($additionalServicesInput as $entry) {
-                if (!is_array($entry)) {
-                    http_response_code(400);
-                    echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                    exit();
-                }
-                $addonName = trim((string)($entry['name'] ?? ''));
-                $aPkgName  = trim((string)($entry['packageName'] ?? ''));
-                $addonQty  = max(1, (int)($entry['quantity'] ?? 1));
-                if ($addonName === '' || $aPkgName === '') {
-                    http_response_code(400);
-                    echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                    exit();
-                }
-                if ($addonName === $mainService) {
-                    // Mirrors the booking-page rule: the main service cannot also be an add-on.
-                    http_response_code(400);
-                    echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                    exit();
-                }
-                if (isset($seenAddonNames[$addonName])) {
-                    http_response_code(400);
-                    echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                    exit();
-                }
-                $seenAddonNames[$addonName] = true;
-
-                $lookupAddon->execute([$addonName]);
-                $addon = $lookupAddon->fetch(PDO::FETCH_ASSOC);
-                if (!$addon) {
-                    // Unknown add-on, inactive add-on, or an add-on whose own parent
-                    // service was deactivated.
-                    http_response_code(400);
-                    echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                    exit();
-                }
-
-                if ($addon['price_from'] !== null) {
-                    // Rates derive from the add-on's linked catalog service.
-                    $lookupLinked->execute([$addon['price_from']]);
-                    $linked = $lookupLinked->fetch(PDO::FETCH_ASSOC);
-                    if (!$linked) {
-                        http_response_code(400);
-                        echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                        exit();
-                    }
-                    if ((int)$linked['per_head_by_pkg'] === 1) {
-                        $lookupLinkedPkg->execute([$linked['id'], $aPkgName]);
-                        $linkedPkg = $lookupLinkedPkg->fetch(PDO::FETCH_ASSOC);
-                        if (!$linkedPkg) {
-                            http_response_code(400);
-                            echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                            exit();
-                        }
-                        $addonRate = (float)$linkedPkg['price'];
-                        $addonPerHead = true;
-                    } elseif ($linked['per_head'] !== null) {
-                        $addonRate = (float)$linked['per_head'];
-                        $addonPerHead = true;
-                    } else {
-                        $lookupLinkedPkg->execute([$linked['id'], $aPkgName]);
-                        $linkedPkg = $lookupLinkedPkg->fetch(PDO::FETCH_ASSOC);
-                        if (!$linkedPkg) {
-                            http_response_code(400);
-                            echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                            exit();
-                        }
-                        $addonRate = (float)$linkedPkg['price'];
-                        $addonPerHead = false;
-                    }
-                    // The chosen package/tier must be an ACTIVE option of the pricing source.
-                    $checkAddonName->execute([$linked['id'], $aPkgName, $linked['id'], $aPkgName]);
-                    if ((int)$checkAddonName->fetchColumn() < 1) {
-                        http_response_code(400);
-                        echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                        exit();
-                    }
-                } elseif ($addon['fixed_price'] !== null) {
-                    $addonRate = (float)$addon['fixed_price'];
-                    $addonPerHead = false;
-                    $checkAddonName->execute([$addon['service_id'], $aPkgName, $addon['service_id'], $aPkgName]);
-                    if ((int)$checkAddonName->fetchColumn() < 1) {
-                        http_response_code(400);
-                        echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                        exit();
-                    }
-                } else {
-                    // Unpriceable add-on (no pricing source configured) — the browser's
-                    // own price for it is never accepted.
-                    http_response_code(400);
-                    echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
-                    exit();
-                }
-
-                // Line pricing follows the exact rules the booking page uses:
-                // per-head add-ons multiply the rate by the guest count, quantity
-                // add-ons multiply by the chosen quantity, the rest are flat.
-                $addonTotal = ($addonPerHead ? $addonRate * $guests : $addonRate)
-                            * ((int)$addon['allow_qty'] === 1 ? $addonQty : 1);
-                $addonLines[] = [
-                    'name'        => $addon['name'],
-                    'packageName' => $aPkgName,
-                    'quantity'    => (int)$addon['allow_qty'] === 1 ? $addonQty : 1,
-                    'unitPrice'   => round($addonRate, 2),
-                    'totalPrice'  => round($addonTotal, 2),
-                ];
-                $estimatedTotal += $addonTotal;
+        foreach ($additionalServicesInput as $entry) {
+            if (!is_array($entry)) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'additionalServices']);
+                exit();
             }
+            $addonInput[] = [
+                'name'        => trim((string) ($entry['name'] ?? '')),
+                'packageName' => trim((string) ($entry['packageName'] ?? '')),
+                'quantity'    => max(1, (int) ($entry['quantity'] ?? 1)),
+            ];
         }
-        $additionalServices = json_encode($addonLines, JSON_UNESCAPED_UNICODE);
     }
 
-    $estimatedTotal = round($estimatedTotal, 2);
+    $priced = pdrPriceReservation($pdo, $serviceRow, $selectedPackage, $guests, $addonInput);
+    if (!$priced['ok']) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => $priced['field'] ?? 'selectedPackage']);
+        exit();
+    }
+
+    $estimatedTotal = $priced['total'];
+    $packageMaxCap = $priced['packageMaxCap'];
+    if (isset($data['additionalServices']) && $data['additionalServices'] !== null) {
+        $additionalServices = json_encode($priced['addons'], JSON_UNESCAPED_UNICODE);
+    }
 } catch (Throwable $catalogError) {
     error_log('Reservation catalog validation failure: ' . $catalogError->getMessage());
     http_response_code(500);

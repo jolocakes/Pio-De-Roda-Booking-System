@@ -1,0 +1,20 @@
+# Pio De Roda booking system — crawler rules.
+#
+# The customer site is public. Everything else is not useful to a crawler and
+# some of it (admin, api, config, database, lib) is sensitive. Both the
+# root-relative and /pdrsystem/-prefixed forms are listed so the rules work
+# whether the app is served at the domain root or in a subfolder.
+
+User-agent: *
+Allow: /customer/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /config/
+Disallow: /database/
+Disallow: /lib/
+
+Disallow: /pdrsystem/admin/
+Disallow: /pdrsystem/api/
+Disallow: /pdrsystem/config/
+Disallow: /pdrsystem/database/
+Disallow: /pdrsystem/lib/

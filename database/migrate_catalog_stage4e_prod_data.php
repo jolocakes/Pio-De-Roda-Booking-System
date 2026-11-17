@@ -525,8 +525,8 @@ try {
     $expectedAddonBaseline = [
         'catering-menu-addon' => ['catering-menu', 'catering-menu', 'catering-menu', 0, 0],
         'coffee-booth-addon' => ['coffee', 'coffee', 'coffee', 0, 0],
-        'dinein-addon' => ['dinein', null, 'dinein', 0, 0],
-        'equipment-addon' => ['equipment', null, 'equipment', 0, 1],
+        'dinein' => ['dinein', null, 'dinein', 0, 0],
+        'equipment' => ['equipment', null, 'equipment', 0, 1],
         'intimate-addon' => ['intimate', 'intimate', 'intimate', 0, 0],
         'noncoffee-booth-addon' => ['noncoffee', 'noncoffee', 'noncoffee', 0, 0],
         'pizza-booth-addon' => ['pizza', 'pizza', 'pizza', 0, 0],
@@ -755,50 +755,50 @@ try {
         }
     }
 
-    // 10. Validate and update service_addons (dinein-addon and equipment-addon)
+    // 10. Validate and update service_addons (dinein and equipment)
     $updatedAddonsCount = 0;
     $dineinAddonRow = $pdo->query(
         "SELECT price_from, allow_qty, fixed_price, is_active
-         FROM service_addons WHERE id = 'dinein-addon' AND service_id = 'dinein'"
+         FROM service_addons WHERE id = 'dinein' AND service_id = 'dinein'"
     )->fetch(PDO::FETCH_ASSOC);
     if (!$dineinAddonRow || $dineinAddonRow['fixed_price'] !== null || (int)$dineinAddonRow['is_active'] !== 1) {
-        throw new RuntimeException("Baseline 'dinein-addon' missing or invalid.");
+        throw new RuntimeException("Baseline 'dinein' missing or invalid.");
     }
     if ($dineinAddonRow['price_from'] === null && (int)$dineinAddonRow['allow_qty'] === 0) {
         assertStage4eProdDataDb($pdo);
         $updDineinAddon = $pdo->prepare(
             "UPDATE service_addons SET price_from = ?
-             WHERE id = 'dinein-addon' AND service_id = 'dinein' AND price_from IS NULL AND allow_qty = 0 AND fixed_price IS NULL"
+             WHERE id = 'dinein' AND service_id = 'dinein' AND price_from IS NULL AND allow_qty = 0 AND fixed_price IS NULL"
         );
         $updDineinAddon->execute(['dinein']);
         if ($updDineinAddon->rowCount() !== 1) {
-            throw new RuntimeException("Update for 'dinein-addon' did not affect exactly 1 row.");
+            throw new RuntimeException("Update for 'dinein' did not affect exactly 1 row.");
         }
         $updatedAddonsCount++;
     } elseif ($dineinAddonRow['price_from'] !== 'dinein' || (int)$dineinAddonRow['allow_qty'] !== 0) {
-        throw new RuntimeException("'dinein-addon' differs from recognized original/corrected state.");
+        throw new RuntimeException("'dinein' differs from recognized original/corrected state.");
     }
 
     $equipAddonRow = $pdo->query(
         "SELECT price_from, allow_qty, fixed_price, is_active
-         FROM service_addons WHERE id = 'equipment-addon' AND service_id = 'equipment'"
+         FROM service_addons WHERE id = 'equipment' AND service_id = 'equipment'"
     )->fetch(PDO::FETCH_ASSOC);
     if (!$equipAddonRow || $equipAddonRow['fixed_price'] !== null || (int)$equipAddonRow['is_active'] !== 1) {
-        throw new RuntimeException("Baseline 'equipment-addon' missing or invalid.");
+        throw new RuntimeException("Baseline 'equipment' missing or invalid.");
     }
     if ($equipAddonRow['price_from'] === null && (int)$equipAddonRow['allow_qty'] === 0) {
         assertStage4eProdDataDb($pdo);
         $updEquipAddon = $pdo->prepare(
             "UPDATE service_addons SET price_from = ?, allow_qty = 1
-             WHERE id = 'equipment-addon' AND service_id = 'equipment' AND price_from IS NULL AND allow_qty = 0 AND fixed_price IS NULL"
+             WHERE id = 'equipment' AND service_id = 'equipment' AND price_from IS NULL AND allow_qty = 0 AND fixed_price IS NULL"
         );
         $updEquipAddon->execute(['equipment']);
         if ($updEquipAddon->rowCount() !== 1) {
-            throw new RuntimeException("Update for 'equipment-addon' did not affect exactly 1 row.");
+            throw new RuntimeException("Update for 'equipment' did not affect exactly 1 row.");
         }
         $updatedAddonsCount++;
     } elseif ($equipAddonRow['price_from'] !== 'equipment' || (int)$equipAddonRow['allow_qty'] !== 1) {
-        throw new RuntimeException("'equipment-addon' differs from recognized original/corrected state.");
+        throw new RuntimeException("'equipment' differs from recognized original/corrected state.");
     }
 
     // 11. Final Pre-Commit Verification

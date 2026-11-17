@@ -188,10 +188,11 @@ $balance = $reservation ? max(0, (float) $reservation['estimated_total'] - $paid
     <p class="note">This receipt reflects the records currently stored by Pio De Roda Cafe &amp; Restaurant. Please present it to staff if you need a correction. Payment status is confirmed by our staff or payment provider.</p>
 
     <div class="actions">
-      <button type="button" onclick="window.print()">Print / Save as PDF</button>
-      <button type="button" class="secondary" onclick="window.close()">Close</button>
+      <button type="button" id="receiptPrint">Print / Save as PDF</button>
+      <button type="button" class="secondary" id="receiptClose">Close</button>
     </div>
   </div>
 <?php endif; ?>
+<script src="receipt.js?v=1.0"></script>
 </body>
 </html>

@@ -2,6 +2,8 @@
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/../config/db.php';
 
+pdrRequirePageCapability('view');
+
 // T-36: a Viewer may read reservations but never change them.
 $canManageReservations = pdrCan('manage_reservations');
 
@@ -122,65 +124,8 @@ $shownTo = min($page * $perPage, $totalRows);
 <body>
 
     <!-- Left Navigation Bar -->
-    <aside class="sidebar">
-        <div>
-            <div class="brand-header">
-                <div class="brand-logo-container">
-                    <img src="pioderoda.jpg" alt="Pio De Roda Logo" class="brand-logo-img">
-                </div>
-                <h2>PIO DE RODA</h2>
-                <p>RESERVATION SYSTEM</p>
-            </div>
-            <ul class="nav-menu">
-                <li class="nav-item">
-                    <a href="dashboard.php"><i class="fa-solid fa-house"></i> Dashboard</a>
-                </li>
-
-                <li class="nav-item active">
-                    <a href="reservation.php"><i class="fa-solid fa-calendar-check"></i> Reservations</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="service.php"><i class="fa-solid fa-concierge-bell"></i> Services</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="event.php"><i class="fa-solid fa-calendar-days"></i> Events</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="customer.php"><i class="fa-solid fa-users"></i> Customers</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="payment.php"><i class="fa-solid fa-money-bill-wave"></i> Payment</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="reports.php"><i class="fa-solid fa-chart-column"></i> Reports</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
-                </li>
-                <?php if (pdrCan('manage_staff')): ?>
-                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                <?php endif; ?>
-            </ul>
-        </div>
-        <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;">
-                <form method="POST" action="logout.php" class="logout-form">
-                    <?php echo pdrCsrfField(); ?>
-                    <button type="submit" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-                </form>
-            </li>
-        </div>
-    </aside>
+    <!-- Shared sidebar: admin/_sidebar.php (T-60) -->
+    <?php $activeNav = 'reservation'; require __DIR__ . '/_sidebar.php'; ?>
 
     <main class="main-wrapper">
         <header class="top-navbar">
@@ -190,8 +135,8 @@ $shownTo = min($page * $perPage, $totalRows);
             <div class="user-profile">
                 <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="user-info">
-                    <p>Admin User</p>
-                    <span>Administrator</span>
+                    <p><?php echo pdrAdminDisplayName(); ?></p>
+                    <span><?php echo pdrAdminDisplayRole(); ?></span>
                 </div>
             </div>
         </header>

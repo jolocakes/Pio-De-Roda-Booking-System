@@ -85,12 +85,12 @@ try {
     $expectedAddonBaseline = [
         'catering-menu-addon' => ['catering-menu','catering-menu',0],
         'venue-addon' => ['venue','venue',0],
-        'dinein-addon' => ['dinein',null,0],
+        'dinein' => ['dinein','dinein',0],
         'noncoffee-booth-addon' => ['noncoffee','noncoffee',0],
         'coffee-booth-addon' => ['coffee','coffee',0],
         'pizza-booth-addon' => ['pizza','pizza',0],
         'intimate-addon' => ['intimate','intimate',0],
-        'equipment-addon' => ['equipment',null,0],
+        'equipment' => ['equipment','equipment',1],
     ];
     $actualAddons = $pdo->query("SELECT id,service_id,price_from,fixed_price,allow_qty FROM service_addons ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
     if (count($actualAddons) !== count($expectedAddonBaseline)) throw new RuntimeException('Add-on baseline count differs; stopping.');
@@ -100,8 +100,10 @@ try {
         if ($expected === null || $addonRow['service_id'] !== $expected[0] || $addonRow['fixed_price'] !== null) {
             throw new RuntimeException('Add-on ID, parent, or fixed price differs from audited copy; refusing overwrite.');
         }
-        $correctedSource = $addonRow['id'] === 'dinein-addon' ? 'dinein' : ($addonRow['id'] === 'equipment-addon' ? 'equipment' : $expected[1]);
-        $correctedQty = $addonRow['id'] === 'equipment-addon' ? 1 : 0;
+        // T-62: add-on ids now mirror their catalog service, so the corrected
+        // state is the baseline itself (the old per-id special cases are gone).
+        $correctedSource = $expected[1];
+        $correctedQty = $expected[2];
         $isOriginal = $addonRow['price_from'] === $expected[1] && (int)$addonRow['allow_qty'] === $expected[2];
         $isCorrected = $addonRow['price_from'] === $correctedSource && (int)$addonRow['allow_qty'] === $correctedQty;
         if (!$isOriginal && !$isCorrected) throw new RuntimeException('Add-on pricing/quantity differs from recognized source/corrected state.');
@@ -348,12 +350,12 @@ try {
 
     $addonBaselineCorrected = true;
     $addonRowsInsertedByThisRun = false;
-    $dineinAddon = $pdo->query("SELECT price_from,allow_qty,fixed_price FROM service_addons WHERE id='dinein-addon' AND service_id='dinein'")->fetch(PDO::FETCH_ASSOC);
-    $equipmentAddon = $pdo->query("SELECT price_from,allow_qty,fixed_price FROM service_addons WHERE id='equipment-addon' AND service_id='equipment'")->fetch(PDO::FETCH_ASSOC);
+    $dineinAddon = $pdo->query("SELECT price_from,allow_qty,fixed_price FROM service_addons WHERE id='dinein' AND service_id='dinein'")->fetch(PDO::FETCH_ASSOC);
+    $equipmentAddon = $pdo->query("SELECT price_from,allow_qty,fixed_price FROM service_addons WHERE id='equipment' AND service_id='equipment'")->fetch(PDO::FETCH_ASSOC);
     if (!$dineinAddon || !$equipmentAddon || $dineinAddon['fixed_price'] !== null || $equipmentAddon['fixed_price'] !== null) throw new RuntimeException('Add-on baseline record missing or fixed-price unexpected.');
     if ($dineinAddon['price_from'] === null && (int)$dineinAddon['allow_qty'] === 0) {
         assertCatalogTestDb($pdo);
-        $pdo->exec("UPDATE service_addons SET price_from='dinein' WHERE id='dinein-addon' AND service_id='dinein' AND price_from IS NULL AND allow_qty=0");
+        $pdo->exec("UPDATE service_addons SET price_from='dinein' WHERE id='dinein' AND service_id='dinein' AND price_from IS NULL AND allow_qty=0");
         $addonBaselineCorrected = false;
     } elseif ($dineinAddon['price_from'] !== 'dinein' || (int)$dineinAddon['allow_qty'] !== 0) {
         throw new RuntimeException('Dine-In add-on differs from allowed original/corrected state.');
@@ -361,12 +363,12 @@ try {
 
     if ($equipmentAddon['price_from'] === null && (int)$equipmentAddon['allow_qty'] === 0) {
         assertCatalogTestDb($pdo);
-        $pdo->exec("UPDATE service_addons SET price_from='equipment',allow_qty=1 WHERE id='equipment-addon' AND service_id='equipment' AND price_from IS NULL AND allow_qty=0");
+        $pdo->exec("UPDATE service_addons SET price_from='equipment',allow_qty=1 WHERE id='equipment' AND service_id='equipment' AND price_from IS NULL AND allow_qty=0");
         $addonBaselineCorrected = false;
     } elseif ($equipmentAddon['price_from'] !== 'equipment' || (int)$equipmentAddon['allow_qty'] !== 1) {
         throw new RuntimeException('Equipment add-on differs from allowed original/corrected state.');
     } else { $addonBaselineCorrected = false; }
-    $addonCheck = $pdo->query("SELECT COUNT(*) FROM service_addons WHERE (id='dinein-addon' AND price_from='dinein' AND allow_qty=0 AND fixed_price IS NULL) OR (id='equipment-addon' AND price_from='equipment' AND allow_qty=1 AND fixed_price IS NULL)")->fetchColumn();
+    $addonCheck = $pdo->query("SELECT COUNT(*) FROM service_addons WHERE (id='dinein' AND price_from='dinein' AND allow_qty=0 AND fixed_price IS NULL) OR (id='equipment' AND price_from='equipment' AND allow_qty=1 AND fixed_price IS NULL)")->fetchColumn();
     if ((int)$addonCheck !== 2) throw new RuntimeException('Add-on reference or quantity precondition mismatch.');
 
     assertCatalogTestDb($pdo);

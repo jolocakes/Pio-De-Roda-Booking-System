@@ -27,7 +27,11 @@ require_once __DIR__ . '/../../config/audit.php';
 require_once __DIR__ . '/../../config/rbac.php';
 
 if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+    if (function_exists('pdrSessionStart')) {
+        pdrSessionStart();
+    } else {
+        session_start();
+    }
 }
 
 // API authentication check returning JSON 401 instead of redirecting.

@@ -23,7 +23,14 @@ require_once __DIR__ . '/../../config/env.php';
 
 $host = (string) pdrEnv('PDR_MAIL_HOST', 'smtp.gmail.com');
 $username = (string) pdrEnv('PDR_MAIL_USERNAME', '');
-$fromEmail = (string) pdrEnv('PDR_MAIL_FROM_EMAIL', $username);
+
+// T-63: customers should see the public inbox as the sender, so replies land
+// where the team actually reads them. This address must be verified as a
+// "Send mail as" alias on the authenticated Gmail account, otherwise Gmail
+// refuses the message (550). Set PDR_MAIL_FROM_EMAIL back to the SMTP username
+// if aliasing is not possible.
+$fromEmail = (string) pdrEnv('PDR_MAIL_FROM_EMAIL', 'pioderodabooking@gmail.com');
+$replyTo = (string) pdrEnv('PDR_MAIL_REPLY_TO', 'pioderodabooking@gmail.com');
 
 return [
     'enabled'     => filter_var(pdrEnv('PDR_MAIL_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),
@@ -36,6 +43,7 @@ return [
     // Who the customer sees as the sender.
     'from_email'  => $fromEmail,
     'from_name'   => (string) pdrEnv('PDR_MAIL_FROM_NAME', 'Pio De Roda Cafe & Restaurant'),
+    'reply_to'    => $replyTo,
 
     // Where un-sent emails are parked as .eml files (viewable/double-clickable).
     'outbox'      => __DIR__ . '/outbox',

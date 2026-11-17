@@ -6,7 +6,7 @@ require_once __DIR__ . '/../config/rbac.php';
 pdrRequirePageCapability('view');
 $canManageCustomers = pdrCan('manage_customers');
 $canArchive = pdrCan('manage_archive');
-$adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
+$adminName = pdrAdminDisplayName();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -23,42 +23,8 @@ $adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
 </head>
 <body>
 
-    <div class="sidebar">
-        <div>
-            <div class="brand-header">
-                <div class="brand-logo-container">
-                    <img src="pioderoda.jpg" alt="Pio De Roda Logo" class="brand-logo-img">
-                </div>
-                <h2>PIO DE RODA</h2>
-                <p>RESERVATION SYSTEM</p>
-            </div>
-
-            <ul class="nav-menu">
-                <li class="nav-item"><a href="dashboard.php"><i class="fa-solid fa-house"></i> Dashboard</a></li>
-                <li class="nav-item"><a href="reservation.php"><i class="fa-solid fa-calendar-check"></i> Reservations</a></li>
-                <li class="nav-item"><a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a></li>
-                <li class="nav-item"><a href="service.php"><i class="fa-solid fa-concierge-bell"></i> Services</a></li>
-                <li class="nav-item"><a href="event.php"><i class="fa-solid fa-calendar-days"></i> Events</a></li>
-                <li class="nav-item active"><a href="customer.php"><i class="fa-solid fa-users"></i> Customers</a></li>
-                <li class="nav-item"><a href="payment.php"><i class="fa-solid fa-money-bill-wave"></i> Payment</a></li>
-                <li class="nav-item"><a href="reports.php"><i class="fa-solid fa-chart-column"></i> Reports</a></li>
-                <li class="nav-item">
-                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
-                </li>
-                <?php if (pdrCan('manage_staff')): ?>
-                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                <?php endif; ?>
-            </ul>
-        </div>
-        <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;">
-                <form method="POST" action="logout.php" class="logout-form">
-                    <?php echo pdrCsrfField(); ?>
-                    <button type="submit" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-                </form>
-            </li>
-        </div>
-    </div>
+    <!-- Shared sidebar: admin/_sidebar.php (T-60) -->
+    <?php $activeNav = 'customer'; require __DIR__ . '/_sidebar.php'; ?>
 
     <div class="main-wrapper">
         <div class="top-navbar">
@@ -66,7 +32,7 @@ $adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
             <div class="user-profile">
                 <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="user-info">
-                    <p><?php echo htmlspecialchars($adminName, ENT_QUOTES, 'UTF-8'); ?></p>
+                    <p><?php echo $adminName; ?></p>
                     <span><?php echo htmlspecialchars(pdrRoleLabel(), ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
             </div>
@@ -190,7 +156,7 @@ $adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
         }
         function money(value) {
             const n = Number(value);
-            return isFinite(n) ? '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '₱0.00';
+            return isFinite(n) ? 'â‚±' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'â‚±0.00';
         }
         function showAlert(message, type) {
             const box = document.getElementById('pageAlert');
@@ -239,8 +205,8 @@ $adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
                 tr.innerHTML =
                     '<td><strong>' + esc(cust.full_name) + '</strong></td>' +
                     '<td>' + esc(cust.email) + '</td>' +
-                    '<td>' + esc(cust.phone || '—') + '</td>' +
-                    '<td>' + esc(cust.address || '—') + '</td>' +
+                    '<td>' + esc(cust.phone || 'â€”') + '</td>' +
+                    '<td>' + esc(cust.address || 'â€”') + '</td>' +
                     '<td>' + Number(cust.bookings || 0) + '</td>' +
                     '<td><span class="status-badge ' + (cust.status === 'Active' ? 'status-active' : 'status-inactive') + '">' + esc(cust.status) + '</span></td>' +
                     '<td style="white-space:nowrap;">' +
@@ -265,7 +231,7 @@ $adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
         function renderPagination() {
             const from = state.total === 0 ? 0 : ((state.page - 1) * state.perPage) + 1;
             const to = Math.min(state.page * state.perPage, state.total);
-            document.getElementById('customerRange').textContent = 'Showing ' + from + '–' + to + ' of ' + state.total + ' customer' + (state.total === 1 ? '' : 's');
+            document.getElementById('customerRange').textContent = 'Showing ' + from + 'â€“' + to + ' of ' + state.total + ' customer' + (state.total === 1 ? '' : 's');
             document.getElementById('customerPage').textContent = 'Page ' + state.page + ' of ' + state.totalPages;
             document.getElementById('customerPrev').disabled = state.page <= 1;
             document.getElementById('customerNext').disabled = state.page >= state.totalPages;
@@ -273,7 +239,7 @@ $adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
 
         async function openDetail(id) {
             const box = document.getElementById('detailBody');
-            box.innerHTML = '<p style="color:#718096;">Loading…</p>';
+            box.innerHTML = '<p style="color:#718096;">Loadingâ€¦</p>';
             document.getElementById('detailModal').style.display = 'flex';
 
             try {
@@ -288,8 +254,8 @@ $adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
                 let html =
                     '<div class="detail-row"><strong>Name:</strong> <span>' + esc(c.full_name) + '</span></div>' +
                     '<div class="detail-row"><strong>Email:</strong> <span>' + esc(c.email) + '</span></div>' +
-                    '<div class="detail-row"><strong>Phone:</strong> <span>' + esc(c.phone || '—') + '</span></div>' +
-                    '<div class="detail-row"><strong>Address:</strong> <span>' + esc(c.address || '—') + '</span></div>' +
+                    '<div class="detail-row"><strong>Phone:</strong> <span>' + esc(c.phone || 'â€”') + '</span></div>' +
+                    '<div class="detail-row"><strong>Address:</strong> <span>' + esc(c.address || 'â€”') + '</span></div>' +
                     '<div class="detail-row"><strong>Status:</strong> <span>' + esc(c.status) + '</span></div>' +
                     '<div class="detail-row"><strong>Bookings:</strong> <span>' + Number(c.bookings || 0) + '</span></div>' +
                     '<div class="detail-row"><strong>Lifetime value:</strong> <span>' + money(c.lifetime_value) + '</span></div>' +
@@ -398,7 +364,7 @@ $adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
 
         async function archiveCustomer(id) {
             const c = state.customers.find(function (row) { return Number(row.id) === id; });
-            if (!confirm('Archive ' + (c ? c.full_name : 'this customer') + '?\n\nYou can restore them from History → Archived Records.')) return;
+            if (!confirm('Archive ' + (c ? c.full_name : 'this customer') + '?\n\nYou can restore them from History â†’ Archived Records.')) return;
 
             try {
                 const res = await fetch('../api/admin/customers.php', {

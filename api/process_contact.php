@@ -66,16 +66,15 @@ try {
         $message = $_POST['message'] ?? '';
     }
 
-    // Optional Turnstile token (the contact form only sends one when a widget
-    // is present). When configured, a supplied-but-invalid token is rejected.
+    // T-45: enforce Turnstile whenever the keys are configured. When CAPTCHA is
+    // disabled pdrVerifyCaptcha() returns ok, so a fresh clone behaves as before.
+    // A missing token is now a rejection, not a skip.
     $captchaToken = $isJson ? ($data['turnstileToken'] ?? '') : ($_POST['turnstileToken'] ?? '');
-    if (is_string($captchaToken) && trim($captchaToken) !== '') {
-        $captcha = pdrVerifyCaptcha($captchaToken, pdrCaptchaClientIp(), 'contact');
-        if (!$captcha['ok']) {
-            http_response_code(403);
-            echo json_encode(['ok' => false, 'error' => 'Please complete the human verification and try again.']);
-            exit();
-        }
+    $captcha = pdrVerifyCaptcha($captchaToken, pdrCaptchaClientIp(), 'contact');
+    if (!$captcha['ok']) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Please complete the human verification and try again.']);
+        exit();
     }
 
     // Coerce to strings and cap sizes so a huge payload cannot be mailed out.
@@ -128,18 +127,17 @@ try {
     // =========================================================================
     // Step 4: Build and send the email (Option A)
     // =========================================================================
-    // THE KEY: Always use the restaurant's email as the From address
-    // This ensures the email passes spam filters and reaches the inbox
-    
     // Recipient comes from .env (PDR_CONTACT_RECIPIENT), falling back to the
     // monitored restaurant inbox. Never caller-controlled.
+    //
+    // The sender is NOT set here: pdrSendMail() uses PDR_MAIL_FROM_EMAIL (the
+    // authenticated SMTP account), which is the address Gmail will actually
+    // accept. A local $fromEmail would be silently ignored.
     $to = trim((string) pdrEnv('PDR_CONTACT_RECIPIENT', 'pioderodabooking@gmail.com'));
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
         $to = 'pioderodabooking@gmail.com';
     }
     $subject = 'Inquiry from Website Contact Form';
-    $fromEmail = 'pioderodabooking@gmail.com'; // Restaurant's email (always)
-    $fromName = 'Pio De Roda Cafe & Restaurant';
 
     // Text body - includes visitor's email so you can see it
     $textBody = "Name: $name\n\n";
@@ -167,9 +165,11 @@ try {
             'message' => "Your message has been sent! We'll get back to you soon."
         ]);
     } else {
+        // Log the transport detail; never return SMTP diagnostics to the browser.
+        error_log('Contact form send failed: ' . ($result['error'] ?? 'unknown'));
         echo json_encode([
             'ok' => false,
-            'error' => 'Failed to send email: ' . ($result['error'] ?? 'Unknown error')
+            'error' => 'We could not send your message right now. Please try again shortly, or email us directly.'
         ]);
     }
 

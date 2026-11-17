@@ -5,9 +5,28 @@
 
 function pdrSessionStart(): void
 {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+    if (session_status() !== PHP_SESSION_NONE) {
+        return;
     }
+
+    // T-58: harden the session cookie. PHP's defaults (and the php.ini in this
+    // XAMPP install) leave HttpOnly and SameSite unset, so the session ID is
+    // readable by JavaScript and sent on cross-site navigations.
+    $https = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+        || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443';
+
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'domain'   => '',
+        'secure'   => $https,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+
+    session_start();
 }
 
 function pdrCsrfToken(): string

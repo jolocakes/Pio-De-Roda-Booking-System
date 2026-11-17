@@ -7,7 +7,7 @@ require_once __DIR__ . '/../config/rbac.php';
 // Archived (soft-deleted) rows remain available on the second tab for admins
 // and staff who still use the archive workflow.
 pdrRequirePageCapability('view');
-$adminName = (string) ($_SESSION['admin_name'] ?? 'Admin User');
+$adminName = pdrAdminDisplayName();
 $canArchive = pdrCan('manage_archive');
 
 $hq = trim((string) ($_GET['hq'] ?? ''));
@@ -39,42 +39,8 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
 </head>
 <body>
 
-    <div class="sidebar">
-        <div>
-            <div class="brand-header">
-                <div class="brand-logo-container">
-                    <img src="pioderoda.jpg" alt="Pio De Roda Logo" class="brand-logo-img">
-                </div>
-                <h2>PIO DE RODA</h2>
-                <p>RESERVATION SYSTEM</p>
-            </div>
-
-            <ul class="nav-menu">
-                <li class="nav-item"><a href="dashboard.php"><i class="fa-solid fa-house"></i> Dashboard</a></li>
-                <li class="nav-item"><a href="reservation.php"><i class="fa-solid fa-calendar-check"></i> Reservations</a></li>
-                <li class="nav-item"><a href="calendar.php"><i class="fa-solid fa-calendar-days"></i> Calendar</a></li>
-                <li class="nav-item"><a href="service.php"><i class="fa-solid fa-concierge-bell"></i> Services</a></li>
-                <li class="nav-item"><a href="event.php"><i class="fa-solid fa-calendar-days"></i> Events</a></li>
-                <li class="nav-item"><a href="customer.php"><i class="fa-solid fa-users"></i> Customers</a></li>
-                <li class="nav-item"><a href="payment.php"><i class="fa-solid fa-money-bill-wave"></i> Payment</a></li>
-                <li class="nav-item"><a href="reports.php"><i class="fa-solid fa-chart-column"></i> Reports</a></li>
-                <li class="nav-item active">
-                    <a href="archive.php"><i class="fa-solid fa-clock-rotate-left"></i> History</a>
-                </li>
-                <?php if (pdrCan('manage_staff')): ?>
-                    <li class="nav-item"><a href="staff.php"><i class="fa-solid fa-user-shield"></i> Staff</a></li>
-                <?php endif; ?>
-            </ul>
-        </div>
-        <div class="sidebar-footer">
-            <li class="nav-item" style="list-style: none;">
-                <form method="POST" action="logout.php" class="logout-form">
-                    <?php echo pdrCsrfField(); ?>
-                    <button type="submit" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-                </form>
-            </li>
-        </div>
-    </div>
+    <!-- Shared sidebar: admin/_sidebar.php (T-60) -->
+    <?php $activeNav = 'archive'; require __DIR__ . '/_sidebar.php'; ?>
 
     <div class="main-wrapper">
         <div class="top-navbar">
@@ -82,7 +48,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             <div class="user-profile">
                 <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="user-info">
-                    <p><?php echo htmlspecialchars($adminName, ENT_QUOTES, 'UTF-8'); ?></p>
+                    <p><?php echo $adminName; ?></p>
                     <span><?php echo htmlspecialchars(pdrRoleLabel(), ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
             </div>
@@ -232,11 +198,11 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             });
         }
         function fmtDate(value) {
-            if (!value) return '—';
+            if (!value) return 'â€”';
             return window.PDRFormat ? (PDRFormat.format(value) || String(value)) : String(value);
         }
         function fmtDateTime(value) {
-            if (!value) return '—';
+            if (!value) return 'â€”';
             return window.PDRFormat ? (PDRFormat.formatDateTime(value) || String(value)) : String(value);
         }
         function showAlert(message, type) {
@@ -306,7 +272,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
                     '<td><strong>' + esc(r.id) + '</strong></td>' +
                     '<td>' + esc(r.customerName) + '</td>' +
                     '<td>' + esc(r.service) + '</td>' +
-                    '<td>' + fmtDate(r.eventDate) + '<br><small style="color:#718096;">' + esc(r.eventTime || '—') + '</small></td>' +
+                    '<td>' + fmtDate(r.eventDate) + '<br><small style="color:#718096;">' + esc(r.eventTime || 'â€”') + '</small></td>' +
                     '<td>' + esc(r.guests) + '</td>' +
                     '<td>' + esc(r.estimatedTotal) + '</td>' +
                     '<td><span class="history-status status-' + esc(String(r.status || '').toLowerCase()) + '">' + esc(r.status) + '</span></td>' +
@@ -323,7 +289,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             const from = historyState.total === 0 ? 0 : ((historyState.page - 1) * historyState.perPage) + 1;
             const to = Math.min(historyState.page * historyState.perPage, historyState.total);
             document.getElementById('historyRange').textContent =
-                'Showing ' + from + '–' + to + ' of ' + historyState.total + ' booking' + (historyState.total === 1 ? '' : 's');
+                'Showing ' + from + 'â€“' + to + ' of ' + historyState.total + ' booking' + (historyState.total === 1 ? '' : 's');
             document.getElementById('historyPage').textContent = 'Page ' + historyState.page + ' of ' + historyState.totalPages;
             document.getElementById('historyPrev').disabled = historyState.page <= 1;
             document.getElementById('historyNext').disabled = historyState.page >= historyState.totalPages;
@@ -333,20 +299,20 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             const record = historyState.records.find(function (r) { return String(r.id) === String(reservationId); });
             if (!record) return;
             const body = document.getElementById('historyModalBody');
-            const packages = record.selectedPackage || '—';
-            const address = record.address || '—';
+            const packages = record.selectedPackage || 'â€”';
+            const address = record.address || 'â€”';
 
             body.innerHTML =
                 '<dl class="detail-list">' +
                     '<div><dt>Reservation ID</dt><dd><strong>' + esc(record.id) + '</strong></dd></div>' +
                     '<div><dt>Status</dt><dd><span class="history-status status-' + esc(String(record.status || '').toLowerCase()) + '">' + esc(record.status) + '</span></dd></div>' +
                     '<div><dt>Customer</dt><dd>' + esc(record.customerName) + '</dd></div>' +
-                    '<div><dt>Contact</dt><dd>' + esc(record.contactNumber || '—') + '</dd></div>' +
-                    '<div><dt>Email</dt><dd>' + esc(record.email || '—') + '</dd></div>' +
+                    '<div><dt>Contact</dt><dd>' + esc(record.contactNumber || 'â€”') + '</dd></div>' +
+                    '<div><dt>Email</dt><dd>' + esc(record.email || 'â€”') + '</dd></div>' +
                     '<div><dt>Address</dt><dd>' + esc(address) + '</dd></div>' +
                     '<div><dt>Service</dt><dd>' + esc(record.service) + '</dd></div>' +
                     '<div><dt>Package</dt><dd>' + esc(packages) + '</dd></div>' +
-                    '<div><dt>Event date</dt><dd>' + fmtDate(record.eventDate) + ' at ' + esc(record.eventTime || '—') + '</dd></div>' +
+                    '<div><dt>Event date</dt><dd>' + fmtDate(record.eventDate) + ' at ' + esc(record.eventTime || 'â€”') + '</dd></div>' +
                     '<div><dt>Guests</dt><dd>' + esc(record.guests) + ' pax</dd></div>' +
                     '<div><dt>Estimated total</dt><dd><strong>' + esc(record.estimatedTotal) + '</strong></dd></div>' +
                     '<div><dt>Submitted</dt><dd>' + fmtDateTime(record.submittedAt) + '</dd></div>' +
@@ -413,7 +379,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
                         '<td>' + fmtDate(r.event_date) + '</td>' +
                         '<td>' + esc(r.status) + '</td>' +
                         '<td>' + fmtDateTime(r.archived_at) + '</td>' +
-                        '<td><span class="category-badge">' + esc(r.archive_reason || '—') + '</span></td>' +
+                        '<td><span class="category-badge">' + esc(r.archive_reason || 'â€”') + '</span></td>' +
                         archiveActionCell(r.id) + '</tr>');
                 });
             } else if (archiveState.type === 'customers') {
@@ -422,10 +388,10 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
                     tbody.insertAdjacentHTML('beforeend',
                         '<tr><td><strong>' + esc(r.full_name) + '</strong></td>' +
                         '<td>' + esc(r.email) + '</td>' +
-                        '<td>' + esc(r.phone || '—') + '</td>' +
+                        '<td>' + esc(r.phone || 'â€”') + '</td>' +
                         '<td>' + esc(r.status) + '</td>' +
                         '<td>' + fmtDateTime(r.archived_at) + '</td>' +
-                        '<td><span class="category-badge">' + esc(r.archive_reason || '—') + '</span></td>' +
+                        '<td><span class="category-badge">' + esc(r.archive_reason || 'â€”') + '</span></td>' +
                         archiveActionCell(r.id) + '</tr>');
                 });
             } else {
@@ -459,7 +425,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
         function renderArchivePagination() {
             const from = archiveState.total === 0 ? 0 : ((archiveState.page - 1) * 50) + 1;
             const to = Math.min(archiveState.page * 50, archiveState.total);
-            document.getElementById('archiveRange').textContent = 'Showing ' + from + '–' + to + ' of ' + archiveState.total + ' record' + (archiveState.total === 1 ? '' : 's');
+            document.getElementById('archiveRange').textContent = 'Showing ' + from + 'â€“' + to + ' of ' + archiveState.total + ' record' + (archiveState.total === 1 ? '' : 's');
             document.getElementById('archivePage').textContent = 'Page ' + archiveState.page + ' of ' + archiveState.totalPages;
             document.getElementById('archivePrev').disabled = archiveState.page <= 1;
             document.getElementById('archiveNext').disabled = archiveState.page >= archiveState.totalPages;

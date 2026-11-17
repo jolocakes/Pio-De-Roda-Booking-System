@@ -7,9 +7,12 @@
  * by something that ignores .htaccess.
  *
  * CSP notes:
- *   - The project still uses many inline handlers (onclick="..."), so
- *     'unsafe-inline' is required for now. Everything else is locked to the
- *     site itself plus the font/icon/chart CDNs the pages actually use.
+ *   - T-61: the customer directory no longer uses inline scripts or inline
+ *     event handlers, so it gets a script-src WITHOUT 'unsafe-inline'. The
+ *     admin pages (and any API response) still rely on inline handlers and keep
+ *     it until those are extracted too.
+ *   - Everything else is locked to the site itself plus the font/icon/chart
+ *     CDNs the pages actually use.
  *   - frame-src allows Cloudflare Turnstile; frame-ancestors prevents the site
  *     from being embedded by another origin (clickjacking).
  */
@@ -17,6 +20,11 @@
 if (headers_sent()) {
     return;
 }
+
+$isCustomerArea = strpos((string) ($_SERVER['REQUEST_URI'] ?? ''), '/customer/') !== false;
+$scriptSrc = $isCustomerArea
+    ? "'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://challenges.cloudflare.com"
+    : "'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://challenges.cloudflare.com";
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -29,7 +37,7 @@ header(
     "object-src 'none'; " .
     "frame-ancestors 'self'; " .
     "form-action 'self'; " .
-    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://challenges.cloudflare.com; " .
+    "script-src $scriptSrc; " .
     "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; " .
     "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; " .
     "img-src 'self' data: blob: https:; " .

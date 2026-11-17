@@ -82,7 +82,8 @@ function pdrMailHeaders(array $cfg, $toEmail, $subject)
 {
     $fromName  = $cfg['from_name'];
     $fromEmail = $cfg['from_email'];
-    return [
+    $replyTo   = trim((string) ($cfg['reply_to'] ?? ''));
+    $headers = [
         'From'     => sprintf('%s <%s>', pdrMailEncodePhrase($fromName), $fromEmail),
         'To'       => $toEmail,
         'Subject'  => pdrMailEncodePhrase($subject),
@@ -90,6 +91,12 @@ function pdrMailHeaders(array $cfg, $toEmail, $subject)
         'Message-ID' => '<' . uniqid('pdr.', true) . '@pioderoda.local>',
         'MIME-Version' => '1.0',
     ];
+    // T-63: replies go to the public inbox even when the sending account is a
+    // different mailbox.
+    if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+        $headers['Reply-To'] = $replyTo;
+    }
+    return $headers;
 }
 
 /**
