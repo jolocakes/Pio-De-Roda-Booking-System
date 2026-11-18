@@ -41,20 +41,22 @@ Options -Indexes
   AddOutputFilterByType DEFLATE application/xml image/svg+xml
 </IfModule>
 
-# T-52: friendly 404 page. Adjust this path if the project is deployed at the
-# domain root instead of /pdrsystem/.
-ErrorDocument 404 /pdrsystem/customer/404.html
+# T-52: friendly 404 page. This path is for a deployment at the domain root
+# (production). If you run the site from a subfolder such as
+# http://localhost/pdrsystem/, change it back to
+# ErrorDocument 404 /pdrsystem/customer/404.html
+ErrorDocument 404 /customer/404.html
 
 # Never serve database dumps, secrets, logs or editor/backup artifacts.
 # A .sql dump contains customer PII and admin password hashes; a leaked
 # .env contains live SMTP credentials.
 <IfModule mod_authz_core.c>
-  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml)$|(^|/)\.env$|~$">
+  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml|sh|conf)$|(^|/)\.env$|~$">
     Require all denied
   </FilesMatch>
 </IfModule>
 <IfModule !mod_authz_core.c>
-  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml)$|(^|/)\.env$|~$">
+  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml|sh|conf)$|(^|/)\.env$|~$">
     Order allow,deny
     Deny from all
   </FilesMatch>
