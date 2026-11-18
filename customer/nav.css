@@ -659,6 +659,7 @@ textarea {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: auto auto;
+  align-items: start;
   gap: 3rem;
 }
 
@@ -676,14 +677,45 @@ textarea {
   font-size: 1rem;
 }
 
-/* Google Maps embed of the cafe location, under the contact details */
+/* Only the word "Address" is clickable — it reveals a separate map block */
+.address-toggle {
+  display: block;
+  width: -moz-fit-content;
+  width: fit-content;
+  cursor: pointer;
+}
+
+.address-toggle strong {
+  transition: color 0.2s ease;
+}
+
+.address-toggle:hover strong,
+.address-toggle:focus-visible strong,
+.address-toggle[aria-expanded="true"] strong {
+  color: var(--crimson);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.address-toggle:focus-visible {
+  outline: 2px solid var(--crimson);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Google Maps embed of the cafe location, right under the address line */
 .contact-map {
-  margin-top: 1.6rem;
+  margin-top: 1rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-soft);
   background: var(--cream-soft);
+  animation: map-reveal 0.25s ease;
+}
+
+.contact-map[hidden] {
+  display: none;
 }
 
 .contact-map iframe {
@@ -691,6 +723,17 @@ textarea {
   width: 100%;
   height: 280px;
   border: 0;
+}
+
+@keyframes map-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .contact-form {
@@ -701,6 +744,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  align-self: start; /* stay its natural height when the map opens */
 }
 
 .contact-form label {

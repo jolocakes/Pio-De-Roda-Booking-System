@@ -27,7 +27,7 @@
       rel="stylesheet"
     />
 
-    <link rel="stylesheet" href="nav.css?v=2" />
+    <link rel="stylesheet" href="nav.css?v=4" />
   </head>
   <body>
     <!-- ============ NAVIGATION BAR ============ -->
@@ -439,8 +439,29 @@
             </p>
             <ul class="contact-list">
               <li>
-                <strong>Address</strong>508 De Ocampo St., Indang, Cavite,
-                Indang, Philippines, 4122
+                <span
+                  class="address-toggle"
+                  id="addressToggle"
+                  role="button"
+                  tabindex="0"
+                  aria-expanded="false"
+                  aria-controls="contactMapPanel"
+                >
+                  <strong>Address</strong>
+                </span>
+                508 De Ocampo St., Indang, Cavite, Indang, Philippines, 4122
+
+                <!-- Google Maps: cafe location (no API key needed for the embed).
+                     Revealed right below the address line by clicking the word
+                     "Address", so the rest of the contact list stays as it was. -->
+                <div class="contact-map" id="contactMapPanel" hidden>
+                  <iframe
+                    src="https://www.google.com/maps?q=Pio%20De%20Roda%20Cafe%2C%20508%20De%20Ocampo%20St.%2C%20Indang%2C%20Cavite%204122%2C%20Philippines&z=15&output=embed"
+                    title="Pio De Roda Cafe location on Google Maps"
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade"
+                    allowfullscreen></iframe>
+                </div>
               </li>
               <li><strong>Phone</strong>(046) 415 0390 / (0926) 684 5833</li>
               <li>
@@ -451,16 +472,6 @@
               </li>
               <li><strong>Hours</strong>Open daily, 8:00 AM – 10:00 PM</li>
             </ul>
-
-            <!-- Google Maps: cafe location (no API key needed for the embed) -->
-            <div class="contact-map">
-              <iframe
-                src="https://www.google.com/maps?q=Pio%20De%20Roda%20Cafe%2C%20508%20De%20Ocampo%20St.%2C%20Indang%2C%20Cavite%204122%2C%20Philippines&z=15&output=embed"
-                title="Pio De Roda Cafe location on Google Maps"
-                loading="lazy"
-                referrerpolicy="no-referrer-when-downgrade"
-                allowfullscreen></iframe>
-            </div>
           </div>
           <form
             class="contact-form"
@@ -569,6 +580,10 @@
     <!-- Mobile menu + header scroll state — same bindNav() behavior as the
        Booking Status and Payment pages (this page had no wiring for it). -->
     <script src="nav.js?v=1.0"></script>
+
+    <!-- Contact section: clicking "Address" toggles a separate map block.
+         External file because this directory's CSP allows no inline scripts. -->
+    <script src="contact-map.js?v=2"></script>
 
     <!-- T-45: contact-form CAPTCHA. Loads the public config (site key only) and
          mounts Turnstile explicitly so it can be reset after each send. When the
