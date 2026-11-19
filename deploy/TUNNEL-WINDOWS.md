@@ -309,6 +309,7 @@ cloudflared service install
 | Xendit webhook not arriving | webhook tunnel closed, or localhost.run rotated the hostname | Restart `deploy\webhook-tunnel.ps1` — it re-registers the new URL |
 | Xendit rejects the webhook URL ("private or local IPs") | `*.trycloudflare.com` / `*.ngrok-free.app` / `*.loca.lt` are blocked by Xendit | Use `deploy\webhook-tunnel.ps1` (`*.lhr.life`) |
 | Xendit returns `401 INVALID_API_KEY` | `secret_key` holds the public key | Use the test **secret** key (`xnd_development_...`) |
+| "Payment could not be started" + `UNAVAILABLE_PAYMENT_METHOD_ERROR` in the error log | `payment_methods` lists a channel your account does not have (e.g. `BANK_TRANSFER`) | Set `'payment_methods' => []` in `config/xendit.php` |
 
 Local (non-tunnel) checks:
 

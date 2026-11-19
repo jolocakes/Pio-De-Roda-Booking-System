@@ -18,10 +18,11 @@ return [
     'app_base_url'   => 'http://localhost/Pio-De-Roda-Booking-System',
 
     // Restrict invoice payment methods (Xendit Invoice `payment_methods`).
-    // For PH this commonly includes EWALLET (e.g. GCash/Maya) and BANK_TRANSFER.
-    // Set to [] or null to show all payment methods enabled on your Xendit account.
-    // Adjust if your account expects specific method codes.
-    'payment_methods' => ['EWALLET', 'BANK_TRANSFER'],
+    // Leave this empty to show every channel enabled on your Xendit account.
+    // Listing a channel the account does not have makes invoice creation fail
+    // with UNAVAILABLE_PAYMENT_METHOD_ERROR, e.g. BANK_TRANSFER on most PH test
+    // accounts (they expose EWALLET, QRPH, over-the-counter and direct debit).
+    'payment_methods' => [],
 
     // Deposit option shown to customers (percentage of estimated_total). 50 = 50%.
     'deposit_percent' => 50,
