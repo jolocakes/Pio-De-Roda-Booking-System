@@ -102,6 +102,19 @@ if (-not (Test-LocalPort 80)) {
     exit 1
 }
 
+# Refuse to publish the XAMPP dashboard by accident.
+try {
+    $probe = Invoke-WebRequest -Uri "http://127.0.0.1/" -UseBasicParsing -TimeoutSec 10
+    if ($probe.Content -match 'XAMPP' -and $probe.Content -notmatch 'Pio De Roda') {
+        Write-Host "Apache is serving the XAMPP dashboard, not the app." -ForegroundColor Red
+        Write-Host "Restart Apache in the XAMPP Control Panel (Stop > Start) so the"
+        Write-Host "pdrsystem.local vhost loads, then run this script again."
+        exit 1
+    }
+} catch {
+    # Probe failed for an unrelated reason - let the tunnel start anyway.
+}
+
 $origin = "http://127.0.0.1:80"
 try {
     $addresses = [System.Net.Dns]::GetHostAddresses($HostName) | ForEach-Object { $_.IPAddressToString }

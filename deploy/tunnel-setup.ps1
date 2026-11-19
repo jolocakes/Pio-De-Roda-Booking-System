@@ -207,12 +207,21 @@ $apacheUp = Test-LocalPort 80
 $mysqlUp  = Test-LocalPort 3306
 
 if ($apacheUp) {
-    try {
-        $restartOutput = & cmd /c "`"$HttpdExe`" -k restart 2>&1"
-        $restartOutput | ForEach-Object { Write-Host "  $_" }
-        Ok "Apache restarted"
-    } catch {
-        Warn "Could not restart Apache from here - use the XAMPP Control Panel"
+    # XAMPP normally runs Apache in console mode, where `httpd -k restart` fails
+    # with "No installed service named Apache2.4". Only a real service can be
+    # restarted from the command line.
+    $apacheService = Get-Service -Name "Apache2.4" -ErrorAction SilentlyContinue
+    if ($apacheService) {
+        try {
+            Restart-Service $apacheService -Force
+            Ok "Apache service restarted"
+        } catch {
+            Warn "Could not restart the Apache service - use the XAMPP Control Panel"
+        }
+    } else {
+        Warn "Apache is in console mode (started from the XAMPP Control Panel)"
+        Write-Host "    Restart it once now so httpd-vhosts.conf and mod_remoteip load:"
+        Write-Host "    XAMPP Control Panel > Stop (Apache) > Start (Apache)"
     }
 }
 
@@ -232,19 +241,41 @@ if (-not $apacheUp -or -not $mysqlUp) {
 if ($apacheUp) { Ok "Apache is listening on port 80" } else { Warn "Apache is still down" }
 if ($mysqlUp)  { Ok "MySQL is listening on port 3306" }  else { Warn "MySQL is still down" }
 
-Step "Verifying http://$HostName/"
+Step "Verifying the local site"
+$verifyUrl = "http://$HostName/"
+$hostResolves = $false
+try {
+    [void][System.Net.Dns]::GetHostAddresses($HostName)
+    $hostResolves = $true
+} catch {
+    # No hosts entry: 127.0.0.1 still reaches the first (and only) vhost.
+    $verifyUrl = "http://127.0.0.1/"
+}
+
 if ($apacheUp) {
-    try {
-        $response = Invoke-WebRequest -Uri "http://$HostName/" -UseBasicParsing -TimeoutSec 15
-        if ($response.Content -match 'Pio De Roda|PDR') {
-            Ok "The app is served at http://$HostName/"
-        } else {
-            Warn "Got HTTP $($response.StatusCode) but the page does not look like the app"
-            Write-Host "    Check the vhost in $VhostsFile"
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            $response = Invoke-WebRequest -Uri $verifyUrl -UseBasicParsing -TimeoutSec 12
+            if ($response.Content -match 'Pio De Roda|PDR') {
+                Ok "The app is served at $verifyUrl"
+                break
+            }
+            if ($response.Content -match 'XAMPP') {
+                Warn "Apache is still serving the XAMPP dashboard at $verifyUrl"
+                Write-Host "    The new vhost has not been loaded yet."
+                Write-Host "    XAMPP Control Panel > Stop (Apache) > Start (Apache), then re-run this script."
+            } else {
+                Warn "Got HTTP $($response.StatusCode) but the page does not look like the app"
+                Write-Host "    Check the vhost in $VhostsFile"
+            }
+            break
+        } catch {
+            if ($attempt -eq 3) {
+                Warn "Could not load $verifyUrl - $($_.Exception.Message)"
+            } else {
+                Start-Sleep -Seconds 2
+            }
         }
-    } catch {
-        Warn "Could not load http://$HostName/ - $($_.Exception.Message)"
-        Write-Host "    If the hosts entry was skipped, either add it or browse http://localhost/pdrsystem/"
     }
 }
 
