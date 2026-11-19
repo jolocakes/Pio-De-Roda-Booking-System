@@ -56,6 +56,9 @@ function Resolve-Cloudflared {
         (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links\cloudflared.exe"),
         "C:\cloudflared\cloudflared.exe"
     )
+    if (${env:ProgramFiles(x86)}) {
+        $candidates += (Join-Path ${env:ProgramFiles(x86)} "cloudflared\cloudflared.exe")
+    }
     foreach ($candidate in $candidates) {
         if (Test-Path $candidate) { return $candidate }
     }
@@ -114,6 +117,10 @@ Write-Host ""
 
 $script:publicUrl = $null
 $script:handled   = $false
+
+# cloudflared logs everything to stderr. Merging that stream under the default
+# Stop preference would abort this script on the first log line, so relax it.
+$ErrorActionPreference = "Continue"
 
 & $cloudflared tunnel --no-autoupdate --url $origin 2>&1 | ForEach-Object {
     $line = "$_"

@@ -68,6 +68,9 @@ function Resolve-Cloudflared {
         (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links\cloudflared.exe"),
         "C:\cloudflared\cloudflared.exe"
     )
+    if (${env:ProgramFiles(x86)}) {
+        $candidates += (Join-Path ${env:ProgramFiles(x86)} "cloudflared\cloudflared.exe")
+    }
     foreach ($candidate in $candidates) {
         if (Test-Path $candidate) { return $candidate }
     }
@@ -161,23 +164,39 @@ if ($httpd -match '(?m)^LoadModule remoteip_module') {
 }
 
 Step "Adding $HostName to the hosts file"
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 try {
     $hosts = Get-Content $HostsFile -Raw -ErrorAction Stop
     $pattern = "(?m)^\s*127\.0\.0\.1\s+.*\b" + [regex]::Escape($HostName) + "\b"
     if ($hosts -match $pattern) {
         Ok "hosts entry already present"
     } else {
+        $item = Get-Item $HostsFile
+        if ($item.Attributes -band [IO.FileAttributes]::ReadOnly) {
+            $item.Attributes = $item.Attributes -bxor [IO.FileAttributes]::ReadOnly
+        }
         Add-Content -Path $HostsFile -Value "`r`n127.0.0.1`t$HostName"
         Ok "hosts entry added"
     }
 } catch {
-    Warn "Could not edit the hosts file (needs an elevated shell). Add this line manually:"
+    if (-not $isAdmin) {
+        Warn "Not elevated, so hosts was left alone. Re-run this from 'PowerShell (Admin)' to add it."
+    } else {
+        Warn "Could not write the hosts file even as Administrator."
+        Write-Host "    Windows Security > Virus & threat protection > Ransomware protection"
+        Write-Host "    > Controlled folder access may be blocking it. Allow PowerShell, or add this line manually:"
+    }
     Write-Host "    127.0.0.1`t$HostName"
+    Write-Host "    (Optional: the tunnel works without it via 127.0.0.1.)"
 }
 
 Step "Testing the Apache configuration"
-& $HttpdExe -t 2>&1 | ForEach-Object { Write-Host "  $_" }
-if ($LASTEXITCODE -ne 0) {
+# cmd.exe does the 2>&1 merge: Apache writes progress to stderr, and letting
+# PowerShell merge it would raise NativeCommandError under Stop preference.
+$apacheTest     = & cmd /c "`"$HttpdExe`" -t 2>&1"
+$apacheTestExit = $LASTEXITCODE
+$apacheTest | ForEach-Object { Write-Host "  $_" }
+if ($apacheTestExit -ne 0) {
     Err "Apache rejected the configuration. Fix the errors above before continuing."
     exit 1
 }
@@ -189,7 +208,8 @@ $mysqlUp  = Test-LocalPort 3306
 
 if ($apacheUp) {
     try {
-        & $HttpdExe -k restart 2>&1 | Out-Host
+        $restartOutput = & cmd /c "`"$HttpdExe`" -k restart 2>&1"
+        $restartOutput | ForEach-Object { Write-Host "  $_" }
         Ok "Apache restarted"
     } catch {
         Warn "Could not restart Apache from here - use the XAMPP Control Panel"

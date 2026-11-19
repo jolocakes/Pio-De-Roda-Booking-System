@@ -64,6 +64,9 @@ If the hosts edit fails, add this line manually as Administrator:
 Then open `http://pdrsystem.local/` — you should see the homepage, and
 `http://pdrsystem.local/admin/` the login.
 
+The hosts entry is **optional**: without it the tunnel uses `127.0.0.1`, which
+still reaches the vhost. It only makes local browsing prettier.
+
 > Prefer not to use a vhost? `http://localhost/pdrsystem/` still works. The
 > tunnel origin just has to be changed to that path, and the 404 page will not
 > resolve (the `.htaccess` path is root-based now).
@@ -223,7 +226,8 @@ cloudflared service install
 | `404` on every path | Wrong DocumentRoot | Re-run `tunnel-setup.ps1` |
 | `cloudflared` not recognized | PATH not refreshed | Open a new terminal, or use `C:\cloudflared\cloudflared.exe` |
 | Script blocked by execution policy | Default policy is Restricted | Prefix with `powershell -ExecutionPolicy Bypass -File` |
-| hosts edit failed | Not elevated | Run PowerShell as Administrator |
+| hosts edit failed | Not elevated, or Controlled folder access | Optional; run PowerShell as Administrator if you want the pretty hostname |
+| Setup stops right after `Syntax OK` | Old script version treated Apache's stderr as fatal | Pull the latest `deploy/tunnel-setup.ps1` (fixed) |
 | MySQL will not start | Port 3306 in use | Stop the other MySQL/Skype service, retry |
 | `500` on a page | PHP fatal | `Get-Content C:\xampp\apache\logs\pdrsystem-error.log -Tail 40` |
 | Login works but bounces | Stale cookie from `localhost` | Clear cookies for the tunnel host and retry |
