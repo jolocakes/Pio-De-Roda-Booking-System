@@ -73,28 +73,54 @@ still reaches the vhost. It only makes local browsing prettier.
 
 ---
 
-## Every session (1 minute)
+## Every session (2 minutes)
 
 1. Open **XAMPP Control Panel** → **Start Apache** and **Start MySQL**.
-2. In a **new** PowerShell window:
+
+2. **Window 1 — the website:**
 
 ```powershell
 cd C:\xampp\htdocs\pdrsystem
 powershell -ExecutionPolicy Bypass -File deploy\tunnel-start.ps1 -UpdateXendit
 ```
 
-3. Wait for the green banner:
+Wait for the green banner:
 
 ```
  PUBLIC URL : https://quiet-river-1234.trycloudflare.com/
  ADMIN      : https://quiet-river-1234.trycloudflare.com/admin/
- WEBHOOK    : https://quiet-river-1234.trycloudflare.com/api/payments/webhook.php
 ```
 
-4. Leave that window open. **Ctrl+C** stops the tunnel (and the public URL).
+3. **Window 2 — the Xendit webhook** (only if you are demoing payments):
 
-The URL is also saved to `deploy\tunnel-url.txt` (git-ignored) so you can copy
-it later.
+```powershell
+cd C:\xampp\htdocs\pdrsystem
+powershell -ExecutionPolicy Bypass -File deploy\webhook-tunnel.ps1
+```
+
+```
+========================================================================
+  WEBHOOK URL : https://586decdc957d9e.app.lhr.life/api/payments/webhook.php
+========================================================================
+  [OK] Registered with Xendit (TEST)
+  [OK] Callback token matches config/xendit.php
+```
+
+4. Leave **both** windows open. **Ctrl+C** in either one stops that tunnel.
+
+The site URL is also saved to `deploy\tunnel-url.txt` (git-ignored).
+
+### Why two tunnels
+
+Xendit refuses `*.trycloudflare.com` (and `*.ngrok-free.app`, `*.loca.lt`)
+webhook URLs — the dashboard says *"This webhook URL can not be saved because
+the URL may contain private or local IPs"*, and the API returns
+`URL_NOT_VALID_ERROR`. It accepts `*.lhr.life`, which
+[localhost.run](https://localhost.run) hands out over plain SSH: no account, no
+installer, no card.
+
+So the site stays on the fast, stable Cloudflare hostname, and only the webhook
+callback travels over localhost.run. Both point at the same Apache site.
 
 ### If the PC sleeps, the site dies
 
@@ -105,21 +131,39 @@ while plugged in. Closing a laptop lid also suspends it.
 
 ## Xendit (payments)
 
-`-UpdateXendit` rewrites `app_base_url` in `config/xendit.php` to the new URL
-and keeps a backup in `%TEMP%`. **The webhook URL in the Xendit dashboard must
-be updated by hand each session** because the hostname changes:
-
-1. Xendit Dashboard → **Settings → Webhooks** → Invoice callback:
-   `https://<the-url-from-the-banner>/api/payments/webhook.php`
-2. Click **Send test** and confirm a `200`.
-3. Run one test invoice end to end.
-
-If `config/xendit.php` does not exist yet:
+`config/xendit.php` needs the **test secret key** (`xnd_development_...`, 78
+characters) — not the public key (`xnd_public_development_...`), which is only
+for browser components. With the public key in `secret_key`, every call fails
+with `401 INVALID_API_KEY` and no invoice can be created.
 
 ```powershell
 copy config\xendit.example.php config\xendit.php
 notepad config\xendit.php
 ```
+
+Quick auth check (expects `HTTP 200`):
+
+```powershell
+C:\xampp\php\php.exe -r "$c = require 'config/xendit.php'; $ch = curl_init('https://api.xendit.co/v2/invoices?limit=1'); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => 1, CURLOPT_USERPWD => $c['secret_key'] . ':']); curl_exec($ch); echo PHP_EOL . 'HTTP ' . curl_getinfo($ch, CURLINFO_HTTP_CODE) . PHP_EOL;"
+```
+
+> Run that from **cmd.exe**, not PowerShell: PowerShell interpolates `$c`
+> inside double quotes and PHP receives a broken script.
+
+`deploy/webhook-tunnel.ps1` registers
+`https://<id>.app.lhr.life/api/payments/webhook.php` with Xendit automatically
+through `POST /callback_urls/invoice`, and warns if the account's callback token
+does not match `config/xendit.php`.
+
+Verify the endpoint by hand (a browser GET returns `403` on purpose — the
+endpoint requires Xendit's `x-callback-token` header):
+
+```powershell
+$tok = (Select-String -Path config\xendit.php -Pattern "'callback_token'\s*=>\s*'([^']+)'").Matches.Groups[1].Value
+curl.exe -s -w " [HTTP %{http_code}]`n" -X POST -H "Content-Type: application/json" -H "x-callback-token: $tok" -d "{\"id\":\"test-nonexistent\"}" https://YOUR-ID.app.lhr.life/api/payments/webhook.php
+```
+
+Expect `ok [HTTP 200]`; remove the header and it must be `403`.
 
 > Never commit `config/xendit.php` — it is already git-ignored.
 
@@ -262,7 +306,9 @@ cloudflared service install
 | Slow first load | Quick-tunnel cold start | Reload once |
 | Browser shows `DNS_PROBE_FINISHED_NXDOMAIN` | Router/ISP DNS cannot resolve new `*.trycloudflare.com` names | Set the PC DNS to `1.1.1.1`, flush, reload (see section above) |
 | Xendit webhook `401` | `callback_token` mismatch | Re-copy it into `config/xendit.php` |
-| Xendit webhook not arriving | Dashboard still has the old URL | Update it to this session's WEBHOOK URL |
+| Xendit webhook not arriving | webhook tunnel closed, or localhost.run rotated the hostname | Restart `deploy\webhook-tunnel.ps1` — it re-registers the new URL |
+| Xendit rejects the webhook URL ("private or local IPs") | `*.trycloudflare.com` / `*.ngrok-free.app` / `*.loca.lt` are blocked by Xendit | Use `deploy\webhook-tunnel.ps1` (`*.lhr.life`) |
+| Xendit returns `401 INVALID_API_KEY` | `secret_key` holds the public key | Use the test **secret** key (`xnd_development_...`) |
 
 Local (non-tunnel) checks:
 

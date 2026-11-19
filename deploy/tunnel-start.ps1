@@ -7,9 +7,11 @@
     Opens a free *.trycloudflare.com HTTPS URL that forwards to the local
     Apache vhost (http://pdrsystem.local or http://127.0.0.1:80).
 
-    The URL is written to deploy\tunnel-url.txt and printed with the admin and
-    Xendit webhook paths. With -UpdateXendit, config/xendit.php app_base_url is
-    rewritten to the new URL automatically.
+    The URL is written to deploy\tunnel-url.txt and printed with the admin path.
+    With -UpdateXendit, config/xendit.php app_base_url is rewritten to the new
+    URL automatically. Xendit webhooks do NOT use this URL: their validator
+    rejects *.trycloudflare.com, so deploy\webhook-tunnel.ps1 registers a
+    *.lhr.life callback instead.
 
     The tunnel lives only while this window is open. Press Ctrl+C to stop it.
 
@@ -156,13 +158,14 @@ $ErrorActionPreference = "Continue"
         Write-Host ("=" * 72) -ForegroundColor Green
         Write-Host ("  PUBLIC URL : " + $script:publicUrl + "/") -ForegroundColor Green
         Write-Host ("  ADMIN      : " + $script:publicUrl + "/admin/") -ForegroundColor Green
-        Write-Host ("  WEBHOOK    : " + $script:publicUrl + "/api/payments/webhook.php") -ForegroundColor Green
         Write-Host ("=" * 72) -ForegroundColor Green
         Write-Host "  Saved to deploy\tunnel-url.txt" -ForegroundColor DarkGray
 
         if ($UpdateXendit) { Update-XenditConfig $script:publicUrl }
 
-        Write-Host "  For this session, set the Xendit webhook to the WEBHOOK URL above." -ForegroundColor Yellow
+        Write-Host "  Payments: run deploy\webhook-tunnel.ps1 in another window." -ForegroundColor Yellow
+        Write-Host "  Xendit refuses trycloudflare.com webhook URLs; that script registers" -ForegroundColor DarkGray
+        Write-Host "  a *.lhr.life callback for this session automatically." -ForegroundColor DarkGray
 
         # The edge creates the hostname a moment after the URL is printed. Some
         # routers/ISP resolvers answer NXDOMAIN for new *.trycloudflare.com names
