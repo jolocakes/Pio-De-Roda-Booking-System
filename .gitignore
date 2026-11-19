@@ -13,6 +13,9 @@ api/mail/outbox/*
 # database/ stay tracked; anything dumped into the web root is ignored.
 /*.sql
 
+# Ephemeral Cloudflare Quick Tunnel URL (deploy/tunnel-start.ps1).
+deploy/tunnel-url.txt
+
 # OS/editor
 .DS_Store
 Thumbs.db
