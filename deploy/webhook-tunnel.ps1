@@ -28,6 +28,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference    = "SilentlyContinue"
 $root     = Split-Path -Parent $PSScriptRoot
 $xendit   = Join-Path $root "config\xendit.php"
 
@@ -85,7 +86,22 @@ if (-not $ssh) {
 Ok $ssh
 
 Step "Checking Apache on port $LocalPort"
-$listening = Test-NetConnection -ComputerName 127.0.0.1 -Port $LocalPort -InformationLevel Quiet -WarningAction SilentlyContinue
+# A raw socket probe: Test-NetConnection renders "Attempting TCP connect /
+# Waiting for response" progress output on Windows PowerShell 5.1, which looks
+# like a hang even though it finishes instantly on localhost.
+$listening = $false
+$probe = New-Object System.Net.Sockets.TcpClient
+try {
+    $pending = $probe.BeginConnect("127.0.0.1", $LocalPort, $null, $null)
+    if ($pending.AsyncWaitHandle.WaitOne(1500)) {
+        $probe.EndConnect($pending)
+        $listening = $true
+    }
+} catch {
+    $listening = $false
+} finally {
+    $probe.Close()
+}
 if (-not $listening) {
     Err "Nothing is listening on 127.0.0.1:$LocalPort. Start Apache in the XAMPP Control Panel."
     exit 1
