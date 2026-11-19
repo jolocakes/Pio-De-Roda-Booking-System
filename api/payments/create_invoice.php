@@ -7,6 +7,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../lookup_guard.php';
+require_once __DIR__ . '/../../config/payments.php';
 
 $xenditConfig = __DIR__ . '/../../config/xendit.php';
 if (!is_file($xenditConfig)) {
@@ -68,6 +69,18 @@ try {
         http_response_code(409);
         echo json_encode(['ok' => false, 'reason' => 'NOT_CONFIRMED', 'status' => $res['status']]);
         exit;
+    }
+
+    // A previous checkout may already be paid even though its callback was
+    // missed. Refresh the balance before creating another invoice, so a
+    // customer who paid the deposit is never charged the full amount again.
+    pdrSyncXenditPayments($pdo, $reservationId);
+    $fresh = $pdo->prepare("SELECT amount_paid, payment_status FROM reservations WHERE reservation_id = ?");
+    $fresh->execute([$reservationId]);
+    $freshRow = $fresh->fetch(PDO::FETCH_ASSOC);
+    if ($freshRow) {
+        $res['amount_paid'] = $freshRow['amount_paid'];
+        $res['payment_status'] = $freshRow['payment_status'];
     }
 
     $estimated = (float)($res['estimated_total'] ?? 0);

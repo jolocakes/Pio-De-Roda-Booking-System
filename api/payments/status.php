@@ -6,6 +6,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../lookup_guard.php';
+require_once __DIR__ . '/../../config/payments.php';
 
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true) ?: [];
@@ -35,6 +36,17 @@ try {
     }
 
     pdrLookupRecord($pdo, $reservationId, true);
+
+    // The gateway callback may never arrive (webhook tunnel down, PC asleep,
+    // rotated hostname). Ask Xendit about any still-Pending invoice so a paid
+    // checkout is reflected here immediately instead of staying "Unpaid".
+    pdrSyncXenditPayments($pdo, $reservationId);
+    $fresh = $pdo->prepare("SELECT payment_status, amount_paid, payment_method FROM reservations WHERE reservation_id = ?");
+    $fresh->execute([$reservationId]);
+    $freshRow = $fresh->fetch(PDO::FETCH_ASSOC);
+    if ($freshRow) {
+        $res = array_merge($res, $freshRow);
+    }
 
     $est = (float)($res['estimated_total'] ?? 0);
     $paid = (float)($res['amount_paid'] ?? 0);

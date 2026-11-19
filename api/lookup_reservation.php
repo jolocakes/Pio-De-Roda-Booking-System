@@ -40,6 +40,16 @@ try {
 
     pdrLookupRecord($pdo, $reservationId, true);
 
+    // Reconcile gateway invoices whose callback never reached us, otherwise a
+    // paid booking still shows "Unpaid" on this page.
+    pdrSyncXenditPayments($pdo, $reservationId);
+    $fresh = $pdo->prepare("SELECT amount_paid, payment_status, payment_method FROM reservations WHERE reservation_id = ?");
+    $fresh->execute([$reservationId]);
+    $freshRow = $fresh->fetch(PDO::FETCH_ASSOC);
+    if ($freshRow) {
+        $res = array_merge($res, $freshRow);
+    }
+
     // Mask phone and email
     $phone = $res['contact_number'];
     $phoneMasked = strlen($phone) < 4 ? '••••' : substr($phone, 0, 2) . str_repeat('*', strlen($phone) - 3) . substr($phone, -1);

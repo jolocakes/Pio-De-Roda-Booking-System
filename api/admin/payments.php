@@ -72,6 +72,10 @@ if ($method === 'GET') {
         /* ---------- one reservation + its payment history ---------- */
         $id = trim((string) ($_GET['id'] ?? ''));
         if ($id !== '') {
+            // Settle any invoice Xendit already marked paid but whose webhook
+            // never reached us, so the history modal is never stale.
+            pdrSyncXenditPayments($pdo, $id);
+
             $stmt = $pdo->prepare(
                 "SELECT r.reservation_id, r.customer_name, r.main_service, r.event_date,
                         r.event_time, r.guests, r.status, r.payment_method,
@@ -286,6 +290,47 @@ if ($method === 'POST') {
     }
 
     $action = strtolower(trim((string) ($data['action'] ?? '')));
+
+    /* ---------- reconcile Pending Xendit invoices with the gateway ---------- */
+    if ($action === 'sync') {
+        $reservationId = trim((string) ($data['reservationId'] ?? ''));
+
+        if ($reservationId !== '') {
+            $ids = [$reservationId];
+        } else {
+            $q = $pdo->query(
+                "SELECT DISTINCT reservation_id
+                   FROM payments
+                  WHERE provider = 'xendit' AND status = 'Pending'
+                  ORDER BY reservation_id
+                  LIMIT 10"
+            );
+            $ids = $q->fetchAll(PDO::FETCH_COLUMN);
+        }
+
+        $checked = 0;
+        $settled = 0;
+        foreach ($ids as $rid) {
+            $r = pdrSyncXenditPayments($pdo, (string) $rid);
+            $checked += (int) $r['checked'];
+            $settled += (int) $r['settled'];
+        }
+
+        if ($settled > 0) {
+            pdrAudit($pdo, 'payment.sync', 'payments', null, [
+                'reservations' => count($ids),
+                'settled'      => $settled,
+            ]);
+        }
+
+        echo json_encode([
+            'ok'           => true,
+            'reservations' => count($ids),
+            'checked'      => $checked,
+            'settled'      => $settled,
+        ]);
+        exit();
+    }
 
     /* ---------- delete a manual payment ---------- */
     if ($action === 'delete') {

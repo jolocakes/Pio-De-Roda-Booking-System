@@ -112,6 +112,7 @@ try {
                     <option value="paid">Fully paid</option>
                 </select>
                 <button type="button" class="btn-cancel" id="refreshBtn"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                <button type="button" class="btn-cancel" id="syncBtn" title="Check Pending Xendit invoices against the gateway"><i class="fa-solid fa-cloud-arrow-down"></i> Sync Xendit</button>
             </div>
 
             <!-- Payments Table -->
@@ -721,6 +722,42 @@ try {
             $("refreshBtn").addEventListener("click", function () {
                 state.picker = [];
                 loadReservations();
+            });
+
+            $("syncBtn").addEventListener("click", async function () {
+                const btn = $("syncBtn");
+                const original = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing…';
+                try {
+                    const res = await fetch(API, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                            "X-CSRF-Token": PDR_CSRF_TOKEN
+                        },
+                        body: JSON.stringify({ action: "sync" })
+                    });
+                    const data = await res.json().catch(function () { return {}; });
+                    if (!res.ok || !data.ok) throw new Error(data.reason || "sync");
+
+                    if (data.settled > 0) {
+                        showAlert("Xendit sync complete: " + data.settled + " paid invoice" + (data.settled === 1 ? "" : "s") + " recorded.", "success");
+                    } else if (data.checked > 0) {
+                        showAlert("Checked " + data.checked + " pending invoice" + (data.checked === 1 ? "" : "s") + " — none were paid yet.", "success");
+                    } else {
+                        showAlert("No pending Xendit invoices to check.", "success");
+                    }
+
+                    state.picker = [];
+                    await loadReservations();
+                } catch (err) {
+                    showAlert("Could not reach Xendit right now. The saved payment data is unchanged.", "error");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                }
             });
 
             $("paymentSearch").addEventListener("input", debounce(function (ev) {
