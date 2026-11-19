@@ -149,6 +149,34 @@ leaving it blank is simpler.
 
 ---
 
+## If the browser says `DNS_PROBE_FINISHED_NXDOMAIN`
+
+The tunnel is usually fine — your router or ISP resolver has failed to resolve
+the brand-new `*.trycloudflare.com` hostname (or cached a negative answer from
+the moment the URL was printed). Check which side is broken:
+
+```powershell
+Resolve-DnsName YOUR-URL.trycloudflare.com                      # uses your router
+Resolve-DnsName YOUR-URL.trycloudflare.com -Server 1.1.1.1      # public DNS
+```
+
+If the second command returns Cloudflare IPs (`104.16.x.x`) and the first says
+"DNS name does not exist", the site is publicly reachable and only this PC's
+resolver is wrong. Fix it in an **elevated** PowerShell:
+
+```powershell
+Set-DnsClientServerAddress -InterfaceAlias 'Ethernet' -ServerAddresses 1.1.1.1,1.0.0.1
+Clear-DnsClientCache
+Resolve-DnsName YOUR-URL.trycloudflare.com
+```
+
+No admin? Enable **Secure DNS** in your browser (Chrome/Edge → Settings →
+Privacy → Security → Use secure DNS → Cloudflare). That bypasses the router.
+Phones on mobile data and any other network resolve it normally.
+
+> This recurs with every new tunnel URL until the router/ISP DNS is bypassed,
+> which is why setting `1.1.1.1` once is worth it.
+
 ## Verify the public URL
 
 ```powershell
@@ -232,6 +260,7 @@ cloudflared service install
 | `500` on a page | PHP fatal | `Get-Content C:\xampp\apache\logs\pdrsystem-error.log -Tail 40` |
 | Login works but bounces | Stale cookie from `localhost` | Clear cookies for the tunnel host and retry |
 | Slow first load | Quick-tunnel cold start | Reload once |
+| Browser shows `DNS_PROBE_FINISHED_NXDOMAIN` | Router/ISP DNS cannot resolve new `*.trycloudflare.com` names | Set the PC DNS to `1.1.1.1`, flush, reload (see section above) |
 | Xendit webhook `401` | `callback_token` mismatch | Re-copy it into `config/xendit.php` |
 | Xendit webhook not arriving | Dashboard still has the old URL | Update it to this session's WEBHOOK URL |
 

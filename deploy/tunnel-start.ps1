@@ -16,17 +16,22 @@
 .PARAMETER UpdateXendit
     Rewrite 'app_base_url' in config/xendit.php to the new public URL.
 
-.PARAMETER NoBrowser
-    Do not open the public URL in the default browser once it is ready.
+.PARAMETER OpenBrowser
+    Also open the public URL in the default browser once this PC can resolve
+    the hostname. Off by default: some routers/ISPs fail to resolve new
+    *.trycloudflare.com names, and opening a broken page only confuses things.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File deploy\tunnel-start.ps1 -UpdateXendit
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File deploy\tunnel-start.ps1 -UpdateXendit -OpenBrowser
 #>
 [CmdletBinding()]
 param(
     [string]$HostName = "pdrsystem.local",
     [switch]$UpdateXendit,
-    [switch]$NoBrowser
+    [switch]$OpenBrowser
 )
 
 $ErrorActionPreference = "Stop"
@@ -158,8 +163,34 @@ $ErrorActionPreference = "Continue"
         if ($UpdateXendit) { Update-XenditConfig $script:publicUrl }
 
         Write-Host "  For this session, set the Xendit webhook to the WEBHOOK URL above." -ForegroundColor Yellow
-        Write-Host ""
 
-        if (-not $NoBrowser) { Start-Process ($script:publicUrl + "/") }
+        # The edge creates the hostname a moment after the URL is printed. Some
+        # routers/ISP resolvers answer NXDOMAIN for new *.trycloudflare.com names
+        # (or cache a negative answer), so opening the browser immediately can
+        # show a false "site can't be reached". Check first, explain if broken.
+        $tunnelHost = ([Uri]$script:publicUrl).Host
+        $resolved = $false
+        for ($attempt = 0; $attempt -lt 4; $attempt++) {
+            try {
+                [void][System.Net.Dns]::GetHostAddresses($tunnelHost)
+                $resolved = $true
+                break
+            } catch {
+                Start-Sleep -Seconds 2
+            }
+        }
+
+        if (-not $resolved) {
+            Write-Host ""
+            Write-Host "  [!] This PC cannot resolve $tunnelHost yet." -ForegroundColor Yellow
+            Write-Host "      The tunnel itself is healthy - other networks can open the URL." -ForegroundColor Yellow
+            Write-Host "      Fix locally (elevated PowerShell):" -ForegroundColor Yellow
+            Write-Host "        Set-DnsClientServerAddress -InterfaceAlias 'Ethernet' -ServerAddresses 1.1.1.1,1.0.0.1" -ForegroundColor Yellow
+            Write-Host "        Clear-DnsClientCache" -ForegroundColor Yellow
+        } elseif ($OpenBrowser) {
+            Start-Process ($script:publicUrl + "/")
+        }
+
+        Write-Host ""
     }
 }
