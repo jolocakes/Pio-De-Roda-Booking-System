@@ -7,6 +7,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/lookup_guard.php';
 require_once __DIR__ . '/capacity.php';
+require_once __DIR__ . '/../config/payments.php';
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
@@ -53,6 +54,16 @@ try {
     $rescheduleCount = (int) ($res['reschedule_count'] ?? 0);
     $changeable = in_array((string) $res['status'], ['Pending', 'Confirmed'], true);
 
+    // Payment summary comes from the same cached columns the customer payment
+    // page uses, so the booking-status page can show paid/balance too.
+    $estimatedTotal = round((float) ($res['estimated_total'] ?? 0), 2);
+    $amountPaid     = round((float) ($res['amount_paid'] ?? 0), 2);
+    $balance        = max(0.0, round($estimatedTotal - $amountPaid, 2));
+    $paymentStatus  = trim((string) ($res['payment_status'] ?? ''));
+    if ($paymentStatus === '') {
+        $paymentStatus = pdrPaymentStatus($estimatedTotal, $amountPaid);
+    }
+
     $customerView = [
         'reservationId' => $res['reservation_id'],
         'status' => $res['status'],
@@ -72,7 +83,11 @@ try {
         'additionalServices' => $res['additional_services'] ? json_decode($res['additional_services'], true) : [],
         // Raw numeric amount — the client formats it (see booking-status.js money()).
         // Sending a pre-formatted "₱1,234.00" here made Number() return NaN.
-        'estimatedTotal' => round((float) $res['estimated_total'], 2),
+        'estimatedTotal' => $estimatedTotal,
+        'amountPaid' => $amountPaid,
+        'balance' => $balance,
+        'paymentStatus' => $paymentStatus,
+        'paymentMethod' => $res['payment_method'] ?? null,
         'daysUntilEvent' => $daysUntilEvent,
         'rescheduleCount' => $rescheduleCount,
         'maxReschedules' => PDR_MAX_RESCHEDULES,

@@ -5,6 +5,7 @@
  * Source of truth for payment status — do not rely on redirect URLs alone.
  */
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../config/payments.php';
 
 $xenditConfig = __DIR__ . '/../../config/xendit.php';
 if (!is_file($xenditConfig)) { http_response_code(500); exit; }
@@ -110,22 +111,22 @@ try {
                 // raw_response still holds the gateway payload.
             }
 
-            // Recompute reservation paid totals from verified payments.
-            $sum = $pdo->prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE reservation_id = ? AND provider = 'xendit' AND status = 'Verified'");
-            $sum->execute([$row['reservation_id']]);
-            $totalPaid = (float)$sum->fetchColumn();
-
-            $r = $pdo->prepare("SELECT estimated_total FROM reservations WHERE reservation_id = ?");
-            $r->execute([$row['reservation_id']]);
-            $est = (float)$r->fetchColumn();
-            $payStatus = ($est > 0 && $totalPaid + 0.01 >= $est) ? 'Paid' : 'Partially Paid';
-
+            // Recompute the cached totals from EVERY verified payment (manual
+            // cash/GCash rows included) so a later gateway callback cannot
+            // wipe out a payment recorded in the admin module.
             try {
-                $ur = $pdo->prepare("UPDATE reservations SET payment_method = 'Xendit', payment_status = ?, amount_paid = ? WHERE reservation_id = ?");
-                $ur->execute([$payStatus, $totalPaid, $row['reservation_id']]);
-            } catch (Throwable $migRes) {
+                pdrRecomputeReservationPayment($pdo, $row['reservation_id']);
                 $ur = $pdo->prepare("UPDATE reservations SET payment_method = 'Xendit' WHERE reservation_id = ?");
                 $ur->execute([$row['reservation_id']]);
+            } catch (Throwable $migRes) {
+                // Pre-migration database: keep the callback successful and at
+                // least record that the payment came through Xendit.
+                try {
+                    $ur = $pdo->prepare("UPDATE reservations SET payment_method = 'Xendit' WHERE reservation_id = ?");
+                    $ur->execute([$row['reservation_id']]);
+                } catch (Throwable $ignored) {
+                    error_log('Xendit webhook: could not update reservation ' . $row['reservation_id']);
+                }
             }
         }
     } elseif (in_array($status, $failedStatuses, true)) {

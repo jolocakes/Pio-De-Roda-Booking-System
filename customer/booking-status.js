@@ -222,6 +222,12 @@
           ${row("Date Submitted", fmtSubmitted(reservation.submittedAt))}
           ${row("Booking Status", esc(ui.full))}
 
+          <h3 class="bs-section-title">PAYMENT</h3>
+          ${row("Payment Status", val(reservation.paymentStatus || "Unpaid"))}
+          ${row("Amount Paid", money(reservation.amountPaid))}
+          ${row("Balance", money(reservation.balance))}
+          ${optRow("Payment Method", reservation.paymentMethod)}
+
           <h3 class="bs-section-title">ESTIMATED TOTAL</h3>
           <div class="bs-total"><span>${money(reservation.estimatedTotal)}</span><small>Subject to confirmation</small></div>
         </article>
