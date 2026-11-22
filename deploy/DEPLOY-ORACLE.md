@@ -45,7 +45,7 @@ The deployment files live in `deploy/` and are blocked from HTTP by
 
 > **Skipping git?** Create an archive that excludes secrets instead:
 > ```powershell
-> tar -czf pdrsystem-deploy.tar.gz admin api config customer database deploy lib index.php .htaccess .gitattributes favicon.svg robots.txt
+> tar -czf pdrsystem-deploy.tar.gz admin api config customer database deploy lib index.php .htaccess .gitattributes favicon.png robots.txt
 > ```
 > Then upload it with `scp` in Phase 3.
 
@@ -391,7 +391,7 @@ Uploaded via tar instead of git? Re-upload and extract over the existing
 folder, never overwrite `.env` or `config/xendit.php`:
 
 ```powershell
-tar -czf pdrsystem-update.tar.gz admin api config customer database deploy lib index.php .htaccess favicon.svg robots.txt
+tar -czf pdrsystem-update.tar.gz admin api config customer database deploy lib index.php .htaccess favicon.png robots.txt
 scp -i C:\Users\Julo\Downloads\ssh-key-2026-11-18.key pdrsystem-update.tar.gz ubuntu@<PUBLIC_IP>:~/
 ```
 

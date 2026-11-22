@@ -79,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login - Pio De Roda Reservation System</title>
+    <link rel="icon" href="../favicon.png" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>">
     <style>
@@ -101,6 +102,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .login-header {
             text-align: center;
             margin-bottom: 30px;
+        }
+        .login-logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
+        .login-logo img {
+            width: 104px;
+            height: 104px;
+            border-radius: 50%;
+            object-fit: cover;
+            display: block;
         }
         .login-header h1 {
             font-size: 24px;
@@ -164,8 +177,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="login-body">
     <div class="login-card">
         <div class="login-header">
-            <div style="font-size: 36px; color: var(--maroon); margin-bottom: 10px;">
-                <i class="fa-solid fa-hotel"></i>
+            <div class="login-logo">
+                <img src="pioderoda.jpg" alt="Pio De Roda Cafe and Restaurant logo">
             </div>
             <h1>Pio De Roda</h1>
             <p>Admin Portal Authentication</p>

@@ -77,6 +77,7 @@ $issuedAt = date('F j, Y g:i A');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Receipt <?php echo rH($reservationId); ?> | Pio De Roda Cafe</title>
+    <link rel="icon" href="../favicon.png" type="image/png">
     <style>
         :root { --maroon: #5B0808; --crimson: #8C1414; --muted: #6b7280; --line: #e5e7eb; }
         * { box-sizing: border-box; }

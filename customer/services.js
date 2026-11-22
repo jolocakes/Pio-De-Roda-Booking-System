@@ -60,7 +60,7 @@ const SERVICE_IMAGES = {
   coffee: "coffeebooth.jpg",
   pizza: "pizza.jpg",
   intimate: "intimate.jpg",
-  equipment: "equipment.jpg",
+  equipment: "equipment.jpeg",
 };
 
 function _toNullableNumber(v) {
