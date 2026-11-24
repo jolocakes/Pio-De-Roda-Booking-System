@@ -8,14 +8,21 @@
  *  - API key: Settings > Developers > API Keys (xnd_development_...)
  *  - Callback token: Settings > Webhooks > Webhook verification token
  */
+
+// The public base URL lives in .env so it does not have to be hand-edited in
+// this file on every tunnel/domain change. Local XAMPP serves the project root
+// at http://localhost (no /pdrsystem/ prefix).
+require_once __DIR__ . '/env.php';
+
 return [
     'secret_key'     => 'xnd_development_REPLACE_WITH_YOUR_TEST_SECRET_KEY',
     'callback_token' => 'REPLACE_WITH_YOUR_WEBHOOK_VERIFICATION_TOKEN',
     'base_url'       => 'https://api.xendit.co',
     'currency'       => 'PHP',
 
-    // Base URL of this app (adjust for your host/path). No trailing slash.
-    'app_base_url'   => 'http://localhost/Pio-De-Roda-Booking-System',
+    // Public base URL of this app. Set PDR_APP_BASE_URL in .env for the real
+    // domain; the fallback matches the local XAMPP vhost. No trailing slash.
+    'app_base_url'   => rtrim((string) pdrEnv('PDR_APP_BASE_URL', 'http://localhost'), '/'),
 
     // Restrict invoice payment methods (Xendit Invoice `payment_methods`).
     // Leave this empty to show every channel enabled on your Xendit account.

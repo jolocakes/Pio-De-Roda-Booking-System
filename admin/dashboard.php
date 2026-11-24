@@ -361,28 +361,34 @@ if ($chartView === 'this_year') {
     $groupExpression = 'event_date';
 }
 
-// One grouped query fills every bucket: no per-day round trips.
-$stmt = $pdo->prepare(
-    "SELECT $groupExpression AS bucket, status, COUNT(*) AS total
-       FROM reservations
-      WHERE event_date BETWEEN ? AND ?
-   GROUP BY bucket, status"
-);
-$stmt->execute([$rangeStart->format('Y-m-d'), $rangeEnd->format('Y-m-d')]);
+// One grouped query fills every bucket: no per-day round trips. Guarded so a
+// brief database outage degrades to zero counts instead of a fatal 500.
+try {
+    $stmt = $pdo->prepare(
+        "SELECT $groupExpression AS bucket, status, COUNT(*) AS total
+           FROM reservations
+          WHERE event_date BETWEEN ? AND ?
+       GROUP BY bucket, status"
+    );
+    $stmt->execute([$rangeStart->format('Y-m-d'), $rangeEnd->format('Y-m-d')]);
 
-foreach ($stmt->fetchAll() as $row) {
-    $bucketKey = (string) $row['bucket'];
-    if (!isset($buckets[$bucketKey])) {
-        continue;
-    }
-    $count = (int) $row['total'];
-    // "Total" includes every status, including Completed and Rejected.
-    $buckets[$bucketKey]['total'] += $count;
+    foreach ($stmt->fetchAll() as $row) {
+        $bucketKey = (string) $row['bucket'];
+        if (!isset($buckets[$bucketKey])) {
+            continue;
+        }
+        $count = (int) $row['total'];
+        // "Total" includes every status, including Completed and Rejected.
+        $buckets[$bucketKey]['total'] += $count;
 
-    $statusKey = strtolower((string) $row['status']);
-    if (in_array($statusKey, ['confirmed', 'pending', 'cancelled'], true)) {
-        $buckets[$bucketKey][$statusKey] += $count;
+        $statusKey = strtolower((string) $row['status']);
+        if (in_array($statusKey, ['confirmed', 'pending', 'cancelled'], true)) {
+            $buckets[$bucketKey][$statusKey] += $count;
+        }
     }
+} catch (Throwable $e) {
+    // Buckets keep their zero defaults; the rest of the dashboard still loads.
+    error_log('Dashboard overview query failed: ' . $e->getMessage());
 }
 
 $overviewChart = [
