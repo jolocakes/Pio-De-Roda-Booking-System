@@ -3,6 +3,15 @@
 # api/, database/), so a bare request would otherwise print the file tree.
 Options -Indexes
 
+# Composer dev dependencies and the test suite are not part of the deployed
+# app. Block them by path so a local `composer install` is never web-readable.
+# .git/ is blocked too: its config leaks the remote URL and the object store can
+# disclose source (including anything ever committed by mistake).
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(vendor|tests|\.git)(/|$) - [F,L]
+</IfModule>
+
 <IfModule mod_headers.c>
   # T-30: security headers for static files too (PHP responses get the same
   # set from config/security_headers.php).
@@ -51,12 +60,12 @@ ErrorDocument 404 /customer/404.html
 # A .sql dump contains customer PII and admin password hashes; a leaked
 # .env contains live SMTP credentials.
 <IfModule mod_authz_core.c>
-  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml|sh|conf)$|(^|/)\.env$|~$">
+  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml|sh|conf)$|(^|/)\.env$|~$|^(composer\.(json|lock)|phpunit\.xml)$">
     Require all denied
   </FilesMatch>
 </IfModule>
 <IfModule !mod_authz_core.c>
-  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml|sh|conf)$|(^|/)\.env$|~$">
+  <FilesMatch "(?i)\.(sql|sql\.gz|log|env|bak|old|orig|swp|swo|zip|tar|gz|ini|yml|yaml|sh|conf)$|(^|/)\.env$|~$|^(composer\.(json|lock)|phpunit\.xml)$">
     Order allow,deny
     Deny from all
   </FilesMatch>

@@ -16,6 +16,11 @@ api/mail/outbox/*
 # Ephemeral Cloudflare Quick Tunnel URL (deploy/tunnel-start.ps1).
 deploy/tunnel-url.txt
 
+# Composer dev tooling (PHPUnit). The app itself has no runtime dependencies.
+/vendor/
+/composer.phar
+/.phpunit.cache/
+
 # OS/editor
 .DS_Store
 Thumbs.db

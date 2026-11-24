@@ -18,6 +18,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/config/password_policy.php';
 
 $username = trim((string) ($argv[1] ?? ''));
 $password = (string) ($argv[2] ?? '');
@@ -29,8 +30,10 @@ if ($username === '' || $password === '') {
     exit(1);
 }
 
-if (strlen($password) < 12) {
-    fwrite(STDERR, "Refusing to set a password shorter than 12 characters.\n");
+$passwordError = pdrPasswordError($password);
+if ($passwordError !== null) {
+    fwrite(STDERR, "Refusing to set a password that does not meet the policy: "
+        . pdrPasswordPolicyText() . "\n");
     exit(1);
 }
 

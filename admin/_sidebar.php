@@ -9,7 +9,7 @@
  *     <?php $activeNav = 'reservation'; require __DIR__ . '/_sidebar.php'; ?>
  *
  * Valid keys: dashboard, reservation, calendar, service, event, customer,
- * payment, reports, archive, staff.
+ * payment, reports, archive, audit, staff, profile.
  */
 
 if (!isset($activeNav)) {
@@ -28,6 +28,11 @@ $pdrSidebarItems = [
     'reports'     => ['reports.php', 'fa-chart-column', 'Reports'],
     'archive'     => ['archive.php', 'fa-clock-rotate-left', 'History'],
 ];
+
+// Audit log is admin-only (T-35 / T-36).
+if (pdrCan('view_audit')) {
+    $pdrSidebarItems['audit'] = ['audit.php', 'fa-clipboard-list', 'Audit Log'];
+}
 
 // Staff is admin-only; keep it last and out of the array for other roles.
 if (pdrCan('manage_staff')) {
@@ -52,6 +57,9 @@ if (pdrCan('manage_staff')) {
             </ul>
         </div>
         <div class="sidebar-footer">
+            <li class="nav-item<?php echo $activeNav === 'profile' ? ' active' : ''; ?>" style="list-style: none;">
+                <a href="profile.php"><i class="fa-solid fa-id-badge"></i> My Account</a>
+            </li>
             <li class="nav-item" style="list-style: none;">
                 <form method="POST" action="logout.php" class="logout-form">
                     <?php echo pdrCsrfField(); ?>

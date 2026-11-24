@@ -571,7 +571,7 @@ $serviceChart = [
                 <div class="dashboard-card">
                     <div class="card-header">
                         <h3>Upcoming Events</h3>
-                        <a href="#">View All</a>
+                        <a href="event.php">View All</a>
                     </div>
                     <div class="events-list">
                         <?php if (empty($upcomingEventsList)): ?>
@@ -606,7 +606,7 @@ $serviceChart = [
             <div class="dashboard-card">
                 <div class="card-header">
                     <h3>Recent Reservations</h3>
-                    <a href="#">View All</a>
+                    <a href="reservation.php">View All</a>
                 </div>
                 <div class="table-responsive">
                     <table class="data-table">

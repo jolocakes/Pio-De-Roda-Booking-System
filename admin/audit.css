@@ -1,0 +1,92 @@
+/* Audit log viewer — table, badges and expandable detail payloads. */
+
+.audit-table td {
+    vertical-align: top;
+}
+
+.audit-when {
+    white-space: nowrap;
+    font-size: 12px;
+    color: #475569;
+}
+
+.audit-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 11.5px;
+    color: #475569;
+}
+
+.audit-muted {
+    color: #94a3b8;
+}
+
+.audit-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    white-space: nowrap;
+    background: #eef2f7;
+    color: #334155;
+}
+
+.audit-badge.audit-reservation { background: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
+.audit-badge.audit-payment     { background: rgba(22, 163, 74, 0.12);  color: #15803d; }
+.audit-badge.audit-staff,
+.audit-badge.audit-account     { background: rgba(124, 58, 237, 0.12); color: #6d28d9; }
+.audit-badge.audit-service,
+.audit-badge.audit-catalog,
+.audit-badge.audit-package,
+.audit-badge.audit-menu,
+.audit-badge.audit-addon       { background: rgba(217, 119, 6, 0.14);  color: #b45309; }
+.audit-badge.audit-customer    { background: rgba(13, 148, 136, 0.13); color: #0f766e; }
+.audit-badge.audit-blackout    { background: rgba(100, 116, 139, 0.14); color: #475569; }
+.audit-badge.audit-archive     { background: rgba(220, 38, 38, 0.12);  color: #b91c1c; }
+.audit-badge.audit-review      { background: rgba(202, 138, 4, 0.15);  color: #a16207; }
+
+.audit-details summary {
+    cursor: pointer;
+    color: var(--maroon, #5b0808);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.audit-details pre {
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    max-width: 420px;
+    max-height: 220px;
+    overflow: auto;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.audit-ua {
+    display: block;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11.5px;
+    color: #64748b;
+}
+
+.audit-empty {
+    text-align: center;
+    padding: 30px;
+    color: #718096;
+    font-size: 13px;
+}
+
+@media (max-width: 900px) {
+    .audit-col-ua {
+        display: none;
+    }
+}

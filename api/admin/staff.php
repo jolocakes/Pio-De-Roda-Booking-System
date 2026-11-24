@@ -16,6 +16,7 @@ header('Cache-Control: no-store');
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/csrf.php';
 require_once __DIR__ . '/../../config/audit.php';
+require_once __DIR__ . '/../../config/password_policy.php';
 require_once __DIR__ . '/../../config/rbac.php';
 
 pdrSessionStart();
@@ -87,9 +88,15 @@ try {
             echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'full_name']);
             exit();
         }
-        if (strlen($password) < 8) {
+        $passwordError = pdrPasswordError($password);
+        if ($passwordError !== null) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'password']);
+            echo json_encode([
+                'ok' => false,
+                'reason' => 'WEAK_PASSWORD',
+                'field' => 'password',
+                'detail' => $passwordError,
+            ]);
             exit();
         }
         if (!in_array($role, $validRoles, true)) {
@@ -146,9 +153,13 @@ try {
             echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'role']);
             exit();
         }
-        if ($password !== '' && strlen($password) < 8) {
+        if ($password !== '' && pdrPasswordError($password) !== null) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'reason' => 'INVALID', 'field' => 'password']);
+            echo json_encode([
+                'ok' => false,
+                'reason' => 'WEAK_PASSWORD',
+                'field' => 'password',
+            ]);
             exit();
         }
 

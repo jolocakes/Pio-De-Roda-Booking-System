@@ -52,7 +52,8 @@ $adminRole = pdrAdminDisplayRole();
                             style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:6px;">
                     </label>
                     <label>Password
-                        <input type="password" name="password" required minlength="8"
+                        <input type="password" name="password" required minlength="12" maxlength="72"
+                            autocomplete="new-password" placeholder="At least 12 characters"
                             style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:6px;">
                     </label>
                     <label>Role
@@ -131,6 +132,7 @@ $adminRole = pdrAdminDisplayRole();
             LAST_ADMIN: 'You cannot remove or demote the last administrator.',
             CANNOT_DELETE_SELF: 'You cannot delete the account you are logged in with.',
             INVALID: 'Please check the values you entered.',
+            WEAK_PASSWORD: 'Password must be at least 12 characters (maximum 72).',
             FORBIDDEN: 'Your role cannot manage staff accounts.'
         };
 
