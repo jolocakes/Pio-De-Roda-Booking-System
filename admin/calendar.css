@@ -192,6 +192,16 @@ body {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 28px;
+  align-items: start;
+}
+
+/* Keep the calendar at its natural height while the side panels scroll independently. */
+.calendar-side-panels {
+  min-width: 0;
+  max-height: clamp(560px, calc(100vh - 170px), 980px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .card {

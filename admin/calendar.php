@@ -73,7 +73,7 @@ $canManageBlackouts = pdrCan('manage_blackouts');
                     
 
                 <!-- Right Side Information Panel -->
-                <div>
+                <div class="calendar-side-panels">
                     <!-- Venue Availability Tracker -->
                     <!-- Filled by updateSidePanels() from the SAME availability
                          rules the customer calendars use. Placeholder only. -->

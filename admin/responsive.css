@@ -118,6 +118,12 @@
         grid-template-columns: 1fr;
         gap: 20px;
     }
+
+    .calendar-side-panels {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+    }
 }
 
 /* --------------------------------------------------------------------------
