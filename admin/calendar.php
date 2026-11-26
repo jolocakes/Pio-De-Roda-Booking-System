@@ -15,6 +15,7 @@ $canManageBlackouts = pdrCan('manage_blackouts');
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo pdrAsset('calendar.css'); ?>" />
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
     
@@ -518,7 +519,7 @@ async function toggleBlackout(dateStr) {
 
     let reason = '';
     if (isBlocked) {
-        if (!confirm('Re-open ' + dateStr + ' for bookings?')) return;
+        if (!(await pdrConfirm('Re-open ' + dateStr + ' for bookings?', { title: 'Re-open Date', confirmText: 'Re-open' }))) return;
     } else {
         const answer = prompt('Reason for closing ' + dateStr + ' (optional):', '');
         if (answer === null) return; // cancelled
@@ -547,6 +548,8 @@ async function toggleBlackout(dateStr) {
 document.addEventListener('DOMContentLoaded', renderCalendar);
 </script>
 
+<?php require __DIR__ . '/_page_alert_modal.php'; ?>
+<script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
 <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
 <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
 <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

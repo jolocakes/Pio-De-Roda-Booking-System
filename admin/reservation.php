@@ -13,6 +13,22 @@ function pdrH($value): string
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
+function pdrFormatTime($time): string
+{
+    $time = trim((string) $time);
+    if ($time === '') return 'All day';
+    $ts = strtotime('1970-01-01 ' . $time);
+    return $ts ? date('g:i A', $ts) : $time;
+}
+
+function pdrFormatDateTime($date, $time): string
+{
+    $d = trim((string) $date);
+    $ts = strtotime($d);
+    $dateLabel = $ts ? date('M j, Y', $ts) : $d;
+    return trim($dateLabel . ' ' . pdrFormatTime($time));
+}
+
 $reservations = [];
 $totalRows = 0;
 $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -80,6 +96,9 @@ try {
             'service' => $r['main_service'],
             'date' => $r['event_date'],
             'time' => $r['event_time'],
+            'date_display' => ($r['event_date'] ? date('M j, Y', strtotime((string) $r['event_date'])) : (string) $r['event_date']),
+            'time_display' => pdrFormatTime($r['event_time']),
+            'datetime_display' => pdrFormatDateTime($r['event_date'], $r['event_time']),
             'guests' => $r['guests'],
             'package' => $r['selected_package'] ?? '',
             'status' => $r['status'],
@@ -119,6 +138,7 @@ $shownTo = min($page * $perPage, $totalRows);
     <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>" />
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 </head>
@@ -143,8 +163,6 @@ $shownTo = min($page * $perPage, $totalRows);
         </header>
 
         <div class="content-body">
-            <div id="pageAlert" class="page-alert" role="status" aria-live="polite"></div>
-
             <!-- Search & Filter Controls (T-28: server-side, survives pagination) -->
             <form method="get" action="reservation.php" class="filter-bar" id="filterForm">
                 <input type="search" id="searchInput" name="q" class="search-input"
@@ -235,7 +253,7 @@ $shownTo = min($page * $perPage, $totalRows);
                                     <td><strong><?php echo pdrH($row['id']); ?></strong></td>
                                     <td><?php echo pdrH($row['customer']); ?></td>
                                     <td><?php echo pdrH($row['service']); ?></td>
-                                    <td><?php echo pdrH($row['date'] . ' ' . $row['time']); ?></td>
+                                    <td><?php echo pdrH($row['datetime_display']); ?></td>
                                     <td>
                                         <span class="badge badge-<?php echo pdrH(strtolower((string) $row['status'])); ?>" id="status-badge-<?php echo pdrH($row['id']); ?>">
                                             <?php echo pdrH($row['status']); ?>
@@ -250,8 +268,8 @@ $shownTo = min($page * $perPage, $totalRows);
                                             data-phone="<?php echo pdrH($row['phone']); ?>"
                                             data-email="<?php echo pdrH($row['email']); ?>"
                                             data-service="<?php echo pdrH($row['service']); ?>"
-                                            data-date="<?php echo pdrH($row['date']); ?>"
-                                            data-time="<?php echo pdrH($row['time']); ?>"
+                                            data-date="<?php echo pdrH($row['date_display']); ?>"
+                                            data-time="<?php echo pdrH($row['time_display']); ?>"
                                             data-guests="<?php echo pdrH((string) $row['guests']); ?>"
                                             data-amount="<?php echo pdrH($row['amount']); ?>"
                                             data-package="<?php echo pdrH($row['package']); ?>"
@@ -405,6 +423,23 @@ $shownTo = min($page * $perPage, $totalRows);
         </div>
     </div>
 
+    <!-- Modal 3: Resend Booking PIN / Confirmation -->
+    <div class="modal-overlay" id="resendPinModal">
+        <div class="modal-card" style="max-width:480px;">
+            <div class="modal-header">
+                <h3 id="resendPinTitle">Resend Booking PIN</h3>
+                <span class="close-modal" onclick="closeModal('resendPinModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="resendPinMessage" style="font-size:14px;line-height:1.6;color:var(--text-dark);margin:0;"></p>
+            </div>
+            <div class="modal-footer" id="resendPinFooter">
+                <button class="btn btn-cancel" id="resendPinCancelBtn" onclick="closeModal('resendPinModal')">Cancel</button>
+                <button class="btn btn-primary" id="resendPinConfirmBtn">Resend &amp; Issue New PIN</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Server-issued CSRF token for every state-changing admin request.
         const PDR_CSRF_TOKEN = <?php echo json_encode(
@@ -435,17 +470,6 @@ function clearEditMessage() {
     el.textContent = '';
     el.className = 'form-message';
     el.style.display = 'none';
-}
-
-function showPageAlert(message, type) {
-    const el = document.getElementById('pageAlert');
-    if (!el) return;
-    el.textContent = message;
-    el.className = 'page-alert ' + (type || '');
-    el.style.display = 'block';
-    window.setTimeout(() => {
-        el.style.display = 'none';
-    }, 5000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -533,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const verb = newStatus === 'Rejected'
                 ? 'reject this reservation? The customer will be told it was not approved.'
                 : `change status to ${newStatus}?`;
-            if (!confirm(`Are you sure you want to ${verb}`)) {
+            if (!(await pdrConfirm(`Are you sure you want to ${verb}`, { title: 'Confirm Status Change', confirmText: 'Yes, Continue' }))) {
                 return false;
             }
 
@@ -700,53 +724,83 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // T-41: resend the confirmation email. The server can only store a PIN
-        // hash, so the action issues a NEW PIN — warn the admin first.
+        // T-41: resend confirmation email / issue a new Booking PIN.
+        // Uses a modal popup (not top page alert) per UI feedback.
+        const resendPinModal = document.getElementById('resendPinModal');
+        const resendPinTitle = document.getElementById('resendPinTitle');
+        const resendPinMessage = document.getElementById('resendPinMessage');
+        const resendPinFooter = document.getElementById('resendPinFooter');
+        const resendPinConfirmBtn = document.getElementById('resendPinConfirmBtn');
+        let pendingResendId = '';
+        let pendingResendButton = null;
+
+        function openResendPinResult(title, message, isError) {
+            if (!resendPinModal) return;
+            resendPinTitle.textContent = title;
+            resendPinMessage.textContent = message;
+            resendPinMessage.style.color = isError ? '#991b1b' : 'var(--text-dark)';
+            resendPinFooter.innerHTML = '<button class="btn btn-primary" type="button" id="resendPinCloseBtn">Close</button>';
+            const closeBtn = document.getElementById('resendPinCloseBtn');
+            if (closeBtn) closeBtn.addEventListener('click', () => closeModal('resendPinModal'));
+            resendPinModal.style.display = 'flex';
+        }
+
         document.querySelectorAll('[data-resend-confirmation]').forEach((button) => {
-            button.addEventListener('click', async () => {
+            button.addEventListener('click', () => {
                 const id = button.dataset.id || '';
-                if (!id) return;
-                if (!confirm(
-                    'Resend the confirmation email for ' + id + '?\n\n' +
-                    'A NEW Booking PIN will be issued and the old PIN will stop working.'
-                )) {
-                    return;
-                }
-
-                button.disabled = true;
-                try {
-                    const res = await fetch('../api/admin/resend_confirmation.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': PDR_CSRF_TOKEN
-                        },
-                        body: JSON.stringify({ reservationId: id })
-                    });
-                    const data = await res.json().catch(() => ({}));
-
-                    if (!res.ok || !data.ok) {
-                        const messages = {
-                            UNAUTHORIZED: 'Your session expired. Please log in again.',
-                            NOT_FOUND: 'Reservation not found. Refresh and try again.',
-                            NO_EMAIL: 'This reservation has no valid email address.',
-                            SERVER_ERROR: 'Could not resend the email. Please try again.'
-                        };
-                        showPageAlert(messages[data.reason] || 'Could not resend the email.', 'error');
-                        return;
+                if (!id || !resendPinModal) return;
+                pendingResendId = id;
+                pendingResendButton = button;
+                resendPinTitle.textContent = 'Resend Booking PIN';
+                resendPinMessage.textContent = 'Resend the confirmation email for ' + id + '? A NEW Booking PIN will be issued and the old PIN will stop working.';
+                resendPinMessage.style.color = 'var(--text-dark)';
+                resendPinFooter.innerHTML = ''
+                    + '<button class="btn btn-cancel" type="button" id="resendPinCancelBtn">Cancel</button>'
+                    + '<button class="btn btn-primary" type="button" id="resendPinConfirmBtn">Resend &amp; Issue New PIN</button>';
+                const cancelBtn = document.getElementById('resendPinCancelBtn');
+                if (cancelBtn) cancelBtn.addEventListener('click', () => closeModal('resendPinModal'));
+                const confirmBtn = document.getElementById('resendPinConfirmBtn');
+                if (confirmBtn) confirmBtn.addEventListener('click', async () => {
+                    const idToSend = pendingResendId;
+                    const triggerBtn = pendingResendButton;
+                    if (!idToSend) return;
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Sending...';
+                    if (triggerBtn) triggerBtn.disabled = true;
+                    try {
+                        const res = await fetch('../api/admin/resend_confirmation.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': PDR_CSRF_TOKEN
+                            },
+                            body: JSON.stringify({ reservationId: idToSend })
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok || !data.ok) {
+                            const messages = {
+                                UNAUTHORIZED: 'Your session expired. Please log in again.',
+                                NOT_FOUND: 'Reservation not found. Refresh and try again.',
+                                NO_EMAIL: 'This reservation has no valid email address.',
+                                SERVER_ERROR: 'Could not resend the email. Please try again.'
+                            };
+                            openResendPinResult('Could Not Resend', messages[data.reason] || 'Could not resend the email.', true);
+                            return;
+                        }
+                        openResendPinResult(
+                            'Booking PIN Sent',
+                            data.emailMode === 'smtp'
+                                ? 'Confirmation email sent. A new Booking PIN was issued for ' + idToSend + '.'
+                                : 'Email saved to the outbox (SMTP not configured). A new Booking PIN was issued for ' + idToSend + '.',
+                            false
+                        );
+                    } catch (err) {
+                        openResendPinResult('Network Error', 'Network error while resending the email. Please try again.', true);
+                    } finally {
+                        if (triggerBtn) triggerBtn.disabled = false;
                     }
-
-                    showPageAlert(
-                        data.emailMode === 'smtp'
-                            ? 'Confirmation email sent. A new Booking PIN was issued.'
-                            : 'Email saved to the outbox (SMTP not configured). A new Booking PIN was issued.',
-                        'success'
-                    );
-                } catch (err) {
-                    showPageAlert('Network error while resending the email.', 'error');
-                } finally {
-                    button.disabled = false;
-                }
+                });
+                resendPinModal.style.display = 'flex';
             });
         });
 
@@ -756,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rowId = Number(button.dataset.rowId || 0);
                 const reservationId = button.dataset.reservationId || '';
                 if (!rowId) return;
-                if (!confirm('Archive reservation ' + reservationId + '?\n\nYou can restore it from the Archive page.')) {
+                if (!(await pdrConfirm('Archive reservation ' + reservationId + '?\n\nYou can restore it from the Archive page.', { title: 'Archive Reservation', confirmText: 'Archive', danger: true }))) {
                     return;
                 }
 
@@ -841,8 +895,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         Rejected: 'reject',
                         Cancelled: 'cancel'
                     };
-                    if (!confirm('Are you sure you want to ' + (verbs[status] || 'update') +
-                        ' ' + ids.length + ' reservation' + (ids.length === 1 ? '' : 's') + '?')) {
+                    if (!(await pdrConfirm('Are you sure you want to ' + (verbs[status] || 'update') +
+                        ' ' + ids.length + ' reservation' + (ids.length === 1 ? '' : 's') + '?', { title: 'Confirm Bulk Update', confirmText: 'Yes, Continue' }))) {
                         return;
                     }
 
@@ -897,6 +951,8 @@ document.addEventListener('DOMContentLoaded', () => {
         })();
 
     </script>
+<?php require __DIR__ . '/_page_alert_modal.php'; ?>
+<script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
 <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
 <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
 <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

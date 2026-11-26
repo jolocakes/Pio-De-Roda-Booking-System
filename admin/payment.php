@@ -33,6 +33,7 @@ try {
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo pdrAsset('payment.css'); ?>" />
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 </head>
 <body>
@@ -61,8 +62,6 @@ try {
                 </div>
                 <button class="btn-add-new" id="openAddBtn" type="button"><i class="fa-solid fa-plus"></i> Record Payment</button>
             </div>
-
-            <div class="alert-box" id="pageAlert" role="status" aria-live="polite"></div>
 
             <?php if (!empty($reviewPayments)): ?>
             <div style="margin:0 0 18px;padding:14px 18px;border:1px solid #d93025;border-left:6px solid #d93025;border-radius:8px;background:#fdecea;color:#611a15;">
@@ -285,16 +284,7 @@ try {
         }
 
         function showAlert(message, type) {
-            const box = $("pageAlert");
-            box.textContent = message;
-            box.className = "alert-box " + (type === "error" ? "alert-error" : "alert-success");
-            box.style.display = "block";
-            if (type !== "error") {
-                window.clearTimeout(showAlert._timer);
-                showAlert._timer = window.setTimeout(function () {
-                    box.style.display = "none";
-                }, 5000);
-            }
+            if (typeof showPageAlert === 'function') return showPageAlert(message, type);
         }
 
         function statusBadge(status) {
@@ -678,7 +668,7 @@ try {
         }
 
         async function deleteManualPayment(paymentId) {
-            if (!window.confirm("Delete this manual payment? The booking totals will be recalculated.")) return;
+            if (!(await pdrConfirm("Delete this manual payment? The booking totals will be recalculated.", { title: 'Delete Payment', confirmText: 'Delete', danger: true }))) return;
 
             historyMessage("Deleting…", false);
             try {
@@ -815,6 +805,8 @@ try {
         document.addEventListener("DOMContentLoaded", init);
     })();
     </script>
+<?php require __DIR__ . '/_page_alert_modal.php'; ?>
+<script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
 <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
 <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
 <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

@@ -110,6 +110,7 @@ function eventH($value): string
     <link rel="stylesheet" href="<?php echo pdrAsset('event.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>" />
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 
@@ -403,7 +404,7 @@ function eventH($value): string
         async function archiveEvent(index) {
             const item = eventsData[index];
             if (!item || !item.id) return;
-            if (!confirm('Archive reservation ' + item.reservation_id + '?\n\nYou can restore it from the Archive page.')) {
+            if (!(await pdrConfirm('Archive reservation ' + item.reservation_id + '?\n\nYou can restore it from the Archive page.', { title: 'Archive Reservation', confirmText: 'Archive', danger: true }))) {
                 return;
             }
             try {
@@ -468,7 +469,7 @@ function eventH($value): string
                     const ids = selected();
                     const status = button.dataset.eventBulk || '';
                     if (!ids.length || !status) return;
-                    if (!confirm('Set ' + ids.length + ' event(s) to ' + status + '?')) return;
+                    if (!(await pdrConfirm('Set ' + ids.length + ' event(s) to ' + status + '?', { title: 'Confirm Bulk Update', confirmText: 'Yes, Continue' }))) return;
 
                     button.disabled = true;
                     message.textContent = 'Working...';
@@ -512,6 +513,8 @@ function eventH($value): string
             initEventBulk();
         });
     </script>
+<?php require __DIR__ . '/_page_alert_modal.php'; ?>
+<script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
 <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
 <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
 <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

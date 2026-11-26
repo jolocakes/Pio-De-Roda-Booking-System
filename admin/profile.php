@@ -18,6 +18,7 @@ $adminFullName = htmlspecialchars((string) ($_SESSION['admin_name'] ?? ''), ENT_
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>">
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>">
     <style>
         .account-grid {
@@ -102,8 +103,6 @@ $adminFullName = htmlspecialchars((string) ($_SESSION['admin_name'] ?? ''), ENT_
                 </div>
             </div>
 
-            <div id="pageAlert" class="page-alert" role="status" aria-live="polite"></div>
-
             <div class="account-grid">
                 <div class="dashboard-card">
                     <div class="card-header">
@@ -164,14 +163,7 @@ $adminFullName = htmlspecialchars((string) ($_SESSION['admin_name'] ?? ''), ENT_
         };
 
         function showAlert(message, type) {
-            const box = document.getElementById('pageAlert');
-            box.textContent = message;
-            box.className = 'page-alert ' + (type === 'error' ? 'error' : 'success');
-            box.style.display = 'block';
-            if (type !== 'error') {
-                window.clearTimeout(showAlert._timer);
-                showAlert._timer = window.setTimeout(() => { box.style.display = 'none'; }, 6000);
-            }
+            if (typeof showPageAlert === 'function') return showPageAlert(message, type);
         }
 
         document.getElementById('passwordForm').addEventListener('submit', async (event) => {
@@ -227,6 +219,8 @@ $adminFullName = htmlspecialchars((string) ($_SESSION['admin_name'] ?? ''), ENT_
             }
         });
     </script>
+    <?php require __DIR__ . '/_page_alert_modal.php'; ?>
+    <script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
     <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
     <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
     <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

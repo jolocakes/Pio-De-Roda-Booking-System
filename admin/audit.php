@@ -18,6 +18,7 @@ $adminRole = pdrAdminDisplayRole();
     <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('audit.css'); ?>">
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>">
 </head>
 <body>
@@ -45,8 +46,6 @@ $adminRole = pdrAdminDisplayRole();
                     <p>A read-only record of every state-changing action taken in the admin console. Client IPs are stored as one-way hashes.</p>
                 </div>
             </div>
-
-            <div id="pageAlert" class="page-alert" role="status" aria-live="polite"></div>
 
             <form class="filter-bar" id="auditFilterForm">
                 <input type="search" id="auditSearch" class="search-input"
@@ -137,12 +136,7 @@ $adminRole = pdrAdminDisplayRole();
             }
 
             function showAlert(message, type) {
-                const box = $('pageAlert');
-                box.textContent = message;
-                box.className = 'page-alert ' + (type === 'error' ? 'error' : 'success');
-                box.style.display = 'block';
-                window.clearTimeout(showAlert._timer);
-                showAlert._timer = window.setTimeout(() => { box.style.display = 'none'; }, 6000);
+                if (typeof showPageAlert === 'function') return showPageAlert(message, type);
             }
 
             function setOptions(select, values, placeholder) {
@@ -345,6 +339,8 @@ $adminRole = pdrAdminDisplayRole();
             load(1);
         })();
     </script>
+    <?php require __DIR__ . '/_page_alert_modal.php'; ?>
+    <script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
     <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
     <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
 </body>

@@ -20,6 +20,7 @@ $adminName = pdrAdminDisplayName();
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo pdrAsset('customer.css'); ?>" />
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 </head>
 <body>
@@ -52,8 +53,6 @@ $adminName = pdrAdminDisplayName();
                 </button>
                 <?php endif; ?>
             </div>
-
-            <div id="pageAlert" class="page-alert" role="status" aria-live="polite" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
 
             <form id="customerFilters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#fff;border:1px solid var(--border-color,#e2e8f0);border-radius:8px;padding:12px;margin-bottom:14px;">
                 <input type="search" id="customerSearch" placeholder="Search name, email, or phone..."
@@ -162,12 +161,7 @@ $adminName = pdrAdminDisplayName();
             return isFinite(n) ? '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '₱0.00';
         }
         function showAlert(message, type) {
-            const box = document.getElementById('pageAlert');
-            box.textContent = message;
-            box.style.display = 'block';
-            box.style.background = type === 'error' ? '#fef2f2' : '#f0fdf4';
-            box.style.color = type === 'error' ? '#b91c1c' : '#166534';
-            box.style.border = '1px solid ' + (type === 'error' ? '#fecaca' : '#bbf7d0');
+            if (typeof showPageAlert === 'function') return showPageAlert(message, type);
         }
 
         async function loadCustomers() {
@@ -367,7 +361,7 @@ $adminName = pdrAdminDisplayName();
 
         async function archiveCustomer(id) {
             const c = state.customers.find(function (row) { return Number(row.id) === id; });
-            if (!confirm('Archive ' + (c ? c.full_name : 'this customer') + '?\n\nYou can restore them from History â†’ Archived Records.')) return;
+            if (!(await pdrConfirm('Archive ' + (c ? c.full_name : 'this customer') + '?\n\nYou can restore them from History → Archived Records.', { title: 'Archive Customer', confirmText: 'Archive', danger: true }))) return;
 
             try {
                 const res = await fetch('../api/admin/customers.php', {
@@ -411,6 +405,8 @@ $adminName = pdrAdminDisplayName();
 
         document.addEventListener('DOMContentLoaded', loadCustomers);
     </script>
+<?php require __DIR__ . '/_page_alert_modal.php'; ?>
+<script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
 <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
 <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
 <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

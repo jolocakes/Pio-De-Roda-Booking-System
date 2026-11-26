@@ -36,6 +36,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
     <link rel="stylesheet" href="<?php echo pdrAsset('archive.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>" />
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 </head>
 <body>
@@ -64,8 +65,6 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
                     <p>Completed, cancelled, rejected and past reservations. This view is read-only; use Reservations or Events to manage upcoming bookings.</p>
                 </div>
             </div>
-
-            <div id="pageAlert" role="status" aria-live="polite" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
 
             <div class="filter-tabs" style="margin-bottom:16px;">
                 <button type="button" class="tab-btn active" data-history-tab="past">Past Bookings</button>
@@ -209,13 +208,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             return window.PDRFormat ? (PDRFormat.formatDateTime(value) || String(value)) : String(value);
         }
         function showAlert(message, type) {
-            const box = document.getElementById('pageAlert');
-            if (!box) return;
-            box.textContent = message;
-            box.style.display = 'block';
-            box.style.background = type === 'error' ? '#fef2f2' : '#f0fdf4';
-            box.style.color = type === 'error' ? '#b91c1c' : '#166534';
-            box.style.border = '1px solid ' + (type === 'error' ? '#fecaca' : '#bbf7d0');
+            if (typeof showPageAlert === 'function') return showPageAlert(message, type);
         }
 
         /* ---------------- Past bookings ---------------- */
@@ -449,7 +442,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
         }
 
         async function restoreRecord(id) {
-            if (!confirm('Restore this record back to the active lists?')) return;
+            if (!(await pdrConfirm('Restore this record back to the active lists?', { title: 'Restore Record', confirmText: 'Restore' }))) return;
             try {
                 await archiveAction('restore', id);
                 showAlert('Record restored.', 'success');
@@ -460,7 +453,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
         }
 
         async function deleteRecord(id) {
-            if (!confirm('Permanently delete this record?\n\nThis cannot be undone.')) return;
+            if (!(await pdrConfirm('Permanently delete this record?\n\nThis cannot be undone.', { title: 'Delete Permanently', confirmText: 'Delete', danger: true }))) return;
             try {
                 await archiveAction('delete', id);
                 showAlert('Record permanently deleted.', 'success');
@@ -537,6 +530,8 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hto)) {
             loadHistory(1);
         });
     </script>
+<?php require __DIR__ . '/_page_alert_modal.php'; ?>
+<script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
 <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
 <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
 <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

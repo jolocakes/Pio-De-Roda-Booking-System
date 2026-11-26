@@ -391,6 +391,7 @@ $printMode = false;
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo pdrAsset('reports.css'); ?>" />
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
     <style>
@@ -661,7 +662,7 @@ $printMode = false;
                 const id = button.dataset.reviewId;
                 const action = button.dataset.reviewAction;
                 if (!id || !action) return;
-                if (!confirm('Are you sure you want to ' + action + ' this review?')) return;
+                if (!(await pdrConfirm('Are you sure you want to ' + action + ' this review?', { title: 'Review Action', confirmText: action.charAt(0).toUpperCase() + action.slice(1), danger: action !== 'approve' }))) return;
 
                 button.disabled = true;
                 try {
@@ -744,8 +745,8 @@ $printMode = false;
             });
         }
 
-        function deleteReview(index) {
-            if(confirm('Manage feedback: Are you sure you want to remove this inappropriate feedback?')) {
+        async function deleteReview(index) {
+            if (await pdrConfirm('Are you sure you want to remove this inappropriate feedback?', { title: 'Remove Feedback', confirmText: 'Remove', danger: true })) {
                 reviewsData.splice(index, 1);
                 renderReviews();
             }
@@ -796,6 +797,8 @@ $printMode = false;
             );
         });
     </script>
+<?php require __DIR__ . '/_page_alert_modal.php'; ?>
+<script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
 <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
 <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
 <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

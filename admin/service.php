@@ -163,6 +163,7 @@ pdrRequirePageCapability('manage_catalog');
         .dishes-count { display: inline-block; background: rgba(91,8,8,.07); border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
     </style>
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 </head>
 <body>
@@ -862,7 +863,7 @@ pdrRequirePageCapability('manage_catalog');
                     return;
                 }
                 if (action === 'toggle-service') {
-                    if (svc.is_active && !window.confirm('Deactivate "' + svc.name + '"?\n\nIt disappears from the customer site, but historical reservations are kept intact.')) return;
+                    if (svc.is_active && !(await pdrConfirm('Deactivate "' + svc.name + '"?\n\nIt disappears from the customer site, but historical reservations are kept intact.', { title: 'Deactivate Service', confirmText: 'Deactivate', danger: true }))) return;
                     btn.disabled = true;
                     try {
                         await apiRequest('POST', { action: 'set_active', kind: 'service', id: svcId, is_active: svc.is_active ? 0 : 1 });
@@ -1001,7 +1002,7 @@ pdrRequirePageCapability('manage_catalog');
                 if (action === 'toggle-item') {
                     const itemId = btn.dataset.id;
                     const activeNow = btn.dataset.active === '1';
-                    if (activeNow && !window.confirm('Deactivate this item?\n\nIt disappears from the customer site, but existing reservations keep their details.')) return;
+                    if (activeNow && !(await pdrConfirm('Deactivate this item?\n\nIt disappears from the customer site, but existing reservations keep their details.', { title: 'Deactivate Item', confirmText: 'Deactivate', danger: true }))) return;
                     btn.disabled = true;
                     try {
                         await apiRequest('POST', {
@@ -1102,6 +1103,8 @@ pdrRequirePageCapability('manage_catalog');
     })();
     </script>
 
+<?php require __DIR__ . '/_page_alert_modal.php'; ?>
+<script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
 <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
 <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
 <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>

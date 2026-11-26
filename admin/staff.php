@@ -16,6 +16,7 @@ $adminRole = pdrAdminDisplayRole();
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>">
         <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
+    <link rel="stylesheet" href="<?php echo pdrAsset('admin-alert.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>">
 </head>
 <body>
@@ -37,8 +38,6 @@ $adminRole = pdrAdminDisplayRole();
         </header>
 
         <div class="content-body">
-            <div id="pageAlert" class="page-alert" role="status" aria-live="polite"></div>
-
             <div class="dashboard-card" style="margin-bottom:20px;">
                 <div class="card-header">
                     <h3>Add account</h3>
@@ -109,11 +108,7 @@ $adminRole = pdrAdminDisplayRole();
         }
 
         function alertBox(message, type) {
-            const box = document.getElementById('pageAlert');
-            box.textContent = message;
-            box.className = 'page-alert ' + (type === 'error' ? 'error' : 'success');
-            box.style.display = 'block';
-            setTimeout(() => { box.style.display = 'none'; }, 6000);
+            if (typeof showPageAlert === 'function') return showPageAlert(message, type);
         }
 
         async function callStaff(payload) {
@@ -184,7 +179,7 @@ $adminRole = pdrAdminDisplayRole();
                 tbody.querySelectorAll('[data-delete-staff]').forEach((btn) => {
                     btn.addEventListener('click', async () => {
                         const id = btn.dataset.deleteStaff;
-                        if (!confirm('Delete this account? This cannot be undone.')) return;
+                        if (!(await pdrConfirm('Delete this account? This cannot be undone.', { title: 'Delete Account', confirmText: 'Delete', danger: true }))) return;
                         const { data } = await callStaff({ action: 'delete', id: Number(id) });
                         if (data.ok) {
                             alertBox('Account deleted.', 'success');
@@ -221,6 +216,8 @@ $adminRole = pdrAdminDisplayRole();
 
         loadStaff();
     </script>
+    <?php require __DIR__ . '/_page_alert_modal.php'; ?>
+    <script src="<?php echo pdrAsset('admin-alert.js'); ?>"></script>
     <script src="<?php echo pdrAsset('date-format.js'); ?>"></script>
     <script src="<?php echo pdrAsset('responsive.js'); ?>"></script>
     <script src="<?php echo pdrAsset('a11y.js'); ?>"></script>
