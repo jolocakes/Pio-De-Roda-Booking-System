@@ -2,20 +2,16 @@
 /**
  * Booking capacity rules — the single source of truth for availability.
  *
- * POLICY (per service, configured in the catalog):
- *   1. Each service has a duration in minutes. A booking occupies
+ * POLICY:
+ *   1. Global daily cap: at most PDR_MAX_DAILY_BOOKINGS (2) active bookings per
+ *      date across all services. When reached, the date is unavailable.
+ *   2. Each service has a duration in minutes. A booking occupies
  *      [start, start + duration).
- *   2. `max_per_day` — how many active bookings of that service a date may
- *      hold. NULL means no daily cap.
- *   3. `max_concurrent` — how many bookings of that service may overlap in
- *      time. NULL means no concurrency cap. So `max_concurrent = 2` lets a
- *      booth run two simultaneous events, while `1` forces non-overlapping
- *      times.
- *   4. A staff blackout closes the date for every service.
- *
- * The old global "2 bookings per day" cap and cross-service venue exclusivity
- * are gone: services carry their own limits, so booths can run alongside the
- * venue instead of competing with it for the whole date.
+ *   3. `max_per_day` — how many active bookings of that service a date may
+ *      hold. NULL means no service-specific daily cap (global cap still applies).
+ *   4. `max_concurrent` — how many bookings of that service may overlap in
+ *      time. NULL means no concurrency cap.
+ *   5. A staff blackout closes the date for every service.
  *
  * Every place that asks "can this be booked?" MUST go through these helpers so
  * the landing-page calendar, the booking calendar, the time picker and the
@@ -27,6 +23,8 @@
 // override these (staff may accept a late booking by phone).
 define('PDR_MIN_LEAD_DAYS', 3);
 define('PDR_MAX_HORIZON_DAYS', 365);
+// Business rule: maximum active (Pending/Confirmed) bookings per date across all services.
+define('PDR_MAX_DAILY_BOOKINGS', 2);
 
 // T-37: self-service policy (customer, with Reservation ID + PIN).
 define('PDR_CANCEL_MIN_DAYS', 7);
@@ -36,6 +34,19 @@ define('PDR_MAX_RESCHEDULES', 1);
 // Statuses that occupy a slot. Cancelled/Completed/Rejected free the slot.
 function pdrActiveStatuses() {
     return ['Pending', 'Confirmed'];
+}
+
+/** Total active bookings on a date (all services), optionally excluding one reservation. */
+function pdrActiveBookingCount($pdo, $eventDate, ?string $excludeReservationId = null): int {
+    $statuses = pdrActiveStatuses();
+    $in = implode(',', array_fill(0, count($statuses), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM reservations
+          WHERE event_date = ? AND status IN ($in)
+            AND (? IS NULL OR reservation_id <> ?)"
+    );
+    $stmt->execute(array_merge([(string) $eventDate], $statuses, [$excludeReservationId, $excludeReservationId]));
+    return (int) $stmt->fetchColumn();
 }
 
 /**
@@ -361,6 +372,20 @@ function pdrServiceDateStatus($pdo, $eventDate, string $serviceId, ?string $excl
         ];
     }
 
+    // Global business rule: at most PDR_MAX_DAILY_BOOKINGS active bookings per date.
+    $totalActive = pdrActiveBookingCount($pdo, $eventDate, $excludeReservationId);
+    if ($totalActive >= PDR_MAX_DAILY_BOOKINGS) {
+        return [
+            'taken'           => true,
+            'count'           => $totalActive,
+            'reason'          => 'FULL',
+            'blockedTimes'    => pdrTimeSlots(),
+            'durationMinutes' => null,
+            'maxPerDay'       => null,
+            'maxConcurrent'   => null,
+        ];
+    }
+
     $rules = pdrServiceRules($pdo);
     if (!isset($rules[$serviceId])) {
         return [
@@ -601,8 +626,23 @@ function pdrAvailabilityPayload($pdo, $year, $month) {
             ];
         }
 
+        // Global business rule: max PDR_MAX_DAILY_BOOKINGS active bookings per date.
+        // When reached, no service can take the date.
+        $globalFull = $total >= PDR_MAX_DAILY_BOOKINGS;
+        if ($globalFull) {
+            foreach ($rules as $serviceId => $rule) {
+                $existing = $services[$serviceId]['dates'][$date] ?? null;
+                $services[$serviceId]['dates'][$date] = [
+                    'count'        => $existing['count'] ?? 0,
+                    'taken'        => true,
+                    'maxPerDay'    => $rule['maxPerDay'],
+                    'blockedTimes' => $slots,
+                ];
+            }
+        }
+
         // A date only reads as "closed" on the landing page when NO service can
-        // still take it. A venue booking no longer hides a date from booths.
+        // still take it.
         $allClosed = count($rules) > 0;
         foreach ($rules as $serviceId => $rule) {
             $entry = $services[$serviceId]['dates'][$date] ?? null;
@@ -616,9 +656,11 @@ function pdrAvailabilityPayload($pdo, $year, $month) {
                 break;
             }
         }
+        if ($globalFull) {
+            $allClosed = true;
+        }
 
-        // Flagship booking is still reported so the calendar can explain the
-        // date ("venue booked — other services available").
+        // Flagship booking is still reported so the calendar can explain the date.
         $hasVenue = false;
         foreach ($exclusive['ids'] as $exclusiveId) {
             if (!empty($services[$exclusiveId]['dates'][$date]['taken'])) {
@@ -630,9 +672,9 @@ function pdrAvailabilityPayload($pdo, $year, $month) {
         $meta[$date] = [
             'count'    => $total,
             'hasVenue' => $hasVenue,
-            'taken'    => $allClosed || $total >= 2,
+            'taken'    => $allClosed,
         ];
-        if ($allClosed || $total >= 2) {
+        if ($allClosed) {
             $dates[] = $date;
         }
     }
