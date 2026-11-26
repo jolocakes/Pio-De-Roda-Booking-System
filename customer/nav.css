@@ -1175,6 +1175,14 @@ textarea {
   pointer-events: none;
 }
 
+/* Outside booking window — future but not bookable (e.g. min lead time). */
+.availability-cal .day.outside-window {
+  color: #bba98f;
+  background: #efe6d2;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* Today — subtle gold outline, still shown as available */
 .availability-cal .day.today {
   box-shadow: inset 0 0 0 1.5px var(--gold);

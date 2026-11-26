@@ -68,7 +68,7 @@
         const why = windowErr === 'TOO_SOON'
           ? `requires ${PDR_MIN_LEAD_DAYS} days' notice`
           : `more than ${PDR_MAX_HORIZON_DAYS} days ahead`;
-        cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — ${why}">${d}</div>`;
+        cells += `<div class="day outside-window" aria-disabled="true" aria-label="${ds} — unavailable, ${why}">${d}</div>`;
         continue;
       }
       const unavail = isDateTaken(ds);

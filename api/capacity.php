@@ -630,9 +630,9 @@ function pdrAvailabilityPayload($pdo, $year, $month) {
         $meta[$date] = [
             'count'    => $total,
             'hasVenue' => $hasVenue,
-            'taken'    => $allClosed,
+            'taken'    => $allClosed || $total >= 2,
         ];
-        if ($allClosed) {
+        if ($allClosed || $total >= 2) {
             $dates[] = $date;
         }
     }

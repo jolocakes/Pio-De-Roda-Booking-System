@@ -548,6 +548,14 @@ ul.plain.dot li:before {
   pointer-events:none;
 }
 
+/* Outside booking window — future but not bookable (e.g. min lead time). */
+.cal-grid .day.outside-window {
+  color:#BBA98F;
+  background:#EFE6D2;
+  cursor:not-allowed;
+  pointer-events:none;
+}
+
 /* TODAY — subtle outline so the current day stands out without blocking it */
 .cal-grid .day.today:not(.sel) {
   box-shadow:inset 0 0 0 1.5px var(--gold);

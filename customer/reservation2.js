@@ -417,13 +417,13 @@ function renderCalendar() {
       cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — past date">${d}</div>`;
       continue;
     }
-    // T-40: outside the booking window — same visual treatment as a past date.
+    // T-40: outside the booking window — disabled, but not a past date.
     const windowErr = bookingWindowError(ds);
     if (windowErr) {
       const why = windowErr === "TOO_SOON"
         ? `requires at least ${PDR_MIN_LEAD_DAYS} days' notice`
         : `more than ${PDR_MAX_HORIZON_DAYS} days ahead`;
-      cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — ${why}">${d}</div>`;
+      cells += `<div class="day outside-window" aria-disabled="true" aria-label="${ds} — unavailable, ${why}">${d}</div>`;
       continue;
     }
     const svcName = currentServiceName();
@@ -1182,9 +1182,10 @@ function bindCalendar() {
         bindCalendar();
       }),
   );
-  // Only .day.avail cells are bound. Past dates (.day.past) and unavailable
-  // dates (.day.unavail) carry no data-date and are never wired up here, so
-  // they cannot be selected even with JavaScript enabled.
+  // Only .day.avail cells are bound. Past dates (.day.past), outside-window
+  // dates (.day.outside-window), and unavailable dates (.day.unavail) carry no
+  // data-date and are never wired up here, so they cannot be selected even with
+  // JavaScript enabled.
   calBox.querySelectorAll(".day.avail").forEach((d) => {
     const pick = () => {
       state.eventDate = d.dataset.date;
