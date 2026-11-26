@@ -171,7 +171,7 @@ function renderDetails() {
     <div class="venue-img">${SERVICE_IMAGES[s.id] ? `<img src="${SERVICE_IMAGES[s.id]}" alt="${s.name}" loading="lazy" decoding="async">` : "[Pio De Roda Venue Image - placeholder]"}</div>
     <div class="section-label">RATES</div>
     <table class="rates">${ratesRows}</table>
-    ${hasMenu ? renderMenuTable(s) : ""}
+    ${hasMenu ? renderMenuTable(s, false) : ""}
     <div class="section-label">STARTING PRICE</div>
     <div class="price-hero"><div class="amt">${startingPriceText}</div></div>
     <div class="section-label">INCLUSIONS</div>
@@ -271,19 +271,27 @@ function renderInclusionsTable(t) {
 /* Dine-In + Catering: renders each service's `menu` as tables. When a menu
    item matches an entry in `packages` (Dine-In's set menus), it gets a Select
    button centered on the right and stays in sync with the booking panel.
-   Catering's fixed menu has no matching package, so it renders display-only. */
-function renderMenuTable(s) {
+   Catering's fixed menu has no matching package, so it renders display-only.
+   Pass allowSelect=false to render a read-only menu (e.g. in the service
+   details when the selectable choices live in the booking panel). */
+function renderMenuTable(s, allowSelect = true, showLabel = true) {
   const anySelectable = s.menu.some((cat) =>
     cat.items.some((item) => s.packages.some((p) => p[0] === item.name)),
   );
+  const showSelect = allowSelect && anySelectable;
+  const label = showSelect
+    ? "MENU — SELECT YOUR SET MENU"
+    : anySelectable
+      ? "MENU — SET MENU OPTIONS"
+      : "MENU — INCLUDED IN EVERY PACKAGE";
   return `
-    <div class="section-label">${anySelectable ? "MENU — SELECT YOUR SET MENU" : "MENU — INCLUDED IN EVERY PACKAGE"}</div>
+    ${showLabel ? `<div class="section-label">${label}</div>` : ""}
     ${s.menu
       .map((cat) =>
         cat.items
           .map((item) => {
             const idx = s.packages.findIndex((p) => p[0] === item.name);
-            const selectable = idx >= 0;
+            const selectable = showSelect && idx >= 0;
             const sel = selectable && state.selectedPackage === idx;
             const dishes =
               item.dishes && item.dishes.length
@@ -489,6 +497,12 @@ function renderPanel() {
   const s = state.service;
   const el = document.getElementById("bookingPanel");
   if (!el || !s) return;
+  const hasSelectableMenu =
+    !s.mainCourses &&
+    Array.isArray(s.menu) &&
+    s.menu.some((cat) =>
+      cat.items.some((item) => s.packages.some((p) => p[0] === item.name)),
+    );
   el.innerHTML = `
     <h2>Book Your Event</h2>
     <p class="req-legend"><span class="req">*</span> Required field</p>
@@ -573,15 +587,19 @@ function renderPanel() {
     <div class="field">
       <label>Selected Food / Package <span class="req" title="Required">*</span></label>
       ${s.mainCourses ? renderMainCourses(s) : ""}
-      ${s.packages
-        .map(
-          (p, i) => `
+      ${
+        hasSelectableMenu
+          ? renderMenuTable(s, true, false)
+          : s.packages
+              .map(
+                (p, i) => `
         <div class="pkg-opt ${s.mainCourses ? "readonly" : ""} ${state.selectedPackage === i ? "sel" : ""}" data-idx="${i}"${s.mainCourses ? ' aria-disabled="true"' : ""}>
           <span class="nm">${p[0]}</span><span>${pkgPerHeadRate(s, p) > 0 ? "₱" + pkgPerHeadRate(s, p).toLocaleString() + " per head" : p[1] === null || p[1] === undefined ? "" : Number.isFinite(Number(p[1])) && Number(p[1]) > 0 ? "₱" + Number(p[1]).toLocaleString() : "Price to be confirmed"}</span>
         </div>`,
-        )
-        .join("")}
-        <div class="cap">${s.mainCourses ? "Your package and per-head rate update automatically from the main courses you choose (minimum 2)." : "Please select the package according to the number of guests"}</div>
+              )
+              .join("")
+      }
+        <div class="cap">${s.mainCourses ? "Your package and per-head rate update automatically from the main courses you choose (minimum 2)." : hasSelectableMenu ? "Select one set menu for your reservation." : "Please select the package according to the number of guests"}</div>
       <div class="err" id="errPkg">Please select a food/package</div>
     </div>
     <div class="field">
@@ -1151,6 +1169,15 @@ function attachPanelEvents() {
         }
         renderPanel();
         if (state.service.menu) renderDetails(); // keep the menu table's highlight in sync
+      }),
+  );
+
+  document.querySelectorAll(".menu-select").forEach(
+    (btn) =>
+      (btn.onclick = () => {
+        state.selectedPackage = parseInt(btn.dataset.idx);
+        renderDetails();
+        renderPanel();
       }),
   );
 

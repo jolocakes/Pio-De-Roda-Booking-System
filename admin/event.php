@@ -107,9 +107,9 @@ function eventH($value): string
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
     <link rel="stylesheet" href="<?php echo pdrAsset('event.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>" />
+        <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 
@@ -121,8 +121,10 @@ function eventH($value): string
     <?php $activeNav = 'event'; require __DIR__ . '/_sidebar.php'; ?>
 
     <div class="main-wrapper">
-        <div class="top-navbar">
-            <span style="font-size: 18px; color: var(--text-dark); font-weight: 700;">Events Management</span>
+        <header class="top-navbar">
+            <div class="header-title-section">
+                <h1>Events Management</h1>
+            </div>
             <div class="user-profile">
                 <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="user-info">
@@ -130,7 +132,7 @@ function eventH($value): string
                     <span><?php echo pdrAdminDisplayRole(); ?></span>
                 </div>
             </div>
-        </div>
+        </header>
 
         <div class="content-body">
             <div class="page-header-container">

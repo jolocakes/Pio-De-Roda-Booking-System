@@ -1,38 +1,42 @@
-        :root {
-            --maroon: #5B0808;
-            --maroon-light: #7A1414;
-            --cream: #F6ECDD;
-            --cream-soft: #FBF6EE;
-            --crimson: #8C1414;
-            --gold: #B8862E;
-            --gold-light: #D9A84E;
-            --sage: #5F6F52;
+:root {
+  /* Core palette */
+  --maroon: #5B0808;
+  --maroon-light: #7A1414;
+  --cream: #F6ECDD;
+  --cream-soft: #FBF6EE;
+  --crimson: #8C1414;
+  --gold: #B8862E;
+  --gold-light: #D9A84E;
+  --sage: #5F6F52;
 
-            --text-dark: #2A0E0E;
-            --text-muted: #6B4C4C;
-            --text-light: #FBF6EE;
-            --text-light-muted: #E3C9C9;
+  /* Text */
+  --text-dark: #2A0E0E;
+  --text-muted: #6B4C4C;
+  --text-light: #FBF6EE;
+  --text-light-muted: #E3C9C9;
 
-            --border-soft: rgba(91, 8, 8, 0.14);
-            --shadow-soft: 0 10px 30px rgba(91, 8, 8, 0.14);
-            --shadow-lift: 0 18px 40px rgba(91, 8, 8, 0.22);
+  /* Surfaces / borders / shadows */
+  --border-soft: rgba(91, 8, 8, 0.14);
+  --shadow-soft: 0 10px 30px rgba(91, 8, 8, 0.14);
+  --shadow-lift: 0 18px 40px rgba(91, 8, 8, 0.22);
 
-            --font-display: "Fraunces", "Georgia", serif;
-            --font-body: "Work Sans", "Segoe UI", sans-serif;
+  /* Type / radii / layout */
+  --font-display: "Fraunces", "Georgia", serif;
+  --font-body: "Work Sans", "Segoe UI", sans-serif;
+  --radius-md: 10px;
+  --radius-lg: 18px;
+  --max-width: 1180px;
+  --nav-height: 78px;
 
-            --radius-md: 10px;
-            --radius-lg: 18px;
-
-            --max-width: 1180px;
-            --nav-height: 78px;
-
-            --primary-burgundy: var(--maroon);
-            --primary-dark: var(--maroon);
-            --accent-red: var(--maroon-light);
-            --bg-light: var(--cream);
-            --card-bg: #ffffff;
-            --border-color: var(--border-soft);
-        }
+  /* Legacy / compatibility aliases */
+  --primary-burgundy: var(--maroon);
+  --primary-dark: var(--maroon-light);
+  --primary-dark-active: var(--maroon-light);
+  --accent-red: var(--crimson);
+  --bg-light: var(--cream);
+  --card-bg: var(--cream-soft);
+  --border-color: var(--border-soft);
+}
 
         * {
             margin: 0;

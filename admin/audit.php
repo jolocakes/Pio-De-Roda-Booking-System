@@ -17,6 +17,7 @@ $adminRole = pdrAdminDisplayRole();
     <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('audit.css'); ?>">
+        <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>">
 </head>
 <body>

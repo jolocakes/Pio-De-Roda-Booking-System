@@ -83,12 +83,13 @@
         padding: 10px 0;
     }
 
-    .sidebar .nav-item a {
+    .sidebar .nav-item a,
+    .sidebar .nav-item .logout-link {
         padding: 9px 25px;
     }
 
     .sidebar .sidebar-footer {
-        padding: 12px 25px;
+        padding: 12px 0;
     }
 }
 
@@ -162,7 +163,8 @@
         padding: 24px 20px;
     }
 
-    .sidebar .nav-item a {
+    .sidebar .nav-item a,
+    .sidebar .nav-item .logout-link {
         padding: 12px 22px;
     }
 

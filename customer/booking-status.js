@@ -175,10 +175,15 @@
             </div>
             ${reservation.canReschedule ? `
             <form id="rescheduleForm" hidden novalidate>
-              <label for="rescheduleDate">New event date</label>
-              <input type="date" id="rescheduleDate" required>
+              <label id="rescheduleDateLabel">New event date</label>
+              <input type="hidden" id="rescheduleDate" value="">
+              <div class="rs-selected-date" id="rescheduleDateDisplay" aria-labelledby="rescheduleDateLabel">Select an available date</div>
+              <div class="cal rs-cal" id="rescheduleCalendar" role="group" aria-labelledby="rescheduleDateLabel"></div>
               <label for="rescheduleTime">New event time</label>
-              <input type="time" id="rescheduleTime" required value="${esc(String(reservation.eventTime || "").slice(0,5))}">
+              <select id="rescheduleTime" required>
+                <option value="">-- Select Time --</option>
+              </select>
+              <p class="bs-note rs-note">Unavailable dates and times are disabled.</p>
               <div class="bs-manage-actions">
                 <button type="submit" class="btn btn-primary" id="rescheduleSubmitBtn">Confirm new date</button>
                 <button type="button" class="bs-clear" id="rescheduleCancelBtn">Keep current date</button>
@@ -388,16 +393,199 @@
 
     if(openRescheduleBtn && rescheduleForm){
       const dateInput = document.getElementById("rescheduleDate");
+      const dateDisplay = document.getElementById("rescheduleDateDisplay");
+      const calBox = document.getElementById("rescheduleCalendar");
+      const timeSelect = document.getElementById("rescheduleTime");
+      const svcName = reservation.mainService || "";
       const now = new Date();
       const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + Number(reservation.rescheduleMinDays || 3));
       const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 365);
-      dateInput.min = localDate(minDate);
-      dateInput.max = localDate(maxDate);
+      const minDateStr = localDate(minDate);
+      const maxDateStr = localDate(maxDate);
+      let calYear = minDate.getFullYear();
+      let calMonth = minDate.getMonth();
+      let selectedDate = "";
+      let preferredTime = "";
 
-      openRescheduleBtn.onclick = ()=>{
+      function rsDaysInMonth(y, m){
+        return window.PDRDates ? PDRDates.daysInMonth(y, m) : new Date(y, m + 1, 0).getDate();
+      }
+      function rsFmtDate(y, m, d){
+        return window.PDRDates
+          ? PDRDates.toISODate(new Date(y, m, d))
+          : y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+      }
+      function rsServiceStatus(ds, name){
+        if(typeof availServiceStatus === "function"){
+          const st = availServiceStatus(ds, name);
+          if(st) return st;
+        }
+        if(!ds || !name || typeof AVAIL === "undefined" || !AVAIL.services) return null;
+        const want = String(name).trim().toLowerCase();
+        for(const id in AVAIL.services){
+          const svc = AVAIL.services[id];
+          if(svc && String(svc.name || "").trim().toLowerCase() === want && svc.dates){
+            return svc.dates[ds] || null;
+          }
+        }
+        return null;
+      }
+      function rsIsDateTaken(ds, name){
+        const st = rsServiceStatus(ds, name);
+        if(st) return !!st.taken;
+        if(typeof isDateTaken === "function") return !!isDateTaken(ds, name);
+        return false;
+      }
+      function rsBlockedReason(ds){
+        if(ds < minDateStr || ds > maxDateStr) return "outside booking window";
+        if(typeof bookingWindowError === "function"){
+          const w = bookingWindowError(ds);
+          if(w === "TOO_SOON") return "too soon to book";
+          if(w === "TOO_FAR") return "too far ahead";
+        }
+        const meta = (typeof AVAIL !== "undefined" && AVAIL.meta) ? AVAIL.meta[ds] : null;
+        if(meta && meta.blackout) return "closed by staff";
+        if(rsIsDateTaken(ds, svcName)) return "fully booked for this service";
+        // Fallback: if service lookup missed but the date is globally closed/unavailable
+        if(typeof AVAIL !== "undefined" && Array.isArray(AVAIL.dates) && AVAIL.dates.indexOf(ds) !== -1){
+          return "fully booked";
+        }
+        return "";
+      }
+
+      function renderRescheduleTimeOptions(){
+        if(!timeSelect) return;
+        const prev = timeSelect.value || preferredTime;
+        const slots = typeof EVENT_TIME_SLOTS !== "undefined" ? EVENT_TIME_SLOTS : [];
+        if(!selectedDate){
+          timeSelect.innerHTML = `<option value="">Select a date first</option>`;
+          timeSelect.disabled = true;
+          return;
+        }
+        timeSelect.disabled = false;
+        const svcStatus = rsServiceStatus(selectedDate, svcName);
+        let list;
+        if(svcStatus){
+          const blocked = svcStatus.blockedTimes || [];
+          list = slots.map(t => ({ time: t, taken: blocked.indexOf(t) !== -1 }));
+        } else {
+          const open = (typeof timeSlotState === "function") ? timeSlotState(selectedDate, svcName) : null;
+          list = open || slots.map(t => ({ time: t, taken: false }));
+        }
+        const globallyClosed = typeof AVAIL !== "undefined" && Array.isArray(AVAIL.dates) && AVAIL.dates.indexOf(selectedDate) !== -1;
+        if(!svcStatus && globallyClosed){
+          list = slots.map(t => ({ time: t, taken: true }));
+        }
+        let html = `<option value="">-- Select Time --</option>`;
+        html += list.map(s => {
+          const t = s.time;
+          const taken = !!s.taken;
+          const label = (typeof fmtEventTime === "function" ? fmtEventTime(t) : t) + (taken ? " — unavailable" : "");
+          const sel = prev === t && !taken ? " selected" : "";
+          return `<option value="${esc(t)}"${sel}${taken ? " disabled" : ""}>${esc(label)}</option>`;
+        }).join("");
+        timeSelect.innerHTML = html;
+        if(timeSelect.value !== prev && prev){
+          timeSelect.value = "";
+        }
+      }
+
+      function renderRescheduleCalendar(){
+        if(!calBox) return;
+        const y = calYear, m = calMonth;
+        const first = new Date(y, m, 1).getDay();
+        const total = rsDaysInMonth(y, m);
+        const monthName = window.PDRDates
+          ? PDRDates.monthName(y, m, false)
+          : new Date(y, m, 1).toLocaleString("default", { month: "long" });
+        const todayStr = typeof getTodayLocalDate === "function"
+          ? getTodayLocalDate()
+          : localDate(new Date());
+        let cells = `<div class="dow">Su</div><div class="dow">Mo</div><div class="dow">Tu</div><div class="dow">We</div><div class="dow">Th</div><div class="dow">Fr</div><div class="dow">Sa</div>`;
+        for(let i = 0; i < first; i++) cells += `<div class="day blank"></div>`;
+        for(let d = 1; d <= total; d++){
+          const ds = rsFmtDate(y, m, d);
+          const isToday = ds === todayStr;
+          if(ds < todayStr){
+            cells += `<div class="day past" aria-disabled="true" aria-label="${esc(ds)} — past date">${d}</div>`;
+            continue;
+          }
+          const reason = rsBlockedReason(ds);
+          if(reason){
+            const cls = reason.indexOf("fully booked") !== -1 ? "unavail" : "outside-window";
+            cells += `<div class="day ${cls}" aria-disabled="true" aria-label="${esc(ds)} — unavailable, ${esc(reason)}">${d}</div>`;
+            continue;
+          }
+          const sel = selectedDate === ds;
+          cells += `<div class="day avail ${sel ? "sel" : ""} ${isToday ? "today" : ""}" data-date="${esc(ds)}" role="button" tabindex="0" aria-label="${esc(ds)} — available${sel ? ", selected" : ""}">${d}</div>`;
+        }
+        calBox.innerHTML = `
+          <div class="cal-head">
+            <button type="button" data-rs-nav="-1" aria-label="Previous month">‹</button>
+            <span>${esc(monthName)} ${y}</span>
+            <button type="button" data-rs-nav="1" aria-label="Next month">›</button>
+          </div>
+          <div class="cal-grid">${cells}</div>`;
+      }
+
+      async function refreshRescheduleCalendar(){
+        if(typeof loadAvailability === "function"){
+          try{ await loadAvailability(calYear, calMonth + 1); }catch(e){ /* keep last known */ }
+        }
+        if(selectedDate && rsBlockedReason(selectedDate)){
+          selectedDate = "";
+          dateInput.value = "";
+          if(dateDisplay) dateDisplay.textContent = "Select an available date";
+        }
+        renderRescheduleCalendar();
+        renderRescheduleTimeOptions();
+      }
+
+      function selectRescheduleDate(ds){
+        if(!ds || rsBlockedReason(ds)) return;
+        selectedDate = ds;
+        dateInput.value = ds;
+        if(dateDisplay){
+          const formatted = window.PDRDates ? PDRDates.format(ds) : ds;
+          dateDisplay.textContent = formatted || ds;
+        }
+        renderRescheduleCalendar();
+        renderRescheduleTimeOptions();
+      }
+
+      if(calBox){
+        calBox.addEventListener("click", async (e)=>{
+          const nav = e.target.closest("button[data-rs-nav]");
+          if(nav){
+            const dir = parseInt(nav.getAttribute("data-rs-nav"), 10) || 0;
+            calMonth += dir;
+            if(calMonth > 11){ calMonth = 0; calYear++; }
+            if(calMonth < 0){ calMonth = 11; calYear--; }
+            await refreshRescheduleCalendar();
+            return;
+          }
+          const day = e.target.closest(".day.avail[data-date]");
+          if(day) selectRescheduleDate(day.getAttribute("data-date"));
+        });
+        calBox.addEventListener("keydown", (e)=>{
+          if(e.key !== "Enter" && e.key !== " ") return;
+          const day = e.target.closest(".day.avail[data-date]");
+          if(!day) return;
+          e.preventDefault();
+          selectRescheduleDate(day.getAttribute("data-date"));
+        });
+      }
+
+      openRescheduleBtn.onclick = async ()=>{
         rescheduleForm.hidden = false;
-        dateInput.value = dateInput.value || localDate(minDate);
-        dateInput.focus();
+        selectedDate = "";
+        preferredTime = String(reservation.eventTime || "").slice(0,5);
+        dateInput.value = "";
+        if(dateDisplay) dateDisplay.textContent = "Select an available date";
+        calYear = minDate.getFullYear();
+        calMonth = minDate.getMonth();
+        await refreshRescheduleCalendar();
+        calBox && calBox.scrollIntoView({behavior:"smooth", block:"nearest"});
       };
       if(rescheduleCancelBtn){
         rescheduleCancelBtn.onclick = ()=>{
@@ -411,7 +599,11 @@
         const ctx = readCtx();
         if(!ctx){ manageMessage.textContent = "Please verify your booking again."; return; }
         if(!dateInput.value){
-          manageMessage.textContent = "Please choose a new date.";
+          manageMessage.textContent = "Please choose an available new date.";
+          return;
+        }
+        if(timeSelect && !timeSelect.value){
+          manageMessage.textContent = "Please choose a new time.";
           return;
         }
 
@@ -427,7 +619,7 @@
               bookingPin: ctx.pin,
               action: "reschedule",
               newDate: dateInput.value,
-              newTime: document.getElementById("rescheduleTime").value
+              newTime: timeSelect ? timeSelect.value : ""
             })
           });
           const data = await res.json().catch(()=>({}));

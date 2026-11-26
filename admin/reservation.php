@@ -116,9 +116,9 @@ $shownTo = min($page * $perPage, $totalRows);
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
     <link rel="stylesheet" href="<?php echo pdrAsset('reservation.css'); ?>" />
     <link rel="stylesheet" href="<?php echo pdrAsset('filters.css'); ?>" />
+        <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 </head>

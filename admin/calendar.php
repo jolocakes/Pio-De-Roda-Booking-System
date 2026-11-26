@@ -14,6 +14,7 @@ $canManageBlackouts = pdrCan('manage_blackouts');
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo pdrAsset('calendar.css'); ?>" />
+        <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
     
@@ -25,8 +26,10 @@ $canManageBlackouts = pdrCan('manage_blackouts');
     <?php $activeNav = 'calendar'; require __DIR__ . '/_sidebar.php'; ?>
 
     <div class="main-wrapper">
-        <div class="top-navbar">
-            <h1 style="font-size: 18px;">Calendar & Availability Schedule</h1>
+        <header class="top-navbar">
+            <div class="header-title-section">
+                <h1>Calendar &amp; Availability Schedule</h1>
+            </div>
             <div class="user-profile">
                 <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="user-info">
@@ -34,7 +37,7 @@ $canManageBlackouts = pdrCan('manage_blackouts');
                     <span><?php echo pdrAdminDisplayRole(); ?></span>
                 </div>
             </div>
-        </div>
+        </header>
 
         <div class="content-body">
             <div class="calendar-layout">

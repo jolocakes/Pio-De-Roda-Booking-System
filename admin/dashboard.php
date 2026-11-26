@@ -33,6 +33,49 @@ $admin_role = pdrAdminDisplayRole();
 $current_date = date('F j, Y');
 $current_time = date('h:i:s A');
 $today = date('Y-m-d');
+$todayDt = new DateTimeImmutable('today');
+
+// Period filter: recent 12 months + full year options. All dashboard
+// metrics/charts/lists follow the selected period.
+$periodRaw = (string) ($_GET['period'] ?? '');
+$periodType = 'month';
+$periodValue = $todayDt->format('Y-m');
+if (preg_match('/^month:(\d{4})-(\d{2})$/', $periodRaw, $m)) {
+    $y = (int) $m[1]; $mo = (int) $m[2];
+    if ($y >= 2020 && $y <= 2100 && $mo >= 1 && $mo <= 12) {
+        $periodType = 'month';
+        $periodValue = sprintf('%04d-%02d', $y, $mo);
+    }
+} elseif (preg_match('/^year:(\d{4})$/', $periodRaw, $m)) {
+    $y = (int) $m[1];
+    if ($y >= 2020 && $y <= 2100) {
+        $periodType = 'year';
+        $periodValue = (string) $y;
+    }
+}
+
+if ($periodType === 'year') {
+    $rangeStart = new DateTimeImmutable($periodValue . '-01-01');
+    $rangeEnd = new DateTimeImmutable($periodValue . '-12-31');
+    $periodLabel = 'Year ' . $periodValue;
+} else {
+    $rangeStart = new DateTimeImmutable($periodValue . '-01');
+    $rangeEnd = $rangeStart->modify('last day of this month');
+    $periodLabel = $rangeStart->format('F Y');
+}
+$rangeStartStr = $rangeStart->format('Y-m-d');
+$rangeEndStr = $rangeEnd->format('Y-m-d');
+
+$periodOptions = [];
+for ($i = 0; $i < 12; $i++) {
+    $d = $todayDt->modify('first day of this month')->modify("-{$i} months");
+    $val = 'month:' . $d->format('Y-m');
+    $periodOptions[] = ['value' => $val, 'label' => $d->format('F Y')];
+}
+$yearOptions = [];
+for ($y = (int) $todayDt->format('Y'); $y >= (int) $todayDt->format('Y') - 2; $y--) {
+    $yearOptions[] = ['value' => 'year:' . $y, 'label' => 'Full Year ' . $y];
+}
 
 // Safe defaults keep the page usable if a query fails.
 $totalReservations = 0;
@@ -62,7 +105,13 @@ $next7DaysCount = 0;
 $paymentsForReviewCount = 0;
 
 try {
-    $statusStmt = $pdo->query("SELECT status, COUNT(*) AS total FROM reservations GROUP BY status");
+    $statusStmt = $pdo->prepare(
+        "SELECT status, COUNT(*) AS total
+           FROM reservations
+          WHERE event_date BETWEEN ? AND ?
+          GROUP BY status"
+    );
+    $statusStmt->execute([$rangeStartStr, $rangeEndStr]);
     foreach ($statusStmt->fetchAll() as $row) {
         $status = (string) $row['status'];
         if (isset($statusCounts[$status])) {
@@ -71,30 +120,38 @@ try {
     }
     $totalReservations = array_sum($statusCounts);
 
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM reservations WHERE event_date = ?");
-    $stmt->execute([$today]);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM reservations WHERE event_date = ? AND event_date BETWEEN ? AND ?");
+    $stmt->execute([$today, $rangeStartStr, $rangeEndStr]);
     $todayReservations = (int) $stmt->fetchColumn();
 
+    $upcomingFrom = max($today, $rangeStartStr);
     $stmt = $pdo->prepare(
         "SELECT COUNT(*) FROM reservations
-          WHERE event_date >= ? AND status IN ('Pending', 'Confirmed')"
+          WHERE event_date BETWEEN ? AND ? AND status IN ('Pending', 'Confirmed')"
     );
-    $stmt->execute([$today]);
-    $upcomingReservations = (int) $stmt->fetchColumn();
+    $stmt->execute([$upcomingFrom, $rangeEndStr]);
+    $upcomingReservations = ($upcomingFrom <= $rangeEndStr) ? (int) $stmt->fetchColumn() : 0;
 
-    $totalCustomers = (int) $pdo->query("SELECT COUNT(DISTINCT email) FROM reservations")->fetchColumn();
+    $stmt = $pdo->prepare("SELECT COUNT(DISTINCT email) FROM reservations WHERE event_date BETWEEN ? AND ?");
+    $stmt->execute([$rangeStartStr, $rangeEndStr]);
+    $totalCustomers = (int) $stmt->fetchColumn();
 
-    $estimatedRevenue = (float) $pdo->query(
-        "SELECT COALESCE(SUM(estimated_total), 0) FROM reservations WHERE status <> 'Cancelled'"
-    )->fetchColumn();
+    $stmt = $pdo->prepare(
+        "SELECT COALESCE(SUM(estimated_total), 0) FROM reservations
+          WHERE status <> 'Cancelled' AND event_date BETWEEN ? AND ?"
+    );
+    $stmt->execute([$rangeStartStr, $rangeEndStr]);
+    $estimatedRevenue = (float) $stmt->fetchColumn();
 
-    $topStmt = $pdo->query(
+    $topStmt = $pdo->prepare(
         "SELECT main_service, COUNT(*) AS total
            FROM reservations
+          WHERE event_date BETWEEN ? AND ?
           GROUP BY main_service
           ORDER BY total DESC, main_service ASC
           LIMIT 1"
     );
+    $topStmt->execute([$rangeStartStr, $rangeEndStr]);
     $topRow = $topStmt->fetch();
     if ($topRow) {
         $topService = (string) $topRow['main_service'];
@@ -104,20 +161,21 @@ try {
     $stmt = $pdo->prepare(
         "SELECT reservation_id, customer_name, main_service, event_type, event_date, event_time, status
            FROM reservations
-          WHERE event_date >= ? AND status IN ('Pending', 'Confirmed')
+          WHERE event_date BETWEEN ? AND ? AND status IN ('Pending', 'Confirmed')
           ORDER BY event_date ASC, event_time ASC
           LIMIT 3"
     );
-    $stmt->execute([$today]);
-    $upcomingEventsList = $stmt->fetchAll();
+    $stmt->execute([$upcomingFrom, $rangeEndStr]);
+    $upcomingEventsList = ($upcomingFrom <= $rangeEndStr) ? $stmt->fetchAll() : [];
 
     $stmt = $pdo->prepare(
         "SELECT reservation_id, customer_name, main_service, event_date, event_time, status, payment_method, estimated_total
            FROM reservations
+          WHERE event_date BETWEEN ? AND ?
           ORDER BY submitted_at DESC, id DESC
           LIMIT 5"
     );
-    $stmt->execute();
+    $stmt->execute([$rangeStartStr, $rangeEndStr]);
     $recentReservations = $stmt->fetchAll();
 
     // T-42: actionable notifications. Each query is guarded so an older schema
@@ -152,51 +210,14 @@ try {
         $paymentsForReviewCount = 0;
     }
 
-    // Reservations overview: current week, Monday through Sunday.
-    $weekStart = new DateTimeImmutable('today');
-    $dayOfWeek = (int) $weekStart->format('N');
-    $weekStart = $weekStart->modify('-' . ($dayOfWeek - 1) . ' days');
-    $weekEnd = $weekStart->modify('+6 days');
-
-    $weekDates = [];
-    $weekSeries = [
-        'total' => array_fill(0, 7, 0),
-        'confirmed' => array_fill(0, 7, 0),
-        'pending' => array_fill(0, 7, 0),
-        'cancelled' => array_fill(0, 7, 0)
-    ];
-    for ($i = 0; $i < 7; $i++) {
-        $day = $weekStart->modify("+$i days");
-        $weekDates[] = $day->format('Y-m-d');
-        $weekLabels[] = $day->format('D');
-    }
-
-    $stmt = $pdo->prepare(
-        "SELECT event_date, status, COUNT(*) AS total
-           FROM reservations
-          WHERE event_date BETWEEN ? AND ?
-          GROUP BY event_date, status"
-    );
-    $stmt->execute([$weekStart->format('Y-m-d'), $weekEnd->format('Y-m-d')]);
-    foreach ($stmt->fetchAll() as $row) {
-        $index = array_search($row['event_date'], $weekDates, true);
-        if ($index === false) continue;
-
-        $count = (int) $row['total'];
-        $weekSeries['total'][$index] += $count;
-
-        $statusKey = strtolower((string) $row['status']);
-        if (isset($weekSeries[$statusKey])) {
-            $weekSeries[$statusKey][$index] += $count;
-        }
-    }
-
-    $serviceStmt = $pdo->query(
+    $serviceStmt = $pdo->prepare(
         "SELECT main_service, COUNT(*) AS total
            FROM reservations
+          WHERE event_date BETWEEN ? AND ?
           GROUP BY main_service
           ORDER BY total DESC, main_service ASC"
     );
+    $serviceStmt->execute([$rangeStartStr, $rangeEndStr]);
     $palette = ['#500a18', '#f43f5e', '#3b82f6', '#06b6d4', '#d97706', '#16a34a', '#7e22ce', '#64748b'];
     $colorIndex = 0;
     foreach ($serviceStmt->fetchAll() as $row) {
@@ -289,52 +310,13 @@ $metrics = [
     ]
 ];
 
-$chartView = (string) ($_GET['chartView'] ?? 'month');
-if (!in_array($chartView, ['week', 'month', 'last_week', 'last_month', 'this_year'], true)) {
-    $chartView = 'month';
-}
-
-// Compute overview chart data based on selected view period
+// Overview chart follows the selected period.
 $overviewChart = ['labels' => [], 'total' => [], 'confirmed' => [], 'pending' => [], 'cancelled' => []];
-
-// Determine the date range for the selected view.
-$today = new DateTimeImmutable('today');
-
-switch ($chartView) {
-    case 'week':
-        // Current week: Monday through Sunday
-        $rangeStart = new DateTimeImmutable('monday this week');
-        $rangeEnd = $rangeStart->modify('+6 days');
-        break;
-
-    case 'last_week':
-        // Previous week: Monday-Sunday before current week
-        $rangeStart = new DateTimeImmutable('monday last week');
-        $rangeEnd = $rangeStart->modify('+6 days');
-        break;
-
-    case 'last_month':
-        $rangeStart = $today->modify('first day of last month');
-        $rangeEnd = $rangeStart->modify('last day of this month');
-        break;
-
-    case 'this_year':
-        $rangeStart = new DateTimeImmutable($today->format('Y') . '-01-01');
-        $rangeEnd = new DateTimeImmutable($today->format('Y') . '-12-31');
-        break;
-
-    case 'month':
-    default:
-        // Current month: 1st to last day
-        $rangeStart = $today->modify('first day of this month');
-        $rangeEnd = $today->modify('last day of this month');
-        break;
-}
 
 // Build one x-axis bucket per day (or per month for the yearly view) so every
 // range produces a real line graph rather than a single aggregate point.
 $buckets = [];
-if ($chartView === 'this_year') {
+if ($periodType === 'year') {
     for ($month = 1; $month <= 12; $month++) {
         $key = sprintf('%04d-%02d', (int) $rangeStart->format('Y'), $month);
         $monthDate = new DateTimeImmutable($key . '-01');
@@ -424,8 +406,8 @@ $serviceChart = [
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <link rel="stylesheet" href="<?php echo pdrAsset('dashboard.css'); ?>" />
+        <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 
 </head>
@@ -446,7 +428,6 @@ $serviceChart = [
                     <p><?php echo $admin_name; ?></p>
                     <span><?php echo $admin_role; ?></span>
                 </div>
-                <i class="fa-solid fa-chevron-down" style="font-size: 10px; color: #718096; margin-left: 5px;"></i>
             </div>
         </header>
 
@@ -460,7 +441,7 @@ $serviceChart = [
             <div class="welcome-header">
                 <div>
                     <h2>Welcome back, <?php echo $admin_name; ?>!</h2>
-                    <p>Here's what's happening with your reservation system today.</p>
+                    <p>Showing data for <strong><?php echo h($periodLabel); ?></strong>. All cards, charts, and lists below follow this period.</p>
                 </div>
                     <div class="time-display">
                     <span><i class="fa-regular fa-calendar"></i> <span id="live-date"><?php echo $current_date; ?></span></span>
@@ -541,12 +522,17 @@ $serviceChart = [
                     <div class="card-header">
                         <h3>Reservations Overview</h3>
                         <form name="viewForm" method="get">
-                            <select name="chartView" onchange="this.form.submit()">
-                                <option value="week" <?= ($chartView ?? 'week') === 'week' ? 'selected' : '' ?>>This Week</option>
-                                <option value="month" <?= ($chartView ?? 'week') === 'month' ? 'selected' : '' ?>>This Month</option>
-                                <option value="last_week" <?= ($chartView ?? 'week') === 'last_week' ? 'selected' : '' ?>>Last Week</option>
-                                <option value="last_month" <?= ($chartView ?? 'week') === 'last_month' ? 'selected' : '' ?>>Last Month</option>
-                                <option value="this_year" <?= ($chartView ?? 'week') === 'this_year' ? 'selected' : '' ?>>This Year</option>
+                            <select name="period" onchange="this.form.submit()" aria-label="Select dashboard period">
+                                <optgroup label="By Month">
+                                    <?php foreach ($periodOptions as $opt): ?>
+                                        <option value="<?php echo h($opt['value']); ?>" <?php echo ($periodType === 'month' && 'month:' . $periodValue === $opt['value']) ? 'selected' : ''; ?>><?php echo h($opt['label']); ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                                <optgroup label="By Year">
+                                    <?php foreach ($yearOptions as $opt): ?>
+                                        <option value="<?php echo h($opt['value']); ?>" <?php echo ($periodType === 'year' && 'year:' . $periodValue === $opt['value']) ? 'selected' : ''; ?>><?php echo h($opt['label']); ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
                             </select>
                         </form>
                     </div>

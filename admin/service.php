@@ -162,6 +162,7 @@ pdrRequirePageCapability('manage_catalog');
         .empty-note { font-size: 13px; color: var(--text-muted); padding: 14px 4px; }
         .dishes-count { display: inline-block; background: rgba(91,8,8,.07); border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
     </style>
+        <link rel="stylesheet" href="<?php echo pdrAsset('admin-base.css'); ?>">
     <link rel="stylesheet" href="<?php echo pdrAsset('responsive.css'); ?>" />
 </head>
 <body>
@@ -171,8 +172,10 @@ pdrRequirePageCapability('manage_catalog');
     <?php $activeNav = 'service'; require __DIR__ . '/_sidebar.php'; ?>
 
     <div class="main-wrapper">
-        <div class="top-navbar">
-            <span style="font-size: 18px; color: var(--text-dark); font-weight: 700;">Our Services &amp; Packages</span>
+        <header class="top-navbar">
+            <div class="header-title-section">
+                <h1>Our Services &amp; Packages</h1>
+            </div>
             <div class="user-profile">
                 <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
                 <div class="user-info">
@@ -180,7 +183,7 @@ pdrRequirePageCapability('manage_catalog');
                     <span><?php echo pdrAdminDisplayRole(); ?></span>
                 </div>
             </div>
-        </div>
+        </header>
 
         <div class="content-body">
 
