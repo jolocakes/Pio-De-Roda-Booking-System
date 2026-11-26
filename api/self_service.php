@@ -165,24 +165,29 @@ try {
     }
 
     // Ignore this reservation itself: moving a booking to its own date/time is
-    // not a conflict.
-    $dateCheck = pdrDateTaken($pdo, $newDate, $reservationId);
-    if ($dateCheck['taken']) {
-        http_response_code(409);
-        echo json_encode([
-            'ok' => false,
-            'reason' => $dateCheck['reason'] === 'BLACKOUT' ? 'DATE_BLACKOUT' : 'DATE_TAKEN',
-            'dateReason' => $dateCheck['reason'],
-            'blackoutReason' => $dateCheck['blackoutReason'] ?? null,
-        ]);
-        exit();
-    }
-
-    $takenTimes = pdrTakenTimes($pdo, $newDate, (string) $row['main_service'], $reservationId);
-    if (in_array($newTime, $takenTimes, true)) {
-        http_response_code(409);
-        echo json_encode(['ok' => false, 'reason' => 'TIME_TAKEN', 'field' => 'newTime']);
-        exit();
+    // not a conflict. The per-service rule covers blackouts, the daily cap,
+    // duration overlap and the concurrency limit in one place.
+    $serviceId = !empty($row['service_id'])
+        ? (string) $row['service_id']
+        : pdrServiceIdByName($pdo, (string) $row['main_service']);
+    if ($serviceId !== null && $serviceId !== '') {
+        $slotCheck = pdrCheckBookingSlot($pdo, $newDate, $serviceId, $newTime, $reservationId);
+        if (!$slotCheck['ok']) {
+            $reason = $slotCheck['reason'];
+            // Keep the existing customer-facing code for staff blackouts.
+            if ($reason === 'DATE_TAKEN' && ($slotCheck['cause'] ?? '') === 'BLACKOUT') {
+                $reason = 'DATE_BLACKOUT';
+            }
+            http_response_code(409);
+            echo json_encode([
+                'ok'             => false,
+                'reason'         => $reason,
+                'cause'          => $slotCheck['cause'] ?? null,
+                'field'          => $slotCheck['reason'] === 'DATE_TAKEN' ? 'newDate' : 'newTime',
+                'blackoutReason' => $slotCheck['blackoutReason'] ?? null,
+            ]);
+            exit();
+        }
     }
 
     $upd = $pdo->prepare(

@@ -249,7 +249,7 @@ body {
   background: var(--cream-soft);
 }
 
-/* CLOSED date (2 services booked, or the venue is booked that day).
+/* CLOSED date (every service is full, or staff blocked the day).
    Same gray treatment as the customer calendars so admin and customer
    views can never look like they disagree. Reason shows on hover. */
 .day-cell.day-taken {

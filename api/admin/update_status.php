@@ -54,7 +54,7 @@ try {
     // checked against the calendar. Without this, a Cancelled booking could be
     // re-confirmed onto a date/time that is already taken.
     $checkStmt = $pdo->prepare(
-        "SELECT status, main_service, event_date, event_time
+        "SELECT status, service_id, main_service, event_date, event_time
            FROM reservations WHERE reservation_id = ?"
     );
     $checkStmt->execute([$reservationId]);
@@ -72,28 +72,30 @@ try {
     // rules as creating or rescheduling one. The row is excluded so it never
     // conflicts with itself.
     if ($changed && in_array($newStatus, ['Pending', 'Confirmed'], true)) {
-        $dateCheck = pdrDateTaken($pdo, $current['event_date'], $reservationId);
-        if ($dateCheck['taken']) {
-            http_response_code(409);
-            echo json_encode([
-                'ok'     => false,
-                'reason' => 'DATE_TAKEN',
-                'cause'  => $dateCheck['reason'],
-                'count'  => $dateCheck['count'],
-            ]);
-            exit();
-        }
-
-        $takenTimes = pdrTakenTimes($pdo, $current['event_date'], $current['main_service'], $reservationId);
-        if (in_array($current['event_time'], $takenTimes, true)) {
-            http_response_code(409);
-            echo json_encode([
-                'ok'     => false,
-                'reason' => 'TIME_TAKEN',
-                'time'   => $current['event_time'],
-                'service'=> $current['main_service'],
-            ]);
-            exit();
+        $serviceId = !empty($current['service_id'])
+            ? (string) $current['service_id']
+            : pdrServiceIdByName($pdo, (string) $current['main_service']);
+        if ($serviceId !== null && $serviceId !== '') {
+            $slotCheck = pdrCheckBookingSlot(
+                $pdo,
+                (string) $current['event_date'],
+                $serviceId,
+                (string) $current['event_time'],
+                $reservationId
+            );
+            if (!$slotCheck['ok']) {
+                http_response_code(409);
+                echo json_encode([
+                    'ok'             => false,
+                    'reason'         => $slotCheck['reason'],
+                    'cause'          => $slotCheck['cause'] ?? null,
+                    'count'          => $slotCheck['count'] ?? null,
+                    'time'           => $slotCheck['time'] ?? $current['event_time'],
+                    'service'        => $slotCheck['service'] ?? $current['main_service'],
+                    'blackoutReason' => $slotCheck['blackoutReason'] ?? null,
+                ]);
+                exit();
+            }
         }
     }
 

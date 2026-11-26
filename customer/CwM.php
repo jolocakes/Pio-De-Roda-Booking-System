@@ -78,8 +78,8 @@ try {
       <div class="modal" id="successBody"></div>
     </div>
     
-    <script src="services.js?v=3.4"></script> 
+    <script src="services.js?v=3.5"></script>
 <script src="pdr-dates.js?v=1.0"></script>
-<script src="reservation2.js?v=3.6"></script>
+<script src="reservation2.js?v=3.7"></script>
 </body>
 </html>

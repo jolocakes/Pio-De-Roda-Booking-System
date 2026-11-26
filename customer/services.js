@@ -676,14 +676,17 @@ const API_BASE_URL = window.location.pathname.includes("/customer")
    =========================================================================== */
 
 /* ---- Availability (shared by both calendars and the time picker) ----------
-   AVAIL holds the CURRENT month's picture: which dates are fully taken and
-   which services already hold which time slots on each date. Every surface
-   reads this one object, so the landing page, the booking calendar and the
-   time picker can never disagree. Rules live in api/capacity.php. */
+   AVAIL holds the CURRENT month's picture: which dates are fully taken, which
+   services already hold which time slots on each date, and each service's own
+   rules (duration, per-day cap, concurrency cap). Every surface reads this one
+   object, so the landing page, the booking calendar and the time picker can
+   never disagree. Rules live in api/capacity.php. */
 let AVAIL = {
   dates: [],
   times: {},
   meta: {},
+  services: {},
+  timeSlots: [],
   rules: null,
   year: null,
   month: null,
@@ -702,6 +705,8 @@ async function loadAvailability(year, month) {
       dates: data.dates || [],
       times: data.times || {},
       meta: data.meta || {},
+      services: data.services || {},
+      timeSlots: Array.isArray(data.timeSlots) ? data.timeSlots : [],
       rules: data.rules || null,
       year: year,
       month: month,
@@ -712,15 +717,40 @@ async function loadAvailability(year, month) {
   return AVAIL;
 }
 
-// Is this date fully taken? (venue-exclusive OR at the per-day service cap)
-function isDateTaken(dateStr) {
+// The availability record for one service on one date, or null when the
+// service has no bookings there (i.e. the date is open for it).
+function availServiceStatus(dateStr, serviceName) {
+  if (!dateStr || !serviceName || !AVAIL.services) return null;
+  for (const id in AVAIL.services) {
+    const svc = AVAIL.services[id];
+    if (svc && svc.name === serviceName && svc.dates) {
+      return svc.dates[dateStr] || null;
+    }
+  }
+  return null;
+}
+
+// Is this date fully taken? With a service name it asks that service only
+// (a venue booking must not hide the date from a booth). Without one it
+// reports the landing-page meaning: no service can take the date at all.
+function isDateTaken(dateStr, serviceName) {
+  if (serviceName) {
+    const status = availServiceStatus(dateStr, serviceName);
+    return !!(status && status.taken);
+  }
   return AVAIL.dates.indexOf(dateStr) !== -1;
 }
 
-// Is this time blocked ON THIS DATE for THIS SERVICE? (per-service rule:
-// another service sharing the same time does NOT block it)
+// Is this time blocked ON THIS DATE for THIS SERVICE? Duration-aware: any
+// booking whose [start, start + duration) range overlaps the requested slot
+// counts, up to the service's concurrency limit.
 function isTimeTakenFor(dateStr, timeStr, serviceName) {
   if (!dateStr || !timeStr || !serviceName) return false;
+  const status = availServiceStatus(dateStr, serviceName);
+  if (status) {
+    return (status.blockedTimes || []).indexOf(timeStr) !== -1;
+  }
+  // Legacy shape for callers reading the raw per-time map.
   const byTime = AVAIL.times[dateStr];
   if (!byTime || !byTime[timeStr]) return false;
   return byTime[timeStr].indexOf(serviceName) !== -1;
@@ -729,9 +759,13 @@ function isTimeTakenFor(dateStr, timeStr, serviceName) {
 // Time slots offered to the customer, each flagged available for their service.
 // Used to render the Event Time select with taken slots disabled.
 function timeSlotState(dateStr, serviceName) {
-  const byTime = (dateStr && AVAIL.times[dateStr]) || {};
-  return EVENT_TIME_SLOTS.map(function (t) {
-    return { time: t, taken: (byTime[t] || []).indexOf(serviceName) !== -1 };
+  const slots = (AVAIL.timeSlots && AVAIL.timeSlots.length)
+    ? AVAIL.timeSlots
+    : EVENT_TIME_SLOTS;
+  const status = serviceName ? availServiceStatus(dateStr, serviceName) : null;
+  const blocked = status ? status.blockedTimes || [] : [];
+  return slots.map(function (t) {
+    return { time: t, taken: blocked.indexOf(t) !== -1 };
   });
 }
 

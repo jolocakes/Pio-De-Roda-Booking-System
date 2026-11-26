@@ -426,18 +426,20 @@ function renderCalendar() {
       cells += `<div class="day past" aria-disabled="true" aria-label="${ds} — ${why}">${d}</div>`;
       continue;
     }
-    const unavail = isDateTaken(ds);
+    const svcName = currentServiceName();
+    const unavail = isDateTaken(ds, svcName);
     const sel = state.eventDate === ds;
     const meta = AVAIL.meta[ds];
+    const svcStatus = svcName ? availServiceStatus(ds, svcName) : null;
     const hint = unavail
-      ? meta && meta.blackout
+      ? svcStatus && svcStatus.blackout
         ? "closed by staff"
-        : meta && meta.hasVenue
-          ? "exclusive service booked"
-          : "fully booked"
-      : meta && meta.count > 0
-        ? `${meta.count} of ${(AVAIL.rules && AVAIL.rules.maxPerDay) || 2} slots booked`
-        : "";
+        : "fully booked for this service"
+      : svcStatus && svcStatus.count > 0
+        ? `${svcStatus.count} of ${svcStatus.maxPerDay || "unlimited"} booked for this service`
+        : meta && meta.count > 0
+          ? `${meta.count} booking${meta.count === 1 ? "" : "s"} on this date`
+          : "";
     cells += `<div class="day ${unavail ? "unavail" : "avail"} ${sel ? "sel" : ""} ${isToday ? "today" : ""}"
       data-date="${unavail ? "" : ds}" ${unavail ? 'aria-disabled="true" ' : ""}role="button" tabindex="0"
       ${hint ? `title="${hint}" ` : ""}aria-label="${ds} — ${unavail ? "unavailable" : isToday ? "today, available" : "available"}${hint ? ", " + hint : ""}${sel ? ", selected" : ""}">${d}</div>`;
@@ -461,9 +463,13 @@ function currentServiceName() {
 function timeOptionsHTML() {
   const svc = currentServiceName();
   const open = state.eventDate ? timeSlotState(state.eventDate, svc) : null;
+  const slots = open || (AVAIL.timeSlots && AVAIL.timeSlots.length
+    ? AVAIL.timeSlots.map((t) => ({ time: t, taken: false }))
+    : EVENT_TIME_SLOTS.map((t) => ({ time: t, taken: false })));
   let html = `<option value="">-- Select Time --</option>`;
-  html += EVENT_TIME_SLOTS.map((t) => {
-    const taken = open ? open.some((s) => s.time === t && s.taken) : false;
+  html += slots.map((s) => {
+    const t = s.time;
+    const taken = s.taken;
     const sel = state.eventTime === t;
     const label = fmtEventTime(t) + (taken ? " — unavailable" : "");
     return `<option value="${t}" ${sel ? "selected" : ""} ${taken ? "disabled" : ""}>${label}</option>`;
@@ -1245,13 +1251,11 @@ function handleContinue() {
     dateMsg = `Bookings open at most ${PDR_MAX_HORIZON_DAYS} days ahead. Please choose an earlier date.`;
   else if (windowErr === "INVALID")
     dateMsg = "Please select a valid event date.";
-  else if (isDateTaken(state.eventDate))
+  else if (isDateTaken(state.eventDate, currentServiceName()))
     dateMsg =
       AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].blackout
         ? "That date is closed by our staff. Please choose another date."
-        : AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue
-          ? "The venue is already booked for that date. Please choose another date."
-          : "That date is fully booked. Please choose another date.";
+        : "Your chosen service is fully booked for that date. Please choose another date.";
   if (dateMsg) document.getElementById("errDate").textContent = dateMsg;
   setErr("errDate", !!dateMsg);
 
@@ -1430,11 +1434,9 @@ document.getElementById("submitBtn").onclick = async () => {
     renderPanel();
     return;
   }
-  if (isDateTaken(state.eventDate)) {
+  if (isDateTaken(state.eventDate, currentServiceName())) {
     alert(
-      AVAIL.meta[state.eventDate] && AVAIL.meta[state.eventDate].hasVenue
-        ? "The venue is already booked for that date. Please select an available event date."
-        : "That date is fully booked. Please select an available event date.",
+      "Your chosen service is already fully booked for that date. Please select another event date.",
     );
     return;
   }
@@ -1511,12 +1513,12 @@ document.getElementById("submitBtn").onclick = async () => {
     resetCaptcha();
     checkChecks();
     if (result.reason === "DATE_TAKEN") {
-      // cause distinguishes WHY the date closed: VENUE (exclusive per date)
-      // or FULL (2 services already booked).
+      // cause says WHY: BLACKOUT (staff closed the date) or FULL (this service
+      // just reached its daily limit).
       alert(
-        result.cause === "VENUE"
-          ? "Sorry, the venue was just booked for that date by another customer. Please choose another date."
-          : "Sorry, that date just reached its booking limit. Please choose another date.",
+        result.cause === "BLACKOUT"
+          ? "That date was just closed by our staff. Please choose another date."
+          : "Sorry, that service just reached its booking limit for that date. Please choose another date.",
       );
       document.getElementById("reviewModal").classList.remove("open");
       state.eventDate = null;

@@ -175,26 +175,17 @@ try {
     // occupies the calendar. Cancelled/Completed rows are historical records.
     $activeStatuses = ['Pending', 'Confirmed'];
     if (in_array($status, $activeStatuses, true)) {
-        $dateCheck = pdrDateTaken($pdo, $date, $reservationId);
-        if ($dateCheck['taken']) {
+        $slotCheck = pdrCheckBookingSlot($pdo, $date, $serviceId, $time, $reservationId);
+        if (!$slotCheck['ok']) {
             http_response_code(409);
             echo json_encode([
-                'ok'     => false,
-                'reason' => 'DATE_TAKEN',
-                'cause'  => $dateCheck['reason'], // 'VENUE' or 'FULL'
-                'count'  => $dateCheck['count'],
-            ]);
-            exit();
-        }
-
-        $takenTimes = pdrTakenTimes($pdo, $date, $serviceName, $reservationId);
-        if (in_array($time, $takenTimes, true)) {
-            http_response_code(409);
-            echo json_encode([
-                'ok'     => false,
-                'reason' => 'TIME_TAKEN',
-                'time'   => $time,
-                'service'=> $serviceName,
+                'ok'             => false,
+                'reason'         => $slotCheck['reason'],
+                'cause'          => $slotCheck['cause'] ?? null,
+                'count'          => $slotCheck['count'] ?? null,
+                'time'           => $slotCheck['time'] ?? $time,
+                'service'        => $slotCheck['service'] ?? $serviceName,
+                'blackoutReason' => $slotCheck['blackoutReason'] ?? null,
             ]);
             exit();
         }

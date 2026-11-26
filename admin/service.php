@@ -280,6 +280,9 @@ pdrRequirePageCapability('manage_catalog');
             INVALID_BASE_PRICE: 'Enter a valid base price (0 or higher).',
             INVALID_PER_HEAD: 'Enter a valid per-head rate (0 or higher) or leave it blank.',
             INVALID_MAX_CAP: 'Enter a valid maximum capacity (1 or higher) or leave it blank.',
+            INVALID_DURATION: 'Enter a booking duration from 0 to 1440 minutes, or leave it blank.',
+            INVALID_MAX_PER_DAY: 'Enter 1 or more bookings per day, or leave it blank.',
+            INVALID_MAX_CONCURRENT: 'Enter 1 or more simultaneous bookings, or leave it blank.',
             INVALID_PRICE_DISPLAY: 'The price display is too long (maximum 50 characters).',
             INVALID_CUSTOMER_DISPLAY: 'Check the customer display fields: every RATES row needs a label and value, and notes/main courses must stay within the limits.',
             NOTHING_TO_UPDATE: 'No changes were detected.',
@@ -491,14 +494,23 @@ pdrRequirePageCapability('manage_catalog');
                                 <label>Max capacity
                                     <input type="number" name="max_cap" min="1" step="1" value="${svc.max_cap === null ? '' : esc(svc.max_cap)}">
                                 </label>
-                                <label>Date exclusivity
+                                <label>Flagship service
                                     <span class="exclusive-toggle" style="display:flex;gap:8px;align-items:center;font-weight:400;">
                                         <input type="checkbox" name="is_exclusive" ${svc.is_exclusive ? 'checked' : ''}>
-                                        One booking closes the whole date
+                                        Show &ldquo;venue booked&rdquo; hint on the calendar
                                     </span>
                                 </label>
+                                <label>Booking duration (minutes)
+                                    <input type="number" name="duration_minutes" min="0" max="1440" step="15" value="${svc.duration_minutes === null ? '' : esc(svc.duration_minutes)}">
+                                </label>
+                                <label>Max bookings per day
+                                    <input type="number" name="max_per_day" min="1" step="1" value="${svc.max_per_day === null ? '' : esc(svc.max_per_day)}">
+                                </label>
+                                <label>Max simultaneous bookings
+                                    <input type="number" name="max_concurrent" min="1" step="1" value="${svc.max_concurrent === null ? '' : esc(svc.max_concurrent)}">
+                                </label>
                             </div>
-                            <p class="hint">The price display is the &ldquo;starting price&rdquo; text customers see. It follows the base price unless you type custom text.</p>
+                            <p class="hint">The price display is the &ldquo;starting price&rdquo; text customers see. It follows the base price unless you type custom text. Duration is how long one booking occupies its time slot; leave it empty for exact-start-only blocking. Leave a cap empty for no limit.</p>
 
                             <details class="cd-box">
                                 <summary>Customer display &mdash; RATES table, notes &amp; main courses</summary>
@@ -897,6 +909,9 @@ pdrRequirePageCapability('manage_catalog');
                     price_display: String(formData.get('price_display') || '').trim(),
                     per_head: String(formData.get('per_head') || '').trim() === '' ? null : Number(formData.get('per_head')),
                     max_cap: String(formData.get('max_cap') || '').trim() === '' ? null : parseInt(formData.get('max_cap'), 10),
+                    duration_minutes: String(formData.get('duration_minutes') || '').trim() === '' ? null : parseInt(formData.get('duration_minutes'), 10),
+                    max_per_day: String(formData.get('max_per_day') || '').trim() === '' ? null : parseInt(formData.get('max_per_day'), 10),
+                    max_concurrent: String(formData.get('max_concurrent') || '').trim() === '' ? null : parseInt(formData.get('max_concurrent'), 10),
                     is_exclusive: form.querySelector('[name="is_exclusive"]').checked ? 1 : 0,
                     customer_display: {
                         rates: rates,

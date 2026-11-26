@@ -7,11 +7,16 @@
  *
  *   GET availability.php                 -> every fully-taken date (legacy shape)
  *   GET availability.php?year=2026&month=11
- *        -> { dates: [...], times: {...}, meta: {...} } for that month
+ *        -> { dates: [...], times: {...}, meta: {...}, services: {...} }
  *
  * `dates` is always present so older callers keep working. `times` maps a date
  * to the services already holding each time slot, and `meta` carries the
  * count/venue flags the calendars use for tooltips and gray-out decisions.
+ *
+ * Capacity is per service: `services[serviceId].dates[date]` holds that
+ * service's own count, blocked start times and `taken` flag. The calendar on
+ * the booking page reads that, not the date-level `dates` list, so a venue
+ * booking no longer closes the date for booths.
  */
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/db.php';
@@ -31,12 +36,13 @@ try {
     $exclusive = pdrExclusiveServices($pdo);
 
     echo json_encode([
-        'ok'    => true,
-        'dates' => $payload['dates'],
-        'times' => $payload['times'],
-        'meta'  => $payload['meta'],
+        'ok'       => true,
+        'dates'    => $payload['dates'],
+        'times'    => $payload['times'],
+        'meta'     => $payload['meta'],
+        'services' => $payload['services'],
+        'timeSlots' => $payload['timeSlots'],
         'rules' => [
-            'maxPerDay'         => PDR_MAX_SERVICES_PER_DAY,
             // T-23: catalog-driven list. `exclusiveService` is kept for older
             // callers that only expect a single name.
             'exclusiveServices' => $exclusive['names'],

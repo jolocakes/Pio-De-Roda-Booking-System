@@ -48,6 +48,13 @@ The project is designed to be the Apache document root (for example
    C:\xampp\php\php.exe database\seed_catalog.php
    ```
 
+   Each service row also carries its booking capacity: `duration_minutes`
+   (how long one booking occupies), `max_per_day` (daily cap) and
+   `max_concurrent` (how many may overlap). `NULL` means no cap; a duration of
+   `0` only blocks the exact same start time. Staff can change these on the
+   Catalog page, and `api/capacity.php` is the single source of truth for every
+   calendar, time picker and submit-time check.
+
 3. **Create the local `.env`**
 
    ```powershell

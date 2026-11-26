@@ -2,25 +2,25 @@
 /**
  * Booking capacity rules — the single source of truth for availability.
  *
- * POLICY (agreed with Pio De Roda):
- *   1. A date holds at most MAX_SERVICES_PER_DAY active bookings (Pending or
- *      Confirmed). At that count the date is fully taken.
- *   2. A service marked `services.is_exclusive = 1` is exclusive per DATE: once
- *      such a booking exists on a date, no further booking of any service may
- *      take that date. One customer per exclusive-service day.
- *   3. Time slots are blocked PER SERVICE: a booking at 14:00 blocks 14:00
- *      only for that same service. Two different services may share 14:00.
+ * POLICY (per service, configured in the catalog):
+ *   1. Each service has a duration in minutes. A booking occupies
+ *      [start, start + duration).
+ *   2. `max_per_day` — how many active bookings of that service a date may
+ *      hold. NULL means no daily cap.
+ *   3. `max_concurrent` — how many bookings of that service may overlap in
+ *      time. NULL means no concurrency cap. So `max_concurrent = 2` lets a
+ *      booth run two simultaneous events, while `1` forces non-overlapping
+ *      times.
+ *   4. A staff blackout closes the date for every service.
  *
- * T-23: exclusivity is a catalog flag, NOT a hardcoded service name. Renaming
- * the venue (or adding another date-exclusive service) changes nothing here.
+ * The old global "2 bookings per day" cap and cross-service venue exclusivity
+ * are gone: services carry their own limits, so booths can run alongside the
+ * venue instead of competing with it for the whole date.
  *
  * Every place that asks "can this be booked?" MUST go through these helpers so
  * the landing-page calendar, the booking calendar, the time picker and the
  * submit-time conflict check can never disagree with each other.
  */
-
-// How many active bookings one date may hold (rule 1).
-define('PDR_MAX_SERVICES_PER_DAY', 2);
 
 // T-40: booking window. The customer may book at least this many days ahead and
 // at most this many days ahead. Admin edits are intentionally allowed to
@@ -37,6 +37,112 @@ define('PDR_MAX_RESCHEDULES', 1);
 function pdrActiveStatuses() {
     return ['Pending', 'Confirmed'];
 }
+
+/**
+ * The hourly start times the booking form offers. Kept here so the server can
+ * compute blocked start times with the same list the client renders.
+ */
+function pdrTimeSlots(): array {
+    return [
+        '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
+        '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
+        '20:00', '21:00',
+    ];
+}
+
+/* ==========================================================================
+   Time / interval helpers
+   ========================================================================== */
+
+/** "HH:MM" -> minutes since midnight, or null when the value is not a time. */
+function pdrMinutesOfDay(string $time): ?int {
+    if (!preg_match('/^(\d{1,2}):(\d{2})/', trim($time), $m)) {
+        return null;
+    }
+    $hours = (int) $m[1];
+    $minutes = (int) $m[2];
+    if ($hours > 23 || $minutes > 59) {
+        return null;
+    }
+    return $hours * 60 + $minutes;
+}
+
+/**
+ * Do two time ranges overlap? A zero-length range (duration 0) only clashes
+ * with another range that starts at the exact same minute.
+ */
+function pdrIntervalsOverlap(int $aStart, int $aEnd, int $bStart, int $bEnd): bool {
+    if ($aEnd <= $aStart || $bEnd <= $bStart) {
+        return $aStart === $bStart;
+    }
+    return $aStart < $bEnd && $bStart < $aEnd;
+}
+
+/* ==========================================================================
+   Per-service rules (cached per request)
+   ========================================================================== */
+
+/**
+ * Every service's capacity rule, keyed by service id.
+ *
+ * Falls back to "no limits" when migration 011 has not run yet, so a
+ * pre-migration database keeps working instead of throwing.
+ */
+function pdrServiceRules($pdo): array {
+    static $cache = [];
+    $key = is_object($pdo) ? spl_object_id($pdo) : 0;
+    if (isset($cache[$key])) {
+        return $cache[$key];
+    }
+
+    $out = [];
+    try {
+        $rows = $pdo->query(
+            "SELECT id, name, duration_minutes, max_per_day, max_concurrent FROM services"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $migrationMissing) {
+        // Pre-011 database: every service behaves as before (no duration, no
+        // per-service caps). The date-level blackout still applies.
+        try {
+            $rows = $pdo->query("SELECT id, name FROM services")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $fatal) {
+            $rows = [];
+        }
+    }
+
+    foreach ($rows as $row) {
+        $out[(string) $row['id']] = [
+            'id'            => (string) $row['id'],
+            'name'          => (string) $row['name'],
+            'duration'      => isset($row['duration_minutes']) && $row['duration_minutes'] !== null
+                ? max(0, (int) $row['duration_minutes'])
+                : 0,
+            'maxPerDay'     => isset($row['max_per_day']) && $row['max_per_day'] !== null
+                ? max(1, (int) $row['max_per_day'])
+                : null,
+            'maxConcurrent' => isset($row['max_concurrent']) && $row['max_concurrent'] !== null
+                ? max(1, (int) $row['max_concurrent'])
+                : null,
+        ];
+    }
+
+    $cache[$key] = $out;
+    return $out;
+}
+
+/** Resolve a service id from its display name (legacy rows may only have a name). */
+function pdrServiceIdByName($pdo, string $name): ?string {
+    foreach (pdrServiceRules($pdo) as $id => $rule) {
+        if ($rule['name'] === $name) {
+            return $id;
+        }
+    }
+    return null;
+}
+
+/* ==========================================================================
+   Blackout dates
+   ========================================================================== */
 
 /**
  * T-24: why is this date blocked by staff, or null if it is not?
@@ -73,13 +179,16 @@ function pdrBlackoutDates($pdo, $year, $month): array {
     }
 }
 
+/* ==========================================================================
+   T-23: date-exclusive (flagship) services
+   ========================================================================== */
+
 /**
- * T-23: the exclusive services, read from the catalog.
+ * Services flagged `is_exclusive = 1`. These no longer block other services,
+ * but the landing-page calendar still uses them to describe the date
+ * ("venue booked"), so the flag is kept.
  *
  * Returns ['ids' => [...], 'names' => [...], 'enabled' => bool].
- * Cached per request because every calendar request calls this more than once.
- * If migration 004 has not run yet, it falls back to the old venue name so the
- * site keeps working instead of throwing.
  */
 function pdrExclusiveServices($pdo) {
     static $cached = null;
@@ -105,34 +214,9 @@ function pdrExclusiveServices($pdo) {
     return $cached;
 }
 
-/**
- * SQL predicate that is true when a reservation row holds an exclusive date.
- *
- * Uses service_id (stable across renames) and falls back to the service NAME
- * only for legacy rows saved before service_id was populated.
- *
- * Returns ['sql' => string, 'params' => array].
- */
-function pdrExclusiveCase($pdo, string $alias = 'r') {
-    $cfg = pdrExclusiveServices($pdo);
-    if (!$cfg['enabled']) {
-        return ['sql' => '0 = 1', 'params' => []];
-    }
-
-    $parts = [];
-    $params = [];
-    if ($cfg['ids']) {
-        $parts[] = "{$alias}.service_id IN (" . implode(',', array_fill(0, count($cfg['ids']), '?')) . ")";
-        $params = array_merge($params, $cfg['ids']);
-    }
-    if ($cfg['names']) {
-        $parts[] = "({$alias}.service_id IS NULL AND {$alias}.main_service IN (" .
-            implode(',', array_fill(0, count($cfg['names']), '?')) . "))";
-        $params = array_merge($params, $cfg['names']);
-    }
-
-    return ['sql' => '(' . implode(' OR ', $parts) . ')', 'params' => $params];
-}
+/* ==========================================================================
+   Booking window
+   ========================================================================== */
 
 /**
  * T-40: is a date inside the customer booking window?
@@ -172,142 +256,385 @@ function pdrDaysUntilDate($eventDate): int {
     return (int) $today->diff($date)->format('%r%a');
 }
 
+/* ==========================================================================
+   Per-service occupancy
+   ========================================================================== */
+
 /**
- * Active bookings grouped by date, with a per-date venue flag.
- *
- * Returns [ 'YYYY-MM-DD' => ['count' => int, 'hasVenue' => bool], ... ]
- * Only dates that actually have at least one active booking are listed.
+ * Active bookings of one service on one date, as ['time' => 'HH:MM',
+ * 'duration' => minutes] entries. Legacy rows with a NULL service_id are
+ * matched by service name.
  */
-function pdrDateLoad($pdo, ?string $excludeReservationId = null) {
+function pdrServiceBookings($pdo, $eventDate, string $serviceId, ?string $excludeReservationId = null): array {
+    $rules = pdrServiceRules($pdo);
+    if (!isset($rules[$serviceId])) {
+        return [];
+    }
+    $name = $rules[$serviceId]['name'];
+    $duration = $rules[$serviceId]['duration'];
+
     $statuses = pdrActiveStatuses();
-    $statusIn = implode(',', array_fill(0, count($statuses), '?'));
-    $exclusive = pdrExclusiveCase($pdo, 'r');
+    $in = implode(',', array_fill(0, count($statuses), '?'));
     $stmt = $pdo->prepare(
-        "SELECT r.event_date,
-                COUNT(*) AS cnt,
-                MAX(CASE WHEN {$exclusive['sql']} THEN 1 ELSE 0 END) AS has_venue
-           FROM reservations r
-          WHERE r.status IN ($statusIn)
-            AND (? IS NULL OR r.reservation_id <> ?)
-          GROUP BY r.event_date"
+        "SELECT event_time
+           FROM reservations
+          WHERE event_date = ? AND status IN ($in)
+            AND (service_id = ? OR (service_id IS NULL AND main_service = ?))
+            AND (? IS NULL OR reservation_id <> ?)"
     );
     $stmt->execute(array_merge(
-        $exclusive['params'],
+        [$eventDate],
         $statuses,
+        [$serviceId, $name],
         [$excludeReservationId, $excludeReservationId]
     ));
 
     $out = [];
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $out[$r['event_date']] = [
-            'count'     => (int) $r['cnt'],
-            'hasVenue'  => (bool) $r['has_venue'],
-        ];
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $time) {
+        $out[] = ['time' => (string) $time, 'duration' => $duration];
     }
     return $out;
 }
 
 /**
- * Is this date fully taken? (rules 1 and 2)
+ * Which of the offered start times would break the rule for this service?
  *
- * Returns ['taken' => bool, 'count' => int, 'hasVenue' => bool,
- *          'reason' => 'VENUE'|'FULL'|null]
+ * Pure helper (no DB) so it is easy to unit test. Returns the blocked 'HH:MM'
+ * strings. A service that has reached `max_per_day` blocks every slot.
  */
-function pdrDateTaken($pdo, $eventDate, ?string $excludeReservationId = null) {
-    // T-24: staff blackout closes the date for every service.
+function pdrBlockedStartTimes(array $rule, array $bookings, array $slots): array {
+    $duration = max(0, (int) ($rule['duration'] ?? 0));
+    $maxPerDay = $rule['maxPerDay'] ?? null;
+    $maxConcurrent = $rule['maxConcurrent'] ?? null;
+
+    if ($maxPerDay !== null && count($bookings) >= $maxPerDay) {
+        return array_values($slots);
+    }
+    if ($maxConcurrent === null) {
+        return [];
+    }
+
+    $blocked = [];
+    foreach ($slots as $slot) {
+        $start = pdrMinutesOfDay((string) $slot);
+        if ($start === null) {
+            continue;
+        }
+        $end = $start + $duration;
+        $overlap = 0;
+        foreach ($bookings as $booking) {
+            $bStart = pdrMinutesOfDay((string) ($booking['time'] ?? ''));
+            if ($bStart === null) {
+                continue;
+            }
+            $bEnd = $bStart + max(0, (int) ($booking['duration'] ?? 0));
+            if (pdrIntervalsOverlap($start, $end, $bStart, $bEnd)) {
+                $overlap++;
+            }
+        }
+        if ($overlap >= $maxConcurrent) {
+            $blocked[] = (string) $slot;
+        }
+    }
+    return $blocked;
+}
+
+/**
+ * Full availability status for one service on one date.
+ *
+ * Returns ['taken' => bool, 'count' => int, 'reason' => 'BLACKOUT'|'FULL'|null,
+ *          'blockedTimes' => [...], 'durationMinutes', 'maxPerDay',
+ *          'maxConcurrent', 'blackoutReason' => ?string].
+ */
+function pdrServiceDateStatus($pdo, $eventDate, string $serviceId, ?string $excludeReservationId = null): array {
     $blackout = pdrBlackoutReason($pdo, $eventDate);
     if ($blackout !== null) {
         return [
-            'taken' => true,
-            'count' => 0,
-            'hasVenue' => false,
-            'reason' => 'BLACKOUT',
+            'taken'           => true,
+            'count'           => 0,
+            'reason'          => 'BLACKOUT',
+            'blockedTimes'    => pdrTimeSlots(),
+            'blackoutReason'  => $blackout,
+            'durationMinutes' => null,
+            'maxPerDay'       => null,
+            'maxConcurrent'   => null,
+        ];
+    }
+
+    $rules = pdrServiceRules($pdo);
+    if (!isset($rules[$serviceId])) {
+        return [
+            'taken'           => false,
+            'count'           => 0,
+            'reason'          => null,
+            'blockedTimes'    => [],
+            'durationMinutes' => 0,
+            'maxPerDay'       => null,
+            'maxConcurrent'   => null,
+        ];
+    }
+
+    $rule = $rules[$serviceId];
+    $bookings = pdrServiceBookings($pdo, $eventDate, $serviceId, $excludeReservationId);
+    $count = count($bookings);
+    $taken = $rule['maxPerDay'] !== null && $count >= $rule['maxPerDay'];
+
+    return [
+        'taken'           => $taken,
+        'count'           => $count,
+        'reason'          => $taken ? 'FULL' : null,
+        'blockedTimes'    => pdrBlockedStartTimes($rule, $bookings, pdrTimeSlots()),
+        'durationMinutes' => $rule['duration'],
+        'maxPerDay'       => $rule['maxPerDay'],
+        'maxConcurrent'   => $rule['maxConcurrent'],
+    ];
+}
+
+/**
+ * Can this exact service/date/time be booked? The one check every write path
+ * uses (public submit, self-service reschedule, admin reschedule/approval).
+ *
+ * Returns ['ok' => bool, 'reason' => 'DATE_TAKEN'|'TIME_TAKEN', 'cause' => ...].
+ */
+function pdrCheckBookingSlot($pdo, string $eventDate, string $serviceId, string $eventTime, ?string $excludeReservationId = null): array {
+    $status = pdrServiceDateStatus($pdo, $eventDate, $serviceId, $excludeReservationId);
+
+    if (!empty($status['taken'])) {
+        return [
+            'ok'             => false,
+            'reason'         => 'DATE_TAKEN',
+            'cause'          => $status['reason'], // BLACKOUT | FULL
+            'count'          => $status['count'],
+            'blackoutReason' => $status['blackoutReason'] ?? null,
+        ];
+    }
+
+    if (in_array($eventTime, $status['blockedTimes'] ?? [], true)) {
+        $rules = pdrServiceRules($pdo);
+        return [
+            'ok'      => false,
+            'reason'  => 'TIME_TAKEN',
+            'cause'   => 'CONCURRENT',
+            'time'    => $eventTime,
+            'service' => $rules[$serviceId]['name'] ?? '',
+        ];
+    }
+
+    return ['ok' => true, 'count' => $status['count']];
+}
+
+/* ==========================================================================
+   Backwards-compatible wrappers
+   ========================================================================== */
+
+/**
+ * Legacy date-level check. Prefer pdrCheckBookingSlot() for new code.
+ *
+ * When a service id is supplied the answer is per-service. Without one it
+ * answers the landing-page question: is the date closed to EVERY service
+ * (blackout, or every service at its own limit)?
+ */
+function pdrDateTaken($pdo, $eventDate, ?string $excludeReservationId = null, ?string $serviceId = null) {
+    if ($serviceId !== null && $serviceId !== '') {
+        $status = pdrServiceDateStatus($pdo, (string) $eventDate, (string) $serviceId, $excludeReservationId);
+        return [
+            'taken'          => $status['taken'],
+            'count'          => $status['count'],
+            'hasVenue'       => false,
+            'reason'         => $status['reason'],
+            'blackoutReason' => $status['blackoutReason'] ?? null,
+        ];
+    }
+
+    $blackout = pdrBlackoutReason($pdo, $eventDate);
+    if ($blackout !== null) {
+        return [
+            'taken'          => true,
+            'count'          => 0,
+            'hasVenue'       => false,
+            'reason'         => 'BLACKOUT',
             'blackoutReason' => $blackout,
         ];
     }
 
-    $load = pdrDateLoad($pdo, $excludeReservationId);
-    $row  = isset($load[$eventDate]) ? $load[$eventDate] : ['count' => 0, 'hasVenue' => false];
+    // Count every active booking that date, regardless of service.
+    $statuses = pdrActiveStatuses();
+    $in = implode(',', array_fill(0, count($statuses), '?'));
+    $countStmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM reservations WHERE event_date = ? AND status IN ($in)"
+    );
+    $countStmt->execute(array_merge([(string) $eventDate], $statuses));
+    $count = (int) $countStmt->fetchColumn();
 
-    if ($row['hasVenue']) {
-        return ['taken' => true, 'count' => $row['count'], 'hasVenue' => true,  'reason' => 'VENUE'];
+    $rules = pdrServiceRules($pdo);
+    $allClosed = count($rules) > 0;
+
+    $exclusive = pdrExclusiveServices($pdo);
+    $hasVenue = false;
+    foreach ($rules as $id => $rule) {
+        $status = pdrServiceDateStatus($pdo, (string) $eventDate, (string) $id, $excludeReservationId);
+        if (in_array($id, $exclusive['ids'], true) && $status['taken']) {
+            $hasVenue = true;
+        }
+        $openSlots = count(pdrTimeSlots()) - count($status['blockedTimes'] ?? []);
+        if (!$status['taken'] && $openSlots > 0) {
+            $allClosed = false;
+        }
     }
-    if ($row['count'] >= PDR_MAX_SERVICES_PER_DAY) {
-        return ['taken' => true, 'count' => $row['count'], 'hasVenue' => false, 'reason' => 'FULL'];
-    }
-    return ['taken' => false, 'count' => $row['count'], 'hasVenue' => false, 'reason' => null];
+
+    return [
+        'taken'    => $allClosed,
+        'count'    => $count,
+        'hasVenue' => $hasVenue,
+        'reason'   => $allClosed ? 'FULL' : null,
+    ];
 }
 
 /**
- * Time slots already occupied on a date BY A GIVEN SERVICE (rule 3).
- *
- * Returns the list of 'HH:MM' strings that service already holds that day.
- * Other services' bookings on the same date/time do NOT appear here.
+ * Legacy helper: the start times this service can no longer take on a date.
+ * Now duration-aware, so it returns blocked starts rather than only exact
+ * matches. Callers use `in_array($time, $takenTimes)`.
  */
 function pdrTakenTimes($pdo, $eventDate, $mainService, ?string $excludeReservationId = null) {
-    $statuses = pdrActiveStatuses();
-    $in = implode(',', array_fill(0, count($statuses), '?'));
-    $stmt = $pdo->prepare(
-        "SELECT DISTINCT event_time
-           FROM reservations
-          WHERE event_date = ? AND main_service = ? AND status IN ($in)
-            AND (? IS NULL OR reservation_id <> ?)"
-    );
-    $stmt->execute(array_merge([$eventDate, $mainService], $statuses, [$excludeReservationId, $excludeReservationId]));
-    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $serviceId = pdrServiceIdByName($pdo, (string) $mainService);
+    if ($serviceId === null) {
+        return [];
+    }
+    $status = pdrServiceDateStatus($pdo, (string) $eventDate, $serviceId, $excludeReservationId);
+    return $status['blockedTimes'] ?? [];
 }
 
-/**
- * Every time blocked on a date by ANY service — for the time picker, which is
- * rendered before the customer's own service is known to be exclusive.
- * Merged view: a slot is blocked if ANY active booking holds it.
- */
-function pdrAllTakenTimes($pdo, $eventDate) {
-    $statuses = pdrActiveStatuses();
-    $in = implode(',', array_fill(0, count($statuses), '?'));
-    $stmt = $pdo->prepare(
-        "SELECT DISTINCT event_time
-           FROM reservations
-          WHERE event_date = ? AND status IN ($in)"
-    );
-    $stmt->execute(array_merge([$eventDate], $statuses));
-    return $stmt->fetchAll(PDO::FETCH_COLUMN);
-}
+/* ==========================================================================
+   Monthly availability payload
+   ========================================================================== */
 
 /**
  * Full availability payload for a month. Drives BOTH calendars and the time
  * picker so there is exactly one definition of "unavailable".
  *
  * Returns:
- *   dates  => ['YYYY-MM-DD', ...] dates that are fully taken (gray)
- *   times  => ['YYYY-MM-DD' => ['HH:MM' => ['serviceA','serviceB'], ...]]
- *   meta   => ['YYYY-MM-DD' => ['count' => n, 'hasVenue' => bool, 'taken' => bool]]
+ *   dates     => ['YYYY-MM-DD', ...] dates closed on the landing-page calendar
+ *                (every service is full, or a blackout)
+ *   times     => ['YYYY-MM-DD' => ['HH:MM' => ['serviceA', ...], ...]]
+ *   meta      => ['YYYY-MM-DD' => ['count' => n, 'hasVenue' => bool,
+ *                                  'taken' => bool, 'blackout' => bool]]
+ *   services  => [serviceId => ['id','name','durationMinutes','maxPerDay',
+ *                               'maxConcurrent','dates' => [date => [...]]]]
+ *   timeSlots => the offered 'HH:MM' starts
  */
 function pdrAvailabilityPayload($pdo, $year, $month) {
     $statuses = pdrActiveStatuses();
     $in = implode(',', array_fill(0, count($statuses), '?'));
+    $rules = pdrServiceRules($pdo);
+    $slots = pdrTimeSlots();
 
-    // --- date-level load (rule 1 + rule 2) ---
-    $exclusive = pdrExclusiveCase($pdo, 'r');
+    // All active bookings in the month, with the service resolved for legacy
+    // rows that predate service_id.
     $stmt = $pdo->prepare(
-        "SELECT r.event_date,
-                COUNT(*) AS cnt,
-                MAX(CASE WHEN {$exclusive['sql']} THEN 1 ELSE 0 END) AS has_venue
-           FROM reservations r
-          WHERE r.status IN ($in)
-            AND YEAR(r.event_date) = ? AND MONTH(r.event_date) = ?
-          GROUP BY r.event_date"
+        "SELECT event_date, event_time, service_id, main_service
+           FROM reservations
+          WHERE status IN ($in)
+            AND YEAR(event_date) = ? AND MONTH(event_date) = ?"
     );
-    $stmt->execute(array_merge($exclusive['params'], $statuses, [(int)$year, (int)$month]));
+    $stmt->execute(array_merge($statuses, [(int) $year, (int) $month]));
 
+    $rowsByDate = [];
+    $byDateService = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $date = (string) $row['event_date'];
+        $rowsByDate[$date][] = $row;
+
+        $serviceId = $row['service_id'] !== null && $row['service_id'] !== ''
+            ? (string) $row['service_id']
+            : pdrServiceIdByName($pdo, (string) $row['main_service']);
+        if ($serviceId !== null && isset($rules[$serviceId])) {
+            $byDateService[$date][$serviceId][] = [
+                'time'     => (string) $row['event_time'],
+                'duration' => $rules[$serviceId]['duration'],
+            ];
+        }
+    }
+
+    // Every service, with the dates it already holds something on.
+    $services = [];
+    foreach ($rules as $serviceId => $rule) {
+        $services[$serviceId] = [
+            'id'              => $serviceId,
+            'name'            => $rule['name'],
+            'durationMinutes' => $rule['duration'],
+            'maxPerDay'       => $rule['maxPerDay'],
+            'maxConcurrent'   => $rule['maxConcurrent'],
+            'dates'           => [],
+        ];
+    }
+
+    $exclusive = pdrExclusiveServices($pdo);
     $dates = [];
-    $meta  = [];
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $count    = (int) $r['cnt'];
-        $hasVenue = (bool) $r['has_venue'];
-        $taken    = $hasVenue || $count >= PDR_MAX_SERVICES_PER_DAY;
-        $meta[$r['event_date']] = ['count' => $count, 'hasVenue' => $hasVenue, 'taken' => $taken];
-        if ($taken) $dates[] = $r['event_date'];
+    $meta = [];
+    $times = [];
+
+    $allDates = array_unique(array_merge(array_keys($rowsByDate), array_keys($byDateService)));
+    sort($allDates);
+
+    foreach ($allDates as $date) {
+        $rows = $rowsByDate[$date] ?? [];
+        $total = count($rows);
+
+        // Legacy per-time view used by the admin calendar.
+        foreach ($rows as $row) {
+            $time = (string) $row['event_time'];
+            $times[$date][$time][] = (string) $row['main_service'];
+        }
+        foreach ($times[$date] ?? [] as $time => $names) {
+            $times[$date][$time] = array_values(array_unique($names));
+        }
+
+        // Per-service occupancy.
+        foreach ($byDateService[$date] ?? [] as $serviceId => $bookings) {
+            $rule = $rules[$serviceId];
+            $taken = $rule['maxPerDay'] !== null && count($bookings) >= $rule['maxPerDay'];
+            $services[$serviceId]['dates'][$date] = [
+                'count'        => count($bookings),
+                'taken'        => $taken,
+                'maxPerDay'    => $rule['maxPerDay'],
+                'blockedTimes' => pdrBlockedStartTimes($rule, $bookings, $slots),
+            ];
+        }
+
+        // A date only reads as "closed" on the landing page when NO service can
+        // still take it. A venue booking no longer hides a date from booths.
+        $allClosed = count($rules) > 0;
+        foreach ($rules as $serviceId => $rule) {
+            $entry = $services[$serviceId]['dates'][$date] ?? null;
+            if ($entry === null) {
+                $allClosed = false;
+                break;
+            }
+            $openSlots = count($slots) - count($entry['blockedTimes'] ?? []);
+            if (empty($entry['taken']) && $openSlots > 0) {
+                $allClosed = false;
+                break;
+            }
+        }
+
+        // Flagship booking is still reported so the calendar can explain the
+        // date ("venue booked — other services available").
+        $hasVenue = false;
+        foreach ($exclusive['ids'] as $exclusiveId) {
+            if (!empty($services[$exclusiveId]['dates'][$date]['taken'])) {
+                $hasVenue = true;
+                break;
+            }
+        }
+
+        $meta[$date] = [
+            'count'    => $total,
+            'hasVenue' => $hasVenue,
+            'taken'    => $allClosed,
+        ];
+        if ($allClosed) {
+            $dates[] = $date;
+        }
     }
 
     // T-24: staff blackouts always win and are reported separately so the UI
@@ -315,30 +642,32 @@ function pdrAvailabilityPayload($pdo, $year, $month) {
     foreach (pdrBlackoutDates($pdo, $year, $month) as $blackoutDate => $reason) {
         $existing = $meta[$blackoutDate] ?? ['count' => 0, 'hasVenue' => false];
         $meta[$blackoutDate] = [
-            'count' => $existing['count'],
-            'hasVenue' => $existing['hasVenue'],
-            'taken' => true,
-            'blackout' => true,
+            'count'          => $existing['count'],
+            'hasVenue'       => $existing['hasVenue'],
+            'taken'          => true,
+            'blackout'       => true,
             'blackoutReason' => $reason,
         ];
         if (!in_array($blackoutDate, $dates, true)) {
             $dates[] = $blackoutDate;
         }
+        foreach ($services as $serviceId => $service) {
+            $services[$serviceId]['dates'][$blackoutDate] = [
+                'count'          => $services[$serviceId]['dates'][$blackoutDate]['count'] ?? 0,
+                'taken'          => true,
+                'maxPerDay'      => $services[$serviceId]['maxPerDay'],
+                'blockedTimes'   => $slots,
+                'blackout'       => true,
+                'blackoutReason' => $reason,
+            ];
+        }
     }
 
-    // --- time-level load (rule 3) ---
-    $stmt = $pdo->prepare(
-        "SELECT event_date, event_time, main_service
-           FROM reservations
-          WHERE status IN ($in)
-            AND YEAR(event_date) = ? AND MONTH(event_date) = ?"
-    );
-    $stmt->execute(array_merge($statuses, [(int)$year, (int)$month]));
-
-    $times = [];
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $times[$r['event_date']][$r['event_time']][] = $r['main_service'];
-    }
-
-    return ['dates' => $dates, 'times' => $times, 'meta' => $meta];
+    return [
+        'dates'     => $dates,
+        'times'     => $times,
+        'meta'      => $meta,
+        'services'  => $services,
+        'timeSlots' => $slots,
+    ];
 }

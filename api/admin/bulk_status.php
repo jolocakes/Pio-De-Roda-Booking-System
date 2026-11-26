@@ -76,7 +76,7 @@ $failed = [];
 
 try {
     $checkStmt = $pdo->prepare(
-        "SELECT status, main_service, event_date, event_time
+        "SELECT status, service_id, main_service, event_date, event_time
            FROM reservations WHERE reservation_id = ?"
     );
     $updStmt = $pdo->prepare("UPDATE reservations SET status = ? WHERE reservation_id = ?");
@@ -97,15 +97,21 @@ try {
 
             // Re-activating obeys the same rules as a single update.
             if (in_array($newStatus, ['Pending', 'Confirmed'], true)) {
-                $dateCheck = pdrDateTaken($pdo, $current['event_date'], $reservationId);
-                if ($dateCheck['taken']) {
-                    $failed[] = ['id' => $reservationId, 'reason' => 'DATE_TAKEN'];
-                    continue;
-                }
-                $takenTimes = pdrTakenTimes($pdo, $current['event_date'], $current['main_service'], $reservationId);
-                if (in_array($current['event_time'], $takenTimes, true)) {
-                    $failed[] = ['id' => $reservationId, 'reason' => 'TIME_TAKEN'];
-                    continue;
+                $serviceId = !empty($current['service_id'])
+                    ? (string) $current['service_id']
+                    : pdrServiceIdByName($pdo, (string) $current['main_service']);
+                if ($serviceId !== null && $serviceId !== '') {
+                    $slotCheck = pdrCheckBookingSlot(
+                        $pdo,
+                        (string) $current['event_date'],
+                        $serviceId,
+                        (string) $current['event_time'],
+                        $reservationId
+                    );
+                    if (!$slotCheck['ok']) {
+                        $failed[] = ['id' => $reservationId, 'reason' => $slotCheck['reason']];
+                        continue;
+                    }
                 }
             }
 

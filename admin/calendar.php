@@ -140,9 +140,10 @@ let fetchSequence = 0;
    AVAILABILITY — the SAME endpoint the customer landing page and the
    booking section use (api/availability.php -> api/capacity.php).
    Reading one shared source is what keeps the admin calendar in sync:
-   max 2 services/day, venue exclusive per date, per-service time slots.
+   per-service daily caps, per-service duration/concurrency, and staff
+   blackouts. A venue booking no longer closes the date for the booths.
    ------------------------------------------------------------------ */
-let avail = { dates: [], times: {}, meta: {}, rules: null };
+let avail = { dates: [], times: {}, meta: {}, services: {}, timeSlots: [], rules: null };
 
 function isAvailTaken(dateStr) {
     return avail.dates.indexOf(dateStr) !== -1;
@@ -153,10 +154,9 @@ function availHint(dateStr) {
     const m = avail.meta[dateStr];
     if (!m) return '';
     if (m.blackout) return 'Closed by staff' + (m.blackoutReason ? ' — ' + m.blackoutReason : '');
-    if (m.hasVenue) return 'Exclusive service booked — date closed';
-    const cap = (avail.rules && avail.rules.maxPerDay) || 2;
-    if (m.count >= cap) return `${m.count} of ${cap} slots used — date closed`;
-    if (m.count > 0) return `${m.count} of ${cap} slots used`;
+    if (m.taken) return 'All services full — date closed';
+    if (m.hasVenue) return 'Venue booked — other services still available';
+    if (m.count > 0) return `${m.count} booking${m.count === 1 ? '' : 's'} on this date`;
     return '';
 }
 
@@ -171,6 +171,8 @@ async function fetchAvailability() {
             dates: data.dates || [],
             times: data.times || {},
             meta: data.meta || {},
+            services: data.services || {},
+            timeSlots: data.timeSlots || [],
             rules: data.rules || null
         };
     } catch (e) {
@@ -276,8 +278,9 @@ function renderCalendar() {
         // capacity endpoint, which only counts Pending and Confirmed bookings.
         const dayEvents = eventsData.filter(e => e.date === dateString);
 
-        // Same rules as the customer calendars: a date is CLOSED when the venue
-        // is booked or the day has hit its service cap. Gray it out + say why.
+        // Same rules as the customer calendars: a date is CLOSED only when
+        // every service is full (or staff blocked it). A venue booking alone
+        // leaves the date open to the booths.
         const taken = isAvailTaken(dateString);
         const hint = availHint(dateString);
 
@@ -398,16 +401,12 @@ function updateSidePanels(dateStr) {
         scheduleCard.innerHTML = detailsHTML;
     }
 
-    // 3. Availability panel — the SAME three rules the customer side enforces:
-    //    max 2 services/day, venue exclusive per date, per-service time slots.
+    // 3. Availability panel — per-service rules, read from the same payload
+    //    the customer side uses. No global "2 per day" cap any more.
     const availCard = document.getElementById('venueAvailabilityCard');
     if (availCard) {
         const meta = avail.meta[dateStr] || { count: 0, hasVenue: false, taken: false };
-        const cap = (avail.rules && avail.rules.maxPerDay) || 2;
-        const exclusiveList = (avail.rules && (avail.rules.exclusiveServices ||
-            (avail.rules.exclusiveService ? [avail.rules.exclusiveService] : []))) || [];
-        const exclusive = exclusiveList.length ? exclusiveList.join(', ') : 'No exclusive service';
-        const closed = isAvailTaken(dateStr);
+        const serviceList = Object.values(avail.services || {});
 
         let html = `
             <div class="panel-section-title">
@@ -416,44 +415,49 @@ function updateSidePanels(dateStr) {
             </div>`;
 
         // Date status
-        if (meta.hasVenue) {
+        if (meta.blackout) {
             html += `
             <div class="availability-card">
                 <div class="venue-name">Date status</div>
-                <div class="venue-status text-booked">Closed — exclusive service booked</div>
-                <div class="time-slot">${exclusive} is exclusive: one booking closes the whole date</div>
+                <div class="venue-status text-booked">Closed by staff${meta.blackoutReason ? ' — ' + escapeHtml(meta.blackoutReason) : ''}</div>
+                <div class="time-slot">No service can be booked on this date</div>
             </div>`;
-        } else if (meta.count >= cap) {
+        } else if (meta.taken) {
             html += `
             <div class="availability-card">
                 <div class="venue-name">Date status</div>
-                <div class="venue-status text-booked">Closed — ${meta.count} of ${cap} slots used</div>
-                <div class="time-slot">No further bookings accepted for this date</div>
+                <div class="venue-status text-booked">Closed — all services full</div>
+                <div class="time-slot">${meta.count} active booking${meta.count === 1 ? '' : 's'} on this date</div>
             </div>`;
         } else {
             html += `
             <div class="availability-card">
                 <div class="venue-name">Date status</div>
                 <div class="venue-status text-available">Open</div>
-                <div class="time-slot">${meta.count} of ${cap} slots used — ${cap - meta.count} remaining</div>
+                <div class="time-slot">${meta.count} active booking${meta.count === 1 ? '' : 's'} on this date${meta.hasVenue ? ' — venue booked, other services still available' : ''}</div>
             </div>`;
         }
 
-        // Slot usage
-        html += `
+        // Per-service capacity
+        serviceList.forEach((svc) => {
+            const entry = (svc.dates && svc.dates[dateStr]) || null;
+            const count = entry ? entry.count : 0;
+            const cap = svc.maxPerDay;
+            const taken = !!(entry && entry.taken);
+            const blocked = (entry && entry.blockedTimes) || [];
+            const duration = svc.durationMinutes ? `${svc.durationMinutes} min` : 'exact start only';
+            const concurrent = svc.maxConcurrent ? ` · up to ${svc.maxConcurrent} at once` : '';
+            const capText = cap === null || cap === undefined
+                ? `${count} booked — no daily cap`
+                : `${count} / ${cap} booked`;
+            html += `
             <div class="availability-card">
-                <div class="venue-name">Daily slots</div>
-                <div class="venue-status ${meta.count >= cap ? 'text-booked' : 'text-available'}">${meta.count} / ${cap} used</div>
-                <div class="time-slot">Maximum ${cap} services per day</div>
+                <div class="venue-name">${escapeHtml(svc.name || 'Service')}</div>
+                <div class="venue-status ${taken ? 'text-booked' : 'text-available'}">${taken ? 'Full' : 'Available'}</div>
+                <div class="time-slot">${capText} · ${duration}${concurrent}</div>
+                ${blocked.length ? `<div class="time-slot">Blocked starts: ${blocked.join(', ')}</div>` : ''}
             </div>`;
-
-        // Venue exclusivity
-        html += `
-            <div class="availability-card">
-                <div class="venue-name">${exclusive}</div>
-                <div class="venue-status ${meta.hasVenue ? 'text-booked' : 'text-available'}">${meta.hasVenue ? 'Booked' : 'Not booked'}</div>
-                <div class="time-slot">${meta.hasVenue ? 'Closes this date for every service' : 'Date remains open to other services'}</div>
-            </div>`;
+        });
 
         // Taken time slots (per-service — a slot blocks only its own service)
         const slots = avail.times[dateStr];

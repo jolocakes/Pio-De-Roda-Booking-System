@@ -266,30 +266,20 @@ try {
     // column is provisioned by database/migrate_services.php; running DDL on
     // every reservation request is slow and fails on MySQL 5.7/8.0.
 
-    // RULE 2 — Venue Rentals is exclusive per DATE. One customer per venue-day.
-    // RULE 1 — a date holds at most PDR_MAX_SERVICES_PER_DAY active bookings.
-    $dateCheck = pdrDateTaken($pdo, $eventDate);
-    if ($dateCheck['taken']) {
+    // Per-service capacity: the booking must fit inside its service's own
+    // duration, daily cap and concurrency limit. One helper so submit agrees
+    // exactly with the calendar and time picker.
+    $slotCheck = pdrCheckBookingSlot($pdo, $eventDate, $serviceId, $eventTime);
+    if (!$slotCheck['ok']) {
         http_response_code(409);
         echo json_encode([
-            'ok'     => false,
-            'reason' => 'DATE_TAKEN',
-            'cause'  => $dateCheck['reason'], // 'VENUE' or 'FULL'
-            'count'  => $dateCheck['count'],
-        ]);
-        exit();
-    }
-
-    // RULE 3 — time slots are blocked PER SERVICE. Another service may share
-    // this time; only the SAME service already holding it blocks it.
-    $takenTimes = pdrTakenTimes($pdo, $eventDate, $mainService);
-    if (in_array($eventTime, $takenTimes, true)) {
-        http_response_code(409);
-        echo json_encode([
-            'ok'     => false,
-            'reason' => 'TIME_TAKEN',
-            'time'   => $eventTime,
-            'service'=> $mainService,
+            'ok'             => false,
+            'reason'         => $slotCheck['reason'], // DATE_TAKEN | TIME_TAKEN
+            'cause'          => $slotCheck['cause'] ?? null,
+            'count'          => $slotCheck['count'] ?? null,
+            'time'           => $slotCheck['time'] ?? $eventTime,
+            'service'        => $slotCheck['service'] ?? $mainService,
+            'blackoutReason' => $slotCheck['blackoutReason'] ?? null,
         ]);
         exit();
     }

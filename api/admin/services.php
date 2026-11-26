@@ -236,6 +236,9 @@ try {
                 'per_head_by_pkg' => (bool)$svc['per_head_by_pkg'],
                 'max_cap' => $svc['max_cap'] === null ? null : (int)$svc['max_cap'],
                 'is_exclusive' => (bool)($svc['is_exclusive'] ?? false),
+                'duration_minutes' => $svc['duration_minutes'] === null ? null : (int)$svc['duration_minutes'],
+                'max_per_day' => $svc['max_per_day'] === null ? null : (int)$svc['max_per_day'],
+                'max_concurrent' => $svc['max_concurrent'] === null ? null : (int)$svc['max_concurrent'],
                 'description' => $svc['description'],
                 'inclusions' => pdrDecodeJsonArray($svc['inclusions'] ?? null),
                 'guidelines' => pdrDecodeJsonArray($svc['guidelines'] ?? null),
@@ -376,6 +379,44 @@ try {
         if (array_key_exists('is_exclusive', $data)) {
             $set[] = 'is_exclusive = ?';
             $params[] = empty($data['is_exclusive']) ? 0 : 1;
+        }
+
+        // Per-service capacity (migration 011). NULL / empty clears the rule:
+        // no duration means "exact start time only", no cap means unlimited.
+        if (array_key_exists('duration_minutes', $data)) {
+            $value = $data['duration_minutes'];
+            if ($value === null || $value === '') {
+                $set[] = 'duration_minutes = NULL';
+            } elseif (!is_numeric($value) || (int)$value < 0 || (int)$value > 1440) {
+                pdrFail('INVALID_DURATION');
+            } else {
+                $set[] = 'duration_minutes = ?';
+                $params[] = (int)$value;
+            }
+        }
+
+        if (array_key_exists('max_per_day', $data)) {
+            $value = $data['max_per_day'];
+            if ($value === null || $value === '') {
+                $set[] = 'max_per_day = NULL';
+            } elseif (!is_numeric($value) || (int)$value < 1) {
+                pdrFail('INVALID_MAX_PER_DAY');
+            } else {
+                $set[] = 'max_per_day = ?';
+                $params[] = (int)$value;
+            }
+        }
+
+        if (array_key_exists('max_concurrent', $data)) {
+            $value = $data['max_concurrent'];
+            if ($value === null || $value === '') {
+                $set[] = 'max_concurrent = NULL';
+            } elseif (!is_numeric($value) || (int)$value < 1) {
+                pdrFail('INVALID_MAX_CONCURRENT');
+            } else {
+                $set[] = 'max_concurrent = ?';
+                $params[] = (int)$value;
+            }
         }
 
         if (array_key_exists('sort_order', $data)) {

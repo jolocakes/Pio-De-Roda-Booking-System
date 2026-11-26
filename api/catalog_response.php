@@ -28,6 +28,14 @@ function pdrBuildCatalogResponse(PDO $pdo): array
     $hasIsActive = (int)$columnCheck->fetchColumn() === 1;
     $columnCheck->execute([$activeDatabase, 'services', 'sort_order']);
     $hasSortOrder = (int)$columnCheck->fetchColumn() === 1;
+    // Per-service capacity (migration 011). Absent on older databases, in which
+    // case every service behaves as "no duration, no caps".
+    $columnCheck->execute([$activeDatabase, 'services', 'duration_minutes']);
+    $hasDuration = (int)$columnCheck->fetchColumn() === 1;
+    $columnCheck->execute([$activeDatabase, 'services', 'max_per_day']);
+    $hasMaxPerDay = (int)$columnCheck->fetchColumn() === 1;
+    $columnCheck->execute([$activeDatabase, 'services', 'max_concurrent']);
+    $hasMaxConcurrent = (int)$columnCheck->fetchColumn() === 1;
     $displayColumn = $hasCustomerDisplay ? ',customer_display' : ',NULL AS customer_display';
     $priceDisplayColumn = $hasPriceDisplay ? ',price_display' : ',NULL AS price_display';
     $perHeadColumn = $hasPerHead ? ',per_head' : ',NULL AS per_head';
@@ -36,9 +44,12 @@ function pdrBuildCatalogResponse(PDO $pdo): array
     $inclusionsColumn = $hasInclusions ? ',inclusions' : ',NULL AS inclusions';
     $guidelinesColumn = $hasGuidelines ? ',guidelines' : ',NULL AS guidelines';
     $sortOrderColumn = $hasSortOrder ? ',sort_order' : ',0 AS sort_order';
+    $durationColumn = $hasDuration ? ',duration_minutes' : ',NULL AS duration_minutes';
+    $maxPerDayColumn = $hasMaxPerDay ? ',max_per_day' : ',NULL AS max_per_day';
+    $maxConcurrentColumn = $hasMaxConcurrent ? ',max_concurrent' : ',NULL AS max_concurrent';
     $whereActive = $hasIsActive ? ' WHERE is_active=1' : '';
     $orderBy = $hasSortOrder ? ' ORDER BY sort_order,id' : ' ORDER BY id';
-    $servicesStmt = $pdo->query("SELECT id,name,category,base_price{$priceDisplayColumn}{$perHeadColumn}{$perHeadByPkgColumn}{$maxCapColumn},description{$inclusionsColumn}{$guidelinesColumn}{$sortOrderColumn}{$displayColumn} FROM services{$whereActive}{$orderBy}");
+    $servicesStmt = $pdo->query("SELECT id,name,category,base_price{$priceDisplayColumn}{$perHeadColumn}{$perHeadByPkgColumn}{$maxCapColumn}{$durationColumn}{$maxPerDayColumn}{$maxConcurrentColumn},description{$inclusionsColumn}{$guidelinesColumn}{$sortOrderColumn}{$displayColumn} FROM services{$whereActive}{$orderBy}");
     $packageCapacityColumn = $hasPackageCapacity ? ',max_cap' : ',NULL AS max_cap';
     $services = [];
     $packageStmt = $pdo->prepare("SELECT package_code,package_name,price,is_active,sort_order{$packageCapacityColumn} FROM service_packages WHERE service_id=? AND is_active=1 ORDER BY sort_order,package_code");
@@ -137,6 +148,9 @@ function pdrBuildCatalogResponse(PDO $pdo): array
             'per_head' => $row['per_head'] === null ? null : (float)$row['per_head'],
             'per_head_by_pkg' => (bool)$row['per_head_by_pkg'],
             'max_cap' => $row['max_cap'] === null ? null : (int)$row['max_cap'],
+            'duration_minutes' => $row['duration_minutes'] === null ? null : (int)$row['duration_minutes'],
+            'max_per_day' => $row['max_per_day'] === null ? null : (int)$row['max_per_day'],
+            'max_concurrent' => $row['max_concurrent'] === null ? null : (int)$row['max_concurrent'],
             'description' => $row['description'], 'inclusions' => $inclusions,
             'guidelines' => $guidelines, 'sort_order' => (int)$row['sort_order'],
             'packages' => $packages, 'menus' => $menus, 'menu' => array_values($menuGroups),
