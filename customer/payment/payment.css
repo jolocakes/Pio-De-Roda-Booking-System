@@ -218,4 +218,10 @@ input[type="number"]:focus {
   h1 {
     font-size: 1.4rem;
   }
+
+  .summary .row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
 }

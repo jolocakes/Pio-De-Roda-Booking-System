@@ -1,62 +1,98 @@
-      (function () {
-        const toggle = document.getElementById("navToggle"),
-          links = document.getElementById("navLinks");
-        if (toggle && links) {
-          toggle.addEventListener("click", () => {
-            const open = links.classList.toggle("open");
-            toggle.classList.toggle("open", open);
-            toggle.setAttribute("aria-expanded", open);
-          });
-          // Homepage menu links jump to sections — close the drawer after a choice.
-          links.addEventListener("click", (e) => {
-            if (e.target.closest("a")) {
-              links.classList.remove("open");
-              toggle.classList.remove("open");
-              toggle.setAttribute("aria-expanded", false);
-            }
-          });
-        }
-        const header = document.getElementById("site-header");
-        if (header) {
-          const onScroll = () =>
-            header.classList.toggle("scrolled", window.scrollY > 10);
-          window.addEventListener("scroll", onScroll);
-          onScroll();
-        }
+(function () {
+  const toggle = document.getElementById("navToggle");
+  const links = document.getElementById("navLinks");
+  const header = document.getElementById("site-header");
+  let overlay = document.querySelector(".nav-overlay");
+  if (!overlay && toggle && links) {
+    overlay = document.createElement("div");
+    overlay.className = "nav-overlay";
+    overlay.hidden = true;
+    document.body.appendChild(overlay);
+  }
 
-        // Scroll-spy: highlight the nav link of whichever section is in view,
-        // so the active item follows the user as they scroll the page.
-        const navAnchors = Array.from(
-          document.querySelectorAll(".nav-link[data-nav]"),
-        );
-        const spySections = navAnchors
-          .map((a) => document.querySelector(a.getAttribute("href")))
-          .filter(Boolean)
-          .sort((a, b) => a.offsetTop - b.offsetTop);
+  const closeMenu = () => {
+    if (!toggle || !links) return;
+    links.classList.remove("open");
+    toggle.classList.remove("open");
+    toggle.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("nav-open");
+    if (overlay) overlay.hidden = true;
+  };
 
-        const runSpy = () => {
-          // Probe line: just past the fixed header, a third into the viewport.
-          const line =
-            window.scrollY +
-            (header ? header.offsetHeight : 0) +
-            window.innerHeight * 0.3;
-          let current = spySections[0];
-          for (const s of spySections) {
-            if (s.offsetTop <= line) current = s;
-          }
-          navAnchors.forEach((a) => {
-            const on = a.getAttribute("href") === "#" + current.id;
-            a.classList.toggle("active-link", on);
-            if (on) a.setAttribute("aria-current", "location");
-            else a.removeAttribute("aria-current");
-          });
-        };
+  const openMenu = () => {
+    if (!toggle || !links) return;
+    links.classList.add("open");
+    toggle.classList.add("open");
+    toggle.setAttribute("aria-expanded", "true");
+    document.body.classList.add("nav-open");
+    if (overlay) overlay.hidden = false;
+  };
 
-        window.addEventListener("scroll", runSpy, { passive: true });
-        window.addEventListener("resize", runSpy);
-        window.addEventListener("hashchange", runSpy);
-        runSpy();
-      })();
+  if (toggle && links) {
+    toggle.addEventListener("click", () => {
+      const open = links.classList.contains("open");
+      if (open) closeMenu();
+      else openMenu();
+    });
+
+    links.addEventListener("click", (e) => {
+      if (e.target.closest("a")) closeMenu();
+    });
+
+    if (overlay) overlay.addEventListener("click", closeMenu);
+
+    document.addEventListener("click", (e) => {
+      if (!links.classList.contains("open")) return;
+      if (links.contains(e.target) || toggle.contains(e.target)) return;
+      closeMenu();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMenu();
+    });
+
+    window.addEventListener("resize", () => {
+      if (window.innerWidth > 680) closeMenu();
+    });
+  }
+
+  if (header) {
+    const onScroll = () => header.classList.toggle("scrolled", window.scrollY > 10);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+
+  // Scroll-spy: highlight the nav link of whichever section is in view.
+  const navAnchors = Array.from(document.querySelectorAll(".nav-link[data-nav]"));
+  const spySections = navAnchors
+    .map((a) => document.querySelector(a.getAttribute("href")))
+    .filter((el) => el && el.id)
+    .sort((a, b) => a.offsetTop - b.offsetTop);
+
+  if (spySections.length && navAnchors.length) {
+    const runSpy = () => {
+      const line =
+        window.scrollY +
+        (header ? header.offsetHeight : 0) +
+        window.innerHeight * 0.3;
+      let current = spySections[0];
+      for (const s of spySections) {
+        if (s.offsetTop <= line) current = s;
+      }
+      navAnchors.forEach((a) => {
+        const on = current && a.getAttribute("href") === "#" + current.id;
+        a.classList.toggle("active-link", on);
+        if (on) a.setAttribute("aria-current", "location");
+        else a.removeAttribute("aria-current");
+      });
+    };
+
+    window.addEventListener("scroll", runSpy, { passive: true });
+    window.addEventListener("resize", runSpy);
+    window.addEventListener("hashchange", runSpy);
+    runSpy();
+  }
+})();
 
       // Contact form: send message via PHP backend (no redirect to email client)
       function handleContactFormSubmit(event) {

@@ -22,8 +22,7 @@
   --radius:14px;
   --font-body:'Work Sans', sans-serif;
   --font-accent:'Fraunces', serif;
-  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
-  box-sizing:border-box;
+  --nav-height:78px;
 }
 * {
   box-sizing:border-box;
@@ -81,20 +80,22 @@ h1,h2,h3,h4 {font-family:var(--font-accent);color:var(--maroon);margin:0 0 .4em;
   grid-template-columns:380px 1fr;
   gap:22px;
   max-width:1180px;
-  margin:22px auto;
+  margin:calc(var(--nav-height, 78px) + 28px) auto 28px;
   padding:0 20px;
 }
 
 @media (max-width:900px) {
   .layout {
     grid-template-columns:1fr;
-  }
-  .layout {
     display:flex;
     flex-direction:column;
+    gap:16px;
   }
   .layout .panel {
     order:2;
+    position:static;
+    max-height:none;
+    overflow:visible;
   }
   .layout .details {
     order:1;
@@ -823,7 +824,7 @@ ul.plain.dot li:before {
   align-items:center;
   justify-content:center;
   padding:16px;
-  z-index:50;
+  z-index:1200;
 }
 
 .modal-bg.open {
@@ -903,6 +904,62 @@ ul.plain.dot li:before {
   from {opacity:0; transform:translateY(4px);}
   to   {opacity:1; transform:none;}
 }
+@media (max-width:680px) {
+  .layout {
+    margin:calc(var(--nav-height, 78px) + 18px) auto 20px;
+    padding:0 14px;
+    gap:14px;
+  }
+  .details,
+  .panel {
+    padding:18px;
+    border-radius:12px;
+  }
+  .venue-img {
+    margin:8px 0 16px;
+  }
+  .price-hero {
+    padding:14px;
+  }
+  .price-hero .amt {
+    font-size:1.35rem;
+  }
+  table.rates td {
+    font-size:.88rem;
+    padding:8px 2px;
+  }
+  .confirm-row {
+    flex-direction:column;
+    gap:2px;
+  }
+  .confirm-row span:last-child {
+    text-align:left;
+  }
+  .modal {
+    padding:18px;
+    max-height:calc(100vh - 24px);
+  }
+  .modal-bg {
+    padding:10px;
+    align-items:flex-end;
+  }
+  .addon,
+  .addon.picking {
+    padding:10px;
+  }
+  .addon-pkg {
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .addon-pkg .amt {
+    text-align:left;
+  }
+  .btn-main,
+  .btn-ghost {
+    font-size:.98rem;
+  }
+}
+
 @media (prefers-reduced-motion:reduce) {
   .addon.fade-in {animation:none;}
 }

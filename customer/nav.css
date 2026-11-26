@@ -15,11 +15,16 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-height) + 16px);
 }
 
 img {
   max-width: 100%;
   display: block;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 /* ---------- Design tokens ---------- */
@@ -60,6 +65,11 @@ body {
   background: var(--cream-soft);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+body.nav-open {
+  overflow: hidden;
 }
 
 h1,
@@ -268,6 +278,13 @@ textarea {
   border: none;
   cursor: pointer;
   z-index: 1100;
+}
+
+.nav-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(42, 14, 14, 0.35);
+  z-index: 999;
 }
 
 .nav-toggle span {
@@ -1232,5 +1249,64 @@ textarea {
 @media (max-width: 680px) {
   .contact-map iframe {
     height: 230px;
+  }
+}
+
+@media (max-width: 520px) {
+  .brand-name {
+    font-size: 0.98rem;
+  }
+
+  .brand-name small {
+    font-size: 0.64rem;
+  }
+
+  .availability-cal {
+    padding: 14px;
+  }
+
+  .availability-cal .cal-grid,
+  .cal-grid {
+    gap: 3px;
+    font-size: 0.85rem;
+  }
+
+  .availability-cal .day,
+  .day {
+    padding: 9px 0;
+  }
+
+  .cal-legend {
+    flex-wrap: wrap;
+    gap: 0.7rem 1rem;
+  }
+
+  .footer-brand {
+    align-self: center;
+    text-align: center;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 400px) {
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .brand-name {
+    font-size: 0.9rem;
+  }
+
+  .brand-name small {
+    display: none;
+  }
+
+  .hero-heading {
+    font-size: 1.85rem;
+  }
+
+  .section-heading {
+    font-size: 1.7rem;
   }
 }

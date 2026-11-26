@@ -20,21 +20,9 @@
     return { res, data };
   }
 
-  function bindNav() {
-    const toggle = $("navToggle"), links = $("navLinks");
-    if (!toggle || !links) return;
-    toggle.addEventListener("click", () => {
-      const open = links.classList.toggle("open");
-      toggle.classList.toggle("open", open);
-      toggle.setAttribute("aria-expanded", open);
-    });
-    const header = $("site-header");
-    const onScroll = () => header && header.classList.toggle("scrolled", window.scrollY > 10);
-    window.addEventListener("scroll", onScroll); onScroll();
-  }
+  // Nav behavior is handled by ../nav.js (shared across customer pages).
 
   async function init() {
-    bindNav();
     const idParam = getParam("id");
     const ctx = getCtx();
     const reservationId = (ctx && ctx.id) || idParam;

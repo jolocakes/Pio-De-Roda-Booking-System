@@ -82,6 +82,9 @@ $balance = $reservation ? max(0, (float) $reservation['estimated_total'] - $paid
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Receipt <?php echo receiptH($reservationId); ?> | Pio De Roda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root { --maroon:#7b1113; --gold:#b8860b; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; }
   * { box-sizing:border-box; }
@@ -105,6 +108,12 @@ $balance = $reservation ? max(0, (float) $reservation['estimated_total'] - $paid
   button.secondary { background:#e5e7eb; color:#374151; }
   .error { max-width:640px; margin:40px auto; background:#fff; border:1px solid #fecaca; color:#991b1b; padding:22px; border-radius:10px; }
   .note { color:var(--muted); font-size:12px; margin-top:24px; }
+  @media (max-width: 680px) {
+    .sheet { margin:16px; padding:22px 18px; }
+    .head { flex-direction:column; align-items:flex-start; }
+    .meta { text-align:left; }
+    .totals { width:100%; }
+  }
   /* Print / Save-as-PDF: the page margin keeps the receipt off the paper
      edge. Without @page the sheet was printed flush against the paper. */
   @page { size: A4 portrait; margin: 15mm 14mm; }

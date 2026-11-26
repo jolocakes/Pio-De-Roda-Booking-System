@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * T-26: Resolve SERVICE_ID from the database catalog.
  *
@@ -40,13 +40,33 @@ try {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="services.css?v=3.3">
+<link rel="stylesheet" href="nav.css?v=5">
+<link rel="stylesheet" href="services.css?v=3.4">
 </head>
 <body data-service-id="<?php echo htmlspecialchars($SERVICE_ID_DB, ENT_QUOTES, 'UTF-8'); ?>">
 
-    <div class="topbar">
-      <div class="brand">Pio De Roda Cafe & Restaurant<small>Non-Coffee Booth Package</small></div>
-      <a class="back" href="nav.html" aria-label="Back to home">← Back to Home</a>
+  <header class="site-header" id="site-header">
+    <nav class="navbar">
+      <a href="nav.html#home" class="brand">
+        <img src="pioderodalogo.jpg" alt="Pio De Roda Cafe and Restaurant logo" class="brand-mark" decoding="async" />
+        <span class="brand-name">Pio De Roda Cafe<small>Restaurant &amp; Catering Services</small></span>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+        <span></span><span></span><span></span>
+      </button>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="nav.html#home" class="nav-link">Home</a></li>
+        <li><a href="nav.html#about" class="nav-link">About Us</a></li>
+        <li><a href="nav.html#availability" class="nav-link">Availability</a></li>
+        <li><a href="nav.html#guide" class="nav-link">Guide</a></li>
+        <li><a href="nav.html#contact" class="nav-link">Contact</a></li>
+        <li><a href="booking-status.html" class="nav-link">Booking Status</a></li>
+      </ul>
+    </nav>
+  </header>
+<a class="back" href="nav.html" aria-label="Back to home">← Back to Home</a>
     </div>
 
     <div class="layout">
@@ -74,6 +94,29 @@ try {
       <div class="modal" id="successBody"></div>
     </div>
     
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <img src="pioderodalogo.jpg" alt="Pio De Roda Cafe and Restaurant logo" class="brand-mark" loading="lazy" decoding="async" />
+        <div>
+          <p class="footer-title">Pio De Roda Cafe</p>
+          <p class="footer-tagline">Catering, celebrations, and events made simple.</p>
+        </div>
+      </div>
+      <ul class="footer-links">
+        <li><a href="nav.html#home">Home</a></li>
+        <li><a href="nav.html#about">About Us</a></li>
+        <li><a href="nav.html#contact">Contact</a></li>
+        <li><a href="nav.html#guide">Guide</a></li>
+        <li><a href="booking-status.html">Booking Status</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="terms.html">Terms of Service</a></li>
+        <li><a href="cancellation.html">Cancellation &amp; Refund Policy</a></li>
+      </ul>
+    </div>
+    <p class="footer-copy">&copy; 2026 Pio De Roda Cafe. All Rights Reserved.</p>
+  </footer>
+    <script src="nav.js?v=1.1"></script>
     <script src="services.js?v=3.5"></script>
 <script src="pdr-dates.js?v=1.0"></script>
 <script src="reservation2.js?v=3.7"></script>

@@ -682,17 +682,7 @@
     });
   }
 
-  function bindNav(){
-    const toggle = document.getElementById("navToggle"), links = document.getElementById("navLinks");
-    toggle.addEventListener("click", ()=>{
-      const open = links.classList.toggle("open");
-      toggle.classList.toggle("open", open);
-      toggle.setAttribute("aria-expanded", open);
-    });
-    const header = document.getElementById("site-header");
-    const onScroll = ()=>header.classList.toggle("scrolled", window.scrollY > 10);
-    window.addEventListener("scroll", onScroll); onScroll();
-  }
+  // Nav behavior is handled by nav.js (shared across customer pages).
 
   function init(){
     // Arriving from the success popup: ?id=PDR-2026-0001 (prefill only —
@@ -700,7 +690,6 @@
     const idParam = new URLSearchParams(location.search).get("id");
     if(idParam) document.getElementById("resId").value = idParam;
 
-    bindNav();
     bindVerify();
     loadBookingStatus();
 

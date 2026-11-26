@@ -6,14 +6,9 @@
   function getCtx() { try { return JSON.parse(sessionStorage.getItem(CTX_KEY) || "null"); } catch (e) { return null; } }
   function qp(n) { return new URLSearchParams(location.search).get(n); }
 
-  function bindNav() {
-    const toggle = $("navToggle"), links = $("navLinks");
-    if (!toggle || !links) return;
-    toggle.addEventListener("click", () => { const open = links.classList.toggle("open"); toggle.classList.toggle("open", open); toggle.setAttribute("aria-expanded", open); });
-  }
+  // Nav behavior is handled by ../nav.js (shared across customer pages).
 
   async function init() {
-    bindNav();
     const result = qp("result");
     const idParam = qp("id");
     const ctx = getCtx();
