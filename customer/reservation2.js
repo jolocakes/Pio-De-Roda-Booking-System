@@ -1747,3 +1747,4 @@ async function initReservationPage() {
 }
 
 initReservationPage();
+tionPage();
