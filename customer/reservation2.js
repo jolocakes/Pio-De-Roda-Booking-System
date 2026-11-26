@@ -161,8 +161,6 @@ function renderDetails() {
     ? s.rates.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")
     : "";
   const hasMenu = Array.isArray(s.menu) && s.menu.length > 0;
-  const hasMainCourses =
-    Array.isArray(s.mainCourses) && s.mainCourses.length > 0;
   const startingPriceText =
     s.price !== null && s.price !== undefined && String(s.price).trim() !== ""
       ? s.price
@@ -174,7 +172,6 @@ function renderDetails() {
     <div class="section-label">RATES</div>
     <table class="rates">${ratesRows}</table>
     ${hasMenu ? renderMenuTable(s) : ""}
-    ${hasMainCourses ? renderMainCourses(s) : ""}
     <div class="section-label">STARTING PRICE</div>
     <div class="price-hero"><div class="amt">${startingPriceText}</div></div>
     <div class="section-label">INCLUSIONS</div>
@@ -313,9 +310,10 @@ function renderMenuTable(s) {
   `;
 }
 
-/* Catering with Menu: main-course picker (minimum 2 selections). Each click
-   re-matches the package in the booking panel — the per-head rate follows the
-   number of choices (2 → ₱1,000, 3 → ₱1,100, 4 → ₱1,300 per head). */
+/* Catering with Menu: main-course picker (minimum 2 selections), rendered in
+   the booking panel's "Selected Food / Package" field. Each click re-matches the
+   package right below it — the per-head rate follows the number of choices
+   (2 → ₱1,000, 3 → ₱1,100, 4 → ₱1,300 per head). */
 function renderMainCourses(s) {
   const n = state.mainCourses.length;
   const rateNote = s.packages
@@ -352,16 +350,11 @@ function toggleMainCourse(name) {
   if (i >= 0) state.mainCourses.splice(i, 1);
   else state.mainCourses.push(name);
   syncMainCoursePackage();
-  renderDetails(); // refresh the ✓ marks and count caption
-  renderPanel(); // refresh the auto-selected package + summary
+  renderDetails(); // keep any menu-table highlight in sync with the derived package
+  renderPanel(); // refresh the ✓ marks, auto-selected package, rate and summary
 }
 
 function attachDetailsEvents() {
-  // Catering: toggling a main course re-matches the package + total.
-  document
-    .querySelectorAll(".mc-opt")
-    .forEach((b) => (b.onclick = () => toggleMainCourse(b.dataset.name)));
-
   document.querySelectorAll(".menu-select").forEach(
     (btn) =>
       (btn.onclick = () => {
@@ -573,15 +566,16 @@ function renderPanel() {
     </div>
     <div class="field">
       <label>Selected Food / Package <span class="req" title="Required">*</span></label>
+      ${s.mainCourses ? renderMainCourses(s) : ""}
       ${s.packages
         .map(
           (p, i) => `
-        <div class="pkg-opt ${state.selectedPackage === i ? "sel" : ""}" data-idx="${i}">
+        <div class="pkg-opt ${s.mainCourses ? "readonly" : ""} ${state.selectedPackage === i ? "sel" : ""}" data-idx="${i}"${s.mainCourses ? ' aria-disabled="true"' : ""}>
           <span class="nm">${p[0]}</span><span>${pkgPerHeadRate(s, p) > 0 ? "₱" + pkgPerHeadRate(s, p).toLocaleString() + " per head" : p[1] === null || p[1] === undefined ? "" : Number.isFinite(Number(p[1])) && Number(p[1]) > 0 ? "₱" + Number(p[1]).toLocaleString() : "Price to be confirmed"}</span>
         </div>`,
         )
         .join("")}
-        <div class="cap">${s.mainCourses ? "Package is set automatically from your Main Course selection (minimum 2)." : "Please select the package according to the number of guests"}</div>
+        <div class="cap">${s.mainCourses ? "Your package and per-head rate update automatically from the main courses you choose (minimum 2)." : "Please select the package according to the number of guests"}</div>
       <div class="err" id="errPkg">Please select a food/package</div>
     </div>
     <div class="field">
@@ -1135,7 +1129,13 @@ function attachPanelEvents() {
       renderAdditionalServices(state.service.id);
   };
 
-  document.querySelectorAll(".pkg-opt").forEach(
+  // Catering: the main-course toggles live in this panel, next to the package
+  // tiers they control. Each click re-derives the package and per-head rate.
+  document
+    .querySelectorAll(".mc-opt")
+    .forEach((b) => (b.onclick = () => toggleMainCourse(b.dataset.name)));
+
+  document.querySelectorAll(".pkg-opt:not(.readonly)").forEach(
     (p) =>
       (p.onclick = () => {
         if (state.service.mainCourses) {

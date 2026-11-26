@@ -102,7 +102,7 @@ function eventH($value): string
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Management - Pio De Roda Cafe</title>
+    <title>Events Management - Pio De Roda Cafe</title>
     <link rel="icon" href="../favicon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -137,8 +137,9 @@ function eventH($value): string
                 <div class="page-title-group">
                     <p>Organize, view, and record all catering and venue event specifications from customer reservations.</p>
                 </div>
-                <div style="font-size: 13px; color: var(--text-muted); background: var(--bg-card, #fff); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
-                    <i class="fa-solid fa-info-circle" style="color: var(--primary);"></i> Events originate automatically from customer reservations.
+                <div class="header-note">
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                    <span>Events originate automatically from customer reservations.</span>
                 </div>
             </div>
 
@@ -171,19 +172,19 @@ function eventH($value): string
             </form>
 
             <!-- T-43: bulk actions for the events table -->
-            <div id="eventBulkBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid var(--border-color);border-radius:8px;padding:10px 14px;margin-bottom:14px;">
-                <strong id="eventBulkCount" style="font-size:13px;color:#4a5568;">0 selected</strong>
-                <button type="button" class="btn-outline-sm" data-event-bulk="Confirmed" title="Approve selected">
+            <div id="eventBulkBar" class="bulk-bar" role="group" aria-label="Bulk event actions">
+                <strong id="eventBulkCount" class="bulk-count">0 selected</strong>
+                <button type="button" class="btn-sm-approve" data-event-bulk="Confirmed" title="Approve selected">
                     <i class="fa-solid fa-check"></i> Approve
                 </button>
-                <button type="button" class="btn-outline-sm" data-event-bulk="Rejected" title="Reject selected">
+                <button type="button" class="btn-sm-reject" data-event-bulk="Rejected" title="Reject selected">
                     <i class="fa-solid fa-xmark"></i> Reject
                 </button>
-                <button type="button" class="btn-outline-sm" data-event-bulk="Cancelled" title="Cancel selected">
+                <button type="button" class="btn-sm-cancel" data-event-bulk="Cancelled" title="Cancel selected">
                     <i class="fa-solid fa-ban"></i> Cancel
                 </button>
-                <button type="button" class="btn-outline-sm" id="eventBulkClear">Clear selection</button>
-                <span id="eventBulkMessage" role="status" aria-live="polite" style="font-size:13px;color:#718096;"></span>
+                <button type="button" class="btn-sm-outline" id="eventBulkClear">Clear selection</button>
+                <span id="eventBulkMessage" role="status" aria-live="polite" class="bulk-message"></span>
             </div>
 
             <!-- Events Table -->
@@ -200,34 +201,34 @@ function eventH($value): string
                             <th>Guests</th>
                             <th>Package</th>
                             <th>Status</th>
-                            <th style="text-align: right;">Actions</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="eventsTableBody">
                         <!-- Rendered dynamically via JavaScript -->
                     </tbody>
                 </table>
-            </div>
 
-            <!-- T-28: pagination -->
-            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:12px 4px 2px;">
-                <span style="font-size:13px;color:#718096;">
-                    Showing <?php echo (int) $eventShownFrom; ?>&ndash;<?php echo (int) $eventShownTo; ?>
-                    of <?php echo (int) $totalRows; ?> event<?php echo $totalRows === 1 ? '' : 's'; ?>
-                </span>
-                <?php if ($totalPages > 1): ?>
-                    <span style="display:flex;gap:6px;align-items:center;font-size:13px;">
-                        <?php if ($page > 1): ?>
-                            <a href="<?php echo eventH($eventPageUrl(1)); ?>" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#4a5568;">&laquo; First</a>
-                            <a href="<?php echo eventH($eventPageUrl($page - 1)); ?>" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#4a5568;">&lsaquo; Prev</a>
-                        <?php endif; ?>
-                        <span style="color:#4a5568;padding:0 6px;">Page <?php echo (int) $page; ?> of <?php echo (int) $totalPages; ?></span>
-                        <?php if ($page < $totalPages): ?>
-                            <a href="<?php echo eventH($eventPageUrl($page + 1)); ?>" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#4a5568;">Next &rsaquo;</a>
-                            <a href="<?php echo eventH($eventPageUrl($totalPages)); ?>" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;text-decoration:none;color:#4a5568;">Last &raquo;</a>
-                        <?php endif; ?>
+                <!-- T-28: pagination -->
+                <div class="table-footer">
+                    <span>
+                        Showing <?php echo (int) $eventShownFrom; ?>&ndash;<?php echo (int) $eventShownTo; ?>
+                        of <?php echo (int) $totalRows; ?> event<?php echo $totalRows === 1 ? '' : 's'; ?>
                     </span>
-                <?php endif; ?>
+                    <div class="pager">
+                        <?php if ($page > 1): ?>
+                            <a class="pager-btn" href="<?php echo eventH($eventPageUrl($page - 1)); ?>">&lsaquo; Prev</a>
+                        <?php else: ?>
+                            <span class="pager-btn is-disabled">&lsaquo; Prev</span>
+                        <?php endif; ?>
+                        <span>Page <?php echo (int) $page; ?> of <?php echo (int) $totalPages; ?></span>
+                        <?php if ($page < $totalPages): ?>
+                            <a class="pager-btn" href="<?php echo eventH($eventPageUrl($page + 1)); ?>">Next &rsaquo;</a>
+                        <?php else: ?>
+                            <span class="pager-btn is-disabled">Next &rsaquo;</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -251,7 +252,7 @@ function eventH($value): string
             <div class="detail-row"><strong>Additional Services:</strong> <span id="v_services"></span></div>
             <div class="detail-row"><strong>Estimated Total:</strong> <span id="v_total"></span></div>
 
-            <div class="modal-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+            <div class="modal-actions">
                 <button type="button" class="btn-cancel" onclick="closeViewModal()">Close</button>
             </div>
         </div>
@@ -354,13 +355,15 @@ function eventH($value): string
                     <td>${guests} pax</td>
                     <td>${escapeHtml(event.selected_package || '—')}</td>
                     <td><span class="status-badge ${statusClass(event.status)}">${escapeHtml(event.status || 'Pending')}</span></td>
-                    <td style="text-align: right;">
-                        <button type="button" class="btn-outline-sm" onclick="viewDetails(${index})">
-                            <i class="fa-solid fa-eye"></i> View
-                        </button>
-                        <button type="button" class="btn-outline-sm" onclick="archiveEvent(${index})" title="Archive event">
-                            <i class="fa-solid fa-box-archive"></i>
-                        </button>
+                    <td>
+                        <div class="action-btns">
+                            <button type="button" class="btn-sm-outline" onclick="viewDetails(${index})" title="View event details" aria-label="View event details">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                            <button type="button" class="btn-sm-outline" onclick="archiveEvent(${index})" title="Archive event" aria-label="Archive event">
+                                <i class="fa-solid fa-box-archive"></i>
+                            </button>
+                        </div>
                     </td>
                 `;
 

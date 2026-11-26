@@ -192,17 +192,14 @@
     }
 
     .content-body {
-        padding: 35px;
+        padding: 30px 35px;
         flex-grow: 1;
-        max-width: var(--max-width);
-        width: 100%;
-        margin: 0 auto;
     }
 
     .page-header-container {
         display: flex;
         justify-content: space-between;
-        align-items: flex-start;
+        align-items: center;
         margin-bottom: 25px;
     }
 
@@ -256,12 +253,12 @@
     }
 
     th {
-        background-color: rgba(91, 8, 8, 0.04);
+        background-color: rgba(184, 134, 46, 0.08);
         color: var(--text-dark);
         padding: 14px 16px;
         font-family: var(--font-display);
         font-weight: 700;
-        border-bottom: 2px solid var(--border-soft);
+        border-bottom: 1px solid var(--border-soft);
         white-space: nowrap;
     }
 
@@ -272,7 +269,7 @@
     }
 
     tr:hover { 
-        background-color: rgba(184, 134, 46, 0.04); 
+        background-color: rgba(246, 236, 221, 0.6); 
     }
 
     .action-btns {
@@ -434,7 +431,7 @@
     .status-badge {
         display: inline-block;
         padding: 4px 10px;
-        border-radius: 999px;
+        border-radius: 12px;
         font-size: 11px;
         font-weight: 600;
         white-space: nowrap;
@@ -460,6 +457,154 @@
         color: #1d4ed8;
     }
 
-    .btn-outline-sm i {
-        margin-right: 4px;
+    .status-rejected {
+        background: rgba(107, 76, 76, 0.15);
+        color: var(--text-muted);
+    }
+
+    /* ---------- Shared list-page controls (matches Payment / Reservations) ---------- */
+    .header-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 340px;
+        padding: 9px 14px;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        background: var(--cream-soft);
+        color: var(--text-muted);
+        font-size: 12.5px;
+        line-height: 1.4;
+    }
+
+    .header-note i {
+        color: var(--gold);
+        flex-shrink: 0;
+    }
+
+    .bulk-bar {
+        display: none;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 14px;
+        padding: 10px 14px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+    }
+
+    .bulk-count {
+        font-size: 13px;
+        color: #4a5568;
+    }
+
+    .bulk-message {
+        font-size: 13px;
+        color: #718096;
+    }
+
+    .btn-sm-outline,
+    .btn-sm-approve,
+    .btn-sm-reject,
+    .btn-sm-cancel {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 6px 11px;
+        border: none;
+        border-radius: 12px;
+        font-size: 11.5px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .btn-sm-outline {
+        background: #eef2f7;
+        color: #374151;
+    }
+
+    .btn-sm-outline:hover {
+        background: #dbe3ee;
+    }
+
+    .btn-sm-approve {
+        background: rgba(95, 111, 82, 0.15);
+        color: var(--sage);
+    }
+
+    .btn-sm-approve:hover {
+        background: var(--sage);
+        color: #fff;
+    }
+
+    .btn-sm-reject {
+        background: rgba(91, 8, 8, 0.10);
+        color: var(--crimson);
+    }
+
+    .btn-sm-reject:hover {
+        background: var(--crimson);
+        color: #fff;
+    }
+
+    .btn-sm-cancel {
+        background: rgba(107, 76, 76, 0.15);
+        color: var(--text-muted);
+    }
+
+    .btn-sm-cancel:hover {
+        background: var(--text-muted);
+        color: #fff;
+    }
+
+    .table-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 16px;
+        font-size: 12.5px;
+        color: var(--text-muted);
+    }
+
+    .pager {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .pager-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 14px;
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        background: var(--cream-soft);
+        color: var(--text-dark);
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background 0.2s;
+    }
+
+    .pager-btn:hover {
+        background: var(--cream);
+    }
+
+    .pager-btn.is-disabled {
+        opacity: 0.45;
+        pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+        .header-note {
+            max-width: 100%;
+        }
     }

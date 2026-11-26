@@ -45,6 +45,12 @@ return [
     'from_name'   => (string) pdrEnv('PDR_MAIL_FROM_NAME', 'Pio De Roda Cafe & Restaurant'),
     'reply_to'    => $replyTo,
 
+    // Domain used in the Message-ID header. It must be a real FQDN that aligns
+    // with the From address, otherwise spam filters see a spoofing signal.
+    // Leave blank to derive it automatically from PDR_MAIL_FROM_EMAIL. Set this
+    // only when you send from a custom domain you own.
+    'message_id_domain' => (string) pdrEnv('PDR_MAIL_MESSAGE_ID_DOMAIN', ''),
+
     // Where un-sent emails are parked as .eml files (viewable/double-clickable).
     'outbox'      => __DIR__ . '/outbox',
 

@@ -276,9 +276,10 @@ table.rates.menu-table tr.menu-row.sel td {
   border-color:var(--sage);
 }
 
-/* Catering with Menu: main-course toggle buttons (minimum 2 selections) */
+/* Catering with Menu: main-course toggle buttons (minimum 2 selections).
+   Rendered inside the booking panel, directly above the derived package tiers. */
 .mc-section {
-  margin-bottom:16px; /* keeps this block clear of the STARTING PRICE section below */
+  margin-bottom:12px;
 }
 
 /* The minimum-2 error lives outside a .field, so it needs the same
@@ -577,6 +578,16 @@ ul.plain.dot li:before {
 .pkg-opt .nm {
   font-family:var(--font-accent);
   font-size:.88rem;
+}
+
+/* Catering: the package tiers are derived from the main-course selection, so
+   they are shown as a read-only summary rather than clickable options. */
+.pkg-opt.readonly {
+  cursor:default;
+}
+
+.pkg-opt.readonly:not(.sel) {
+  opacity:.7;
 }
 
 .addon {

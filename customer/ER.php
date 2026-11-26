@@ -40,7 +40,7 @@ try {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="services.css?v=3.2">
+<link rel="stylesheet" href="services.css?v=3.3">
 </head>
 <body data-service-id="<?php echo htmlspecialchars($SERVICE_ID_DB, ENT_QUOTES, 'UTF-8'); ?>">
 
@@ -76,6 +76,6 @@ try {
     
     <script src="services.js?v=3.4"></script> 
 <script src="pdr-dates.js?v=1.0"></script>
-<script src="reservation2.js?v=3.5"></script>
+<script src="reservation2.js?v=3.6"></script>
 </body>
 </html>

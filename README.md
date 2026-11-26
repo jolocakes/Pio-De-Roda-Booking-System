@@ -111,6 +111,33 @@ That file and `.env` hold live credentials and must never be committed.
 The outbox contains customer PII and booking PINs. Apache denies it over HTTP,
 and its contents are git-ignored.
 
+### Email deliverability (keeping mail out of spam)
+
+Gmail SMTP works, but mail sent from a free `@gmail.com` account is the easiest
+to filter. For production, send from a domain you own and publish the standard
+authentication records:
+
+1. **Use a real sending identity.** Either a custom domain on Google Workspace
+   or a transactional provider (Brevo, Resend, Postmark, Amazon SES). A free
+   Gmail account has no brand reputation and tighter sending limits.
+2. **Publish DNS records** for the sending domain: SPF, DKIM, and a DMARC
+   policy. Start with `v=DMARC1; p=none; rua=mailto:you@your-domain`, then
+   tighten to `p=reject` once legitimate mail is passing.
+3. **Keep the From address aligned.** `PDR_MAIL_FROM_EMAIL` must be the
+   authenticated account or a verified "Send mail as" alias, otherwise Gmail
+   rewrites the sender and DMARC alignment breaks.
+4. **Optionally set `PDR_MAIL_MESSAGE_ID_DOMAIN`** to the domain you send from.
+   The mailer derives it from `PDR_MAIL_FROM_EMAIL` by default, so the
+   Message-ID never points at a fake `.local` domain.
+5. **Send consistently and never buy lists.** Sudden volume spikes and
+   purchased recipients are the fastest way to lose sender reputation.
+6. **Test before launch.** Send a sample to https://www.mail-tester.com and
+   check the SPF/DKIM/DMARC and spam-score report.
+
+The mailer already sends a plain-text alternative, a From-aligned Message-ID,
+and a `List-Unsubscribe` header, and the templates ask customers to add the
+sender to their contacts.
+
 ## Database changes
 
 For an **existing** database, use the migration runner:

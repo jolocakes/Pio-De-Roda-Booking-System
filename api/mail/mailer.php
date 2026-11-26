@@ -88,15 +88,56 @@ function pdrMailHeaders(array $cfg, $toEmail, $subject)
         'To'       => $toEmail,
         'Subject'  => pdrMailEncodePhrase($subject),
         'Date'     => date('r'),
-        'Message-ID' => '<' . uniqid('pdr.', true) . '@pioderoda.local>',
+        // A Message-ID on a real, From-aligned domain. Using ".local" (as this
+        // once did) reads as forged mail to spam filters and hurts deliverability.
+        'Message-ID' => '<' . uniqid('pdr.', true) . '@' . pdrMailDomain($cfg) . '>',
         'MIME-Version' => '1.0',
+        // Transactional mail should never trigger vacation/auto-replies, and
+        // these headers are standard deliverability signals (not bulk markers).
+        'X-Auto-Response-Suppress' => 'All',
+        'Auto-Submitted' => 'auto-generated',
     ];
     // T-63: replies go to the public inbox even when the sending account is a
-    // different mailbox.
+    // different mailbox. A List-Unsubscribe mailto gives Gmail/Outlook a
+    // legitimate opt-out path, which improves sender reputation.
     if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
         $headers['Reply-To'] = $replyTo;
+        $headers['List-Unsubscribe'] = '<mailto:' . $replyTo . '?subject=unsubscribe>';
     }
     return $headers;
+}
+
+/**
+ * Domain used in the Message-ID header. Prefer an explicit override, then the
+ * From address's own domain (keeps SPF/DKIM/DMARC alignment), then a safe FQDN.
+ */
+function pdrMailDomain(array $cfg)
+{
+    $isUsable = function ($d) {
+        if (!is_string($d) || $d === '') {
+            return false;
+        }
+        if (!preg_match('/^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$/', $d)) {
+            return false;
+        }
+        // Reject special-use / non-routable TLDs that spam filters distrust.
+        return !preg_match('/\.(local|localhost|test|invalid|example|lan|internal)$/i', $d);
+    };
+
+    $explicit = trim((string) ($cfg['message_id_domain'] ?? ''));
+    if ($isUsable($explicit)) {
+        return $explicit;
+    }
+
+    $at = strrpos((string) ($cfg['from_email'] ?? ''), '@');
+    if ($at !== false) {
+        $derived = substr($cfg['from_email'], $at + 1);
+        if ($isUsable($derived)) {
+            return $derived;
+        }
+    }
+
+    return 'pioderoda.com';
 }
 
 /**

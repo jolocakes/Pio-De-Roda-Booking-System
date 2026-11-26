@@ -109,7 +109,9 @@ function pdrStatusEmailFor(string $status, array $r): ?array
         . "\n"
         . "— Pio De Roda Cafe and Restaurant\n"
         . "508 De Ocampo St., Indang, Cavite 4122\n"
-        . "(046) 415 0390 / (0926) 684 5833\n";
+        . "(046) 415 0390 / (0926) 684 5833\n"
+        . "\n"
+        . "Tip: add this sender to your contacts so future booking updates reach your inbox.\n";
 
     // ---------- HTML ----------
     $stepsHtml = '';
@@ -170,7 +172,8 @@ function pdrStatusEmailFor(string $status, array $r): ?array
             <td style="background-color:#5B0808;padding:18px 28px;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#E3C9C9;line-height:1.7;">
               Pio De Roda Cafe and Restaurant<br/>
               508 De Ocampo St., Indang, Cavite 4122<br/>
-              (046) 415 0390 / (0926) 684 5833
+              (046) 415 0390 / (0926) 684 5833<br/>
+              <span style="color:#C9A0A0;">Tip: add this sender to your contacts so future booking updates reach your inbox.</span>
             </td>
           </tr>
 
